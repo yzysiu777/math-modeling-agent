@@ -1,0 +1,7 @@
+interface:
+  display_name: "Industrial Math Modeling"
+  short_description: "Evidence-gated competition modeling workflow"
+  default_prompt: "Use $industrial-mathematical-modeling to set up a reproducible, adversarially reviewed math modeling case."
+
+policy:
+  allow_implicit_invocation: true

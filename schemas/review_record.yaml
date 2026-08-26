@@ -1,0 +1,15 @@
+review_id: "REV-YYYYMMDD-0001"
+reviewer_role: "claude_adversary | data_auditor | model_reviewer | reproducibility_reviewer | human"
+mode: "blind | adversarial | reproduction | final"
+target_artifacts: []
+verdict: "PASS | PASS_WITH_LIMITATIONS | BLOCKED | REJECTED"
+findings:
+  - finding_id: "F-001"
+    severity: "P0 | P1 | P2 | P3"
+    statement: ""
+    evidence: []
+    impact: ""
+    recommended_action: ""
+    resolved: false
+unresolved_questions: []
+reviewer_signature: ""

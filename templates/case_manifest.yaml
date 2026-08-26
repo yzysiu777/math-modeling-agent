@@ -1,0 +1,32 @@
+case_id: "2025A-competition"
+problem_title: ""
+problem_type: "clinical_ml | graph_trajectory | dag_scheduling | other"
+language_policy: "zh-human-readable-en-schema"
+owner: ""
+deadline: ""
+objective:
+  user_goal: ""
+  deliverables: []
+  unacceptable_shortcuts: []
+sources:
+  - source_id: "SRC-001"
+    path: "input/"
+    origin: ""
+    authority: "A | B | C | D"
+    sha256: ""
+    readonly: true
+data_contract:
+  entities: []
+  keys: []
+  units: []
+  labels: []
+  train_validation_test_split: ""
+  forbidden_information: []
+acceptance:
+  required_gates: [G0, G1, G2, G3, G4, G5, G6, G7]
+  primary_metrics: []
+  reproducibility_requirement: ""
+roles:
+  lead: "codex"
+  adversary: "claude"
+  final_approver: "human"

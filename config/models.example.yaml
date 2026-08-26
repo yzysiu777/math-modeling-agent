@@ -1,0 +1,25 @@
+# 仅作角色和权限示例，不放 API key、Cookie、账号或真实私密地址。
+lead:
+  platform: "codex"
+  model: "PIN_LOCALLY_FOR_THE_COMPETITION"
+  reasoning_effort: "high_or_max"
+  workspace_write: true
+  default_mode: "plan_then_execute"
+
+adversary:
+  platform: "claude"
+  model: "PIN_LOCALLY_FOR_THE_COMPETITION"
+  workspace_write: "reviews_and_failures_only"
+  initial_visibility: "raw_input_and_contract_only"
+  nonblind_visibility: "explicitly_declared"
+
+deterministic:
+  python: "PIN_ENVIRONMENT_VERSION"
+  statistics: "PIN_ENVIRONMENT_VERSION"
+  graph: "PIN_ENVIRONMENT_VERSION"
+  optimizer: "OPTIONAL_SOLVER_AND_LICENSE"
+
+human:
+  approves_goals: true
+  approves_model_tradeoffs: true
+  signs_final_report: true
