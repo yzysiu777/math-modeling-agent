@@ -7,7 +7,7 @@ metadata:
 
 # Competition Paper Writing
 
-Use this Skill after a model/experiment exists or when a modeling case needs a paper plan from the beginning. It controls content architecture, evidence-calibrated language, figures/tables/equations, citations, AI-use records, and final PDF delivery.
+Use this Skill after a model/experiment exists or when a modeling case needs a paper plan from the beginning. It controls content architecture, evidence-calibrated language, figures/tables/equations, citations, AI-use records, LaTeX collaboration, and final PDF delivery.
 
 ## Required reading
 
@@ -31,13 +31,13 @@ At competition time, also read the current official paper standard document and 
 5. Calibrate wording to evidence; do not turn association into causation or heuristic output into global optimality.
 6. Audit equations, units, figure/table numbering, cross-references, citations, code/source attribution, and AI records.
 7. Run a blind/adversarial review with Claude or a human reviewer.
-8. Export PDF, extract text, inspect metadata, render representative pages, and obtain human sign-off.
+8. Compile the shared `paper/` XeLaTeX project locally and in CI; export PDF, extract text, inspect metadata, render representative pages, and obtain human sign-off.
 9. Compute final hashes and freeze the submitted PDF.
 
 ## Required artifacts
 
 - draft/paper_plan.md
-- draft/paper.md or the official Word/LaTeX source
+- `paper/main.tex` and the section sources, or the current official Word source
 - claim register and experiment cards
 - reviews/paper_adversarial_review.md
 - reviews/citation_review.md

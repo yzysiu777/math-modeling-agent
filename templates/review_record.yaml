@@ -1,0 +1,12 @@
+record_type: review_record
+review_id: REV-YYYYMMDD-0001
+case_id: CASE-YYYYMMDD-0001
+reviewer_role: independent_adversary
+mode: blind
+target_artifacts: []
+input_hashes: []
+verdict: BLOCKED
+findings: []
+unresolved_questions: []
+reviewer_signature: ""
+created_at: "YYYY-MM-DDThh:mm:ss+08:00"

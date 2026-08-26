@@ -1,0 +1,11 @@
+record_type: human_signoff
+signoff_id: SIGN-YYYYMMDD-0001
+case_id: CASE-YYYYMMDD-0001
+signer: ""
+signed_at: "YYYY-MM-DDThh:mm:ss+08:00"
+git_revision: ""
+pdf_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+approved_gates: []
+open_limitations: []
+decision: rejected
+notes: ""

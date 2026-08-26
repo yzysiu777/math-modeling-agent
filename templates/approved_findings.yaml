@@ -1,0 +1,12 @@
+record_type: approved_findings
+approval_id: APR-YYYYMMDD-0001
+case_id: CASE-YYYYMMDD-0001
+review_id: REV-YYYYMMDD-0001
+approver: human_owner
+approved_at: "YYYY-MM-DDThh:mm:ss+08:00"
+finding_ids: [F-001]
+allowed_files: []
+forbidden_files: [input/]
+validation_commands: []
+status: approved
+notes: ""

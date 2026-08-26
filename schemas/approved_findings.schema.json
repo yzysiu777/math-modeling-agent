@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://math-modeling-agent.local/schema/approved_findings.json",
+  "type": "object",
+  "required": ["record_type", "approval_id", "case_id", "review_id", "approver", "approved_at", "finding_ids", "allowed_files", "forbidden_files", "validation_commands", "status"],
+  "properties": {
+    "record_type": {"const": "approved_findings"},
+    "approval_id": {"type": "string"},
+    "case_id": {"type": "string"},
+    "review_id": {"type": "string"},
+    "approver": {"type": "string"},
+    "approved_at": {"type": "string"},
+    "finding_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "allowed_files": {"type": "array", "items": {"type": "string"}},
+    "forbidden_files": {"type": "array", "items": {"type": "string"}},
+    "validation_commands": {"type": "array", "items": {"type": "string"}},
+    "status": {"type": "string", "enum": ["approved", "applied", "rejected", "expired"]},
+    "notes": {"type": "string"}
+  },
+  "additionalProperties": false
+}

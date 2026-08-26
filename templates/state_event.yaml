@@ -1,0 +1,10 @@
+record_type: state_event
+event_id: EVT-YYYYMMDD-0001
+case_id: CASE-YYYYMMDD-0001
+from_state: intake
+to_state: routed
+actor: task_router
+reason: "建立初始路由记录"
+evidence: []
+timestamp: "YYYY-MM-DDThh:mm:ss+08:00"
+supersedes_event_id: null

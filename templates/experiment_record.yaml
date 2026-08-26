@@ -1,0 +1,20 @@
+record_type: experiment_record
+experiment_id: EXP-YYYYMMDD-0001
+case_id: CASE-YYYYMMDD-0001
+question: ""
+objective: ""
+input_manifest_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+code_revision: ""
+environment:
+  os: ""
+  python: ""
+  packages: []
+  solver: ""
+random_seed: null
+command: ""
+parameters: {}
+baseline_or_candidate: baseline
+metrics: {}
+outputs: []
+failure_or_deviation: ""
+review_status: pending

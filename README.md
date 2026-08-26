@@ -1,84 +1,94 @@
-# 华为杯数学建模工业级 Agent 工作台
+# 数学建模 Agent 工作台
 
-这是一个面向中国研究生数学建模竞赛的、可复制的多智能体协作模板。目标不是让两个模型“互相投票”，而是把模型推理、数据验证、复现实验、对抗审查和人工决策分层，形成可追溯的竞赛建模生产线。
+这是一个面向中国研究生数学建模竞赛的通用、可复核协作工作台，服务于三类任务：
 
-## 先看什么
+- 运筹优化：规划、网络、路径、调度、资源分配、多目标、鲁棒与随机优化；
+- 数据分析：数据清洗、统计推断、预测、分类、聚类、时序和可解释性；
+- 混合建模：数据分析产生参数、预测或场景，优化模型完成决策。
 
-1. [RESEARCH_REPORT.md](RESEARCH_REPORT.md)：调研结论、架构判断、支持的 Skills 和三道题的落地路线。
-2. [AGENTS.md](AGENTS.md)：Codex 及其他 coding agent 的长期工作规则。
-3. [CLAUDE.md](CLAUDE.md)：Claude Code 作为独立对抗审查者时的适配规则。
-4. [protocol/workflow.md](protocol/workflow.md)：从题面接收到最终论文的阶段流程。
-5. [protocol/gates.md](protocol/gates.md)：每个阶段的准入、验收和阻断条件。
-6. [skills/industrial-mathematical-modeling/SKILL.md](skills/industrial-mathematical-modeling/SKILL.md)：可复制的项目级 Skill。
+工作台采用“Codex 主解 + Claude 人工触发审核 + 确定性验证器 + 人工最终签字”的结构。模型意见只产生候选和发现，不能替代数据检查、数学推导、程序复现或人的决定。
 
-## 核心判断
+## 快速入口
 
-“Codex 主模型 + Claude 对抗模型”是合理的候选架构，但必须加上第三层：**确定性验证器与人工门禁**。Claude 的不同模型先验可以降低单一模型路径依赖，却不能把“模型不一致”当作真值，也不能代替数据检查、公式推导、求解器结果和复现实验。
+1. 先读 [AGENTS.md](AGENTS.md) 和 [agent.md](agent.md)。
+2. 新建案例时复制 [templates/case_manifest.yaml](templates/case_manifest.yaml)。
+3. 依次阅读 [protocol/workflow.md](protocol/workflow.md) 和 [protocol/gates.md](protocol/gates.md)。
+4. 按路由读取 `skills/industrial-mathematical-modeling/` 下的运筹、数据分析或混合检查清单。
+5. 论文任务先读 [writing/README.md](writing/README.md)，再使用 `paper/` 中的 LaTeX 工程。
+6. 需要 Claude 时，严格按照 [CLAUDE.md](CLAUDE.md) 和 `prompts/claude/` 的“先审后改”协议交接。
 
-建议角色分工：
-
-- Codex：项目协调、资料盘点、代码/实验编排、候选模型实现、结果汇总和论文草稿。
-- Claude：独立建模、反例构造、数据泄漏审查、公式/约束攻击、结果复核；默认只读，不改主方案。
-- Python/统计库/图算法/优化求解器：对数据、公式、约束、指标和结果做可重复的确定性检查。
-- 人：批准目标、确认建模取舍、处理无法自动裁决的争议，并签署最终论文。
-
-## 目录说明
+## 目录结构
 
 ```text
 agent/
-├── README.md                         本文件
-├── RESEARCH_REPORT.md                调研报告
-├── AGENTS.md                         Codex/通用 coding agent 规则
-├── CLAUDE.md                         Claude Code 适配规则
-├── roles/                            权威角色提示词
-│   ├── codex_lead.md
-│   ├── claude_adversary.md
-│   ├── data_auditor.md
-│   ├── model_reviewer.md
-│   ├── reproducibility_reviewer.md
-│   └── final_gatekeeper.md
-├── prompts/                          可直接复制的启动提示词
-├── protocol/                         流程、门禁和升级规则
-├── schemas/                          声明、实验、审查和运行记录字段
-├── templates/                        案例清单、实验卡、审查报告模板
-├── config/                           不含密钥的模型配置示例
-├── skills/
-│   └── industrial-mathematical-modeling/  可携带的 Codex Skill 包
-└── adapters/                         平台适配入口
-    ├── codex/AGENTS.md
-    └── claude/CLAUDE.md
+├── AGENTS.md                         总规则、权限和质量门
+├── agent.md                          Codex 主 Agent 执行协议
+├── CLAUDE.md                         Claude 审核和修订边界
+├── roles/                            与平台无关的权威角色定义
+├── adapters/                         Codex/Claude 平台适配入口
+├── prompts/                          启动、审核和修订提示词
+├── protocol/                         工作流、状态和门禁
+├── schemas/                          JSON Schema 与记录接口
+├── templates/                        案例、实验、审核和签字模板
+├── skills/                           项目级可携带 Skill
+├── scripts/                          路由、Schema、状态和论文检查器
+├── tests/                            不依赖具体历史题目的合成测试
+├── paper/                            可编译的 XeLaTeX 协作工程
+├── writing/                          论文语言、引用、AI 记录和格式规则
+├── audit/                            架构调研和改造决策记录
+└── config/                           不含密钥的模型配置示例
 ```
 
-## 使用方式
-
-把某一道题复制成独立案例工作区，例如：
+## 一次案例的推荐目录
 
 ```text
 case-workspace/
-├── AGENTS.md                 从本目录复制或引用
-├── CLAUDE.md                 需要 Claude Code 时复制
+├── AGENTS.md
+├── CLAUDE.md
 ├── case_manifest.yaml
-├── input/                    原始题面、附件，只读
-├── source/                   论文、官方资料、代码仓库
+├── input/                    原始题面和附件，只读；默认不进入公共 Git
+├── source/                   公开资料、文献、代码来源和哈希
 ├── data_dictionary/         字段、单位、标签和数据契约
-├── artifacts/                模型、图表、表格、推导和中间结论
-├── runs/                     每次实验的命令、环境、日志和结果
-├── reviews/                  Claude/其他审查者的审查记录
-├── failures/                 失败尝试、反例和废弃路线
-└── final/                    经过门禁的论文和答辩材料
+├── artifacts/               问题契约、模型、图表、表格和结论
+├── runs/                    实验命令、环境、日志和结果摘要
+├── reviews/                 Claude、人工和复现审查报告
+├── failures/                失败尝试、反例和废弃路线
+└── final/                   经过门禁的论文源文件和交接记录
 ```
 
-原则上不要把三道题混在同一个运行状态里。每道题要有独立的 `case_manifest.yaml`、原始数据哈希、运行日志和结论登记表。
+原始输入不能被覆盖；案例中的大数据和私有审核包默认通过 `.gitignore` 排除，只有经过人工确认的清单、哈希、源代码、实验摘要和论文源文件进入 Git。
+
+## Codex、Claude 与人工的分工
+
+| 参与者 | 默认职责 | 禁止事项 |
+|---|---|---|
+| Codex | 题意重构、路由、baseline、模型、代码、实验、论文初稿 | 把未验证结果写成定论；自行关闭高风险审核 |
+| Claude | 盲审、数据/模型/复现/论文对抗审查、批准后的修订提案 | 直接改 `main`；自审自批；以一致性替代证据 |
+| 确定性工具 | Schema、数据质量、约束、指标、复现、PDF 检查 | 以启发式输出冒充证明 |
+| 人工队员 | 批准目标、选择模型、确认修订、签署最终交付 | 将模型输出直接视作事实 |
+
+## Git 与论文协作
+
+- `main` 保存可交付版本；`model/<任务>`、`analysis/<任务>`、`paper/<章节>` 和 `review/<编号>` 是默认工作分支。
+- PR 必须通过结构检查、合成测试和 LaTeX CI；高风险发现未关闭时禁止合并。
+- `paper/main.tex` 只做装配，正文分散在 `paper/sections/`；引用统一维护在 `paper/bibliography/references.bib`。
+- `make paper` 编译本地版本，`make paper-ci` 编译 CI 预览，`make qa` 执行静态检查。
+- CI 使用可携带字体完成编译；正式投稿必须以当届官方模板、规则和比赛日字体预检为准。
 
 ## 当前版本边界
 
-- 这是提示词、流程和目录模板，不是已经接通 Codex API、Claude API 或求解器的自动编排平台。
-- `config/models.example.yaml` 不含任何密钥；真正的模型名、账户、预算和 API 地址应在本地私有配置中填写。
-- 2025 A 可能包含较大 CSV 和较重调度实验，先做小算例和确定性 baseline，再扩大规模。
-- 任何“通过”都必须有证据记录；没有运行记录的模型只能标记为“候选”或“未验证”。
+本仓库提供流程、提示词、接口、检查器和论文工程模板，不自动调用 Codex 或 Claude API。模型名称、账号、预算、数据路径和密钥必须保存在本地私有配置中，不能提交到 Git。
 
-## 论文写作与交付
+当前 `writing/official/2025/` 中的文件只是历史格式快照。比赛日必须重新获取当届官方论文标准和 AI 使用规定，并在 `paper/official/<year>/manifest.yaml` 中记录来源、日期和哈希。
 
-论文不作为最后一步的语言润色。请先读 writing/README.md，它包含官方模板快照、论文结构、国奖语言的证据化写法、图表公式规范、AI 合规记录和最终 PDF 门禁。
+## 验收入口
 
-论文专项 Skill 位于 skills/competition-paper-writing/，负责官方模板版本冻结、正文结构、语言证据化、引用/AI 审计和最终 PDF 验收。
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+PYTHON=.venv/bin/python make validate test
+make paper-ci
+make qa
+```
+
+所有检查通过仍不替代人工最终签字；交接时必须报告证据、限制、失败路线和未验证项。

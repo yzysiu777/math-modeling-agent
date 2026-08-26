@@ -1,0 +1,17 @@
+record_type: official_paper_profile
+year: 2026
+active: false
+status: pending_official_paper_standard
+sources:
+  - name: "2026年第二十三届参赛通知"
+    url: "https://www.cmathc.org.cn/mcm/tz/465.html"
+    local_reference: null
+    sha256: null
+required_before_activation:
+  - "当届竞赛论文标准文档"
+  - "当届论文模板/封面/统一摘要页"
+  - "当届AI工具及输出使用规定"
+  - "当届提交操作手册和文件命名规则"
+notes:
+  - "参赛通知已要求使用《竞赛论文标准文档》；本清单不把历史格式推断为2026官方细则。"
+  - "下载并核验原始附件后，补充本文件的文件大小、下载日期和SHA-256。"

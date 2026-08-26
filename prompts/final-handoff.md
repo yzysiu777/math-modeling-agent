@@ -1,5 +1,5 @@
 # 交接给下一轮 Agent 的提示词
 
-请先读取当前案例的 `AGENTS.md`、`case_manifest.yaml`、`artifacts/claim_register.md`、`protocol/gates.md`、最近一次运行记录、所有未解决审查和 `failures/`。
+请先读取当前案例的 `AGENTS.md`、`case_manifest.yaml`、问题契约、claim register、最近运行记录、所有未解决审核、`failures/`、论文状态和 `protocol/gates.md`。
 
-先报告：当前 Gate、已通过项、未验证项、P0/P1 阻塞项、最近一次可信结果和下一步建议。不要从聊天记忆中补造历史结论；以工作区工件和文件证据为准。若发现结论与工件冲突，先暂停定稿并建立新的审查记录。
+先报告当前状态：路由、Gate、已支持结论、证据位置、未验证项、P0/P1 阻塞项、最近一次可信运行、最近一次审核、论文格式状态、AI 使用记录状态和下一步。不要从聊天记忆补造结论；以工作区工件、哈希和 Git 提交为准。发现结论与工件冲突时，先建立新的审查记录并暂停定稿。

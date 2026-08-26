@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://math-modeling-agent.local/schema/claim_record.json",
+  "type": "object",
+  "required": ["record_type", "claim_id", "case_id", "statement", "claim_type", "status", "importance", "provenance", "uncertainty", "last_changed_by", "last_changed_at"],
+  "properties": {
+    "record_type": {"const": "claim_record"},
+    "claim_id": {"type": "string"},
+    "case_id": {"type": "string"},
+    "statement": {"type": "string", "minLength": 1},
+    "claim_type": {"type": "string", "enum": ["data", "definition", "assumption", "derivation", "algorithm", "feasibility", "optimality", "prediction", "interpretation", "result"]},
+    "status": {"type": "string", "enum": ["draft", "supported", "supported_with_limits", "disputed", "rejected", "unverified"]},
+    "importance": {"type": "string", "enum": ["P0", "P1", "P2", "P3"]},
+    "provenance": {"type": "array", "items": {"type": "object", "required": ["kind", "locator"], "properties": {"kind": {"type": "string", "enum": ["user", "problem_statement", "raw_data", "source_paper", "code", "computation", "reviewer", "manual"]}, "locator": {"type": "string"}, "note": {"type": "string"}}, "additionalProperties": false}},
+    "assumptions": {"type": "array", "items": {"type": "string"}},
+    "tests": {"type": "array", "items": {"type": "string"}},
+    "experiments": {"type": "array", "items": {"type": "string"}},
+    "review_ids": {"type": "array", "items": {"type": "string"}},
+    "uncertainty": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "last_changed_by": {"type": "string"},
+    "last_changed_at": {"type": "string"}
+  },
+  "additionalProperties": false
+}

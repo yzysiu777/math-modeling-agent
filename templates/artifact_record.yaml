@@ -1,0 +1,10 @@
+record_type: artifact_record
+artifact_id: ART-YYYYMMDD-0001
+case_id: CASE-YYYYMMDD-0001
+path: artifacts/problem_contract.md
+kind: contract
+sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+created_by: solution_lead
+status: draft
+parents: []
+sensitivity: team

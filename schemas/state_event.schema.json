@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://math-modeling-agent.local/schema/state_event.json",
+  "type": "object",
+  "required": ["record_type", "event_id", "case_id", "from_state", "to_state", "actor", "reason", "evidence", "timestamp"],
+  "properties": {
+    "record_type": {"const": "state_event"},
+    "event_id": {"type": "string"},
+    "case_id": {"type": "string"},
+    "from_state": {"type": "string", "enum": ["intake", "routed", "frozen", "contracted", "baseline_ready", "model_ready", "validated", "reviewed", "revision_approved", "reproduced", "paper_ready", "pdf_qa_passed", "human_frozen"]},
+    "to_state": {"type": "string", "enum": ["intake", "routed", "frozen", "contracted", "baseline_ready", "model_ready", "validated", "reviewed", "revision_approved", "reproduced", "paper_ready", "pdf_qa_passed", "human_frozen"]},
+    "actor": {"type": "string"},
+    "reason": {"type": "string", "minLength": 1},
+    "evidence": {"type": "array", "items": {"type": "string"}},
+    "timestamp": {"type": "string"},
+    "supersedes_event_id": {"type": ["string", "null"]}
+  },
+  "additionalProperties": false
+}

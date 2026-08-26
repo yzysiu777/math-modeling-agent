@@ -1,32 +1,28 @@
-case_id: "2025A-competition"
-problem_title: ""
-problem_type: "clinical_ml | graph_trajectory | dag_scheduling | other"
-language_policy: "zh-human-readable-en-schema"
-owner: ""
-deadline: ""
+record_type: project_manifest
+case_id: "CASE-YYYYMMDD-0001"
+title: "通用数学建模案例模板"
+language_policy: zh-human-readable-en-schema
+route: insufficient_information
+owner:
+  name: ""
+  role: human_owner
+deadline: null
 objective:
   user_goal: ""
   deliverables: []
   unacceptable_shortcuts: []
 sources:
-  - source_id: "SRC-001"
-    path: "input/"
+  - source_id: SRC-001
+    path: input/
     origin: ""
-    authority: "A | B | C | D"
-    sha256: ""
+    authority: A
+    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
     readonly: true
-data_contract:
-  entities: []
-  keys: []
-  units: []
-  labels: []
-  train_validation_test_split: ""
-  forbidden_information: []
 acceptance:
-  required_gates: [G0, G1, G2, G3, G4, G5, G6, G7]
+  required_gates: [G0, G1, G2, G3, G4, G5, G6, G7, G8, G9, G10, G11, G12, G13]
   primary_metrics: []
-  reproducibility_requirement: ""
+  reproducibility_requirement: "另一位成员可按记录复跑关键结果"
 roles:
-  lead: "codex"
-  adversary: "claude"
-  final_approver: "human"
+  lead: codex
+  adversary: claude
+  final_approver: human

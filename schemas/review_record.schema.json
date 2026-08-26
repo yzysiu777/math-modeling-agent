@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://math-modeling-agent.local/schema/review_record.json",
+  "type": "object",
+  "required": ["record_type", "review_id", "case_id", "reviewer_role", "mode", "target_artifacts", "verdict", "findings", "unresolved_questions", "reviewer_signature", "created_at"],
+  "properties": {
+    "record_type": {"const": "review_record"},
+    "review_id": {"type": "string"},
+    "case_id": {"type": "string"},
+    "reviewer_role": {"type": "string", "enum": ["independent_adversary", "data_auditor", "optimization_modeler", "data_analyst", "reproducibility_engineer", "formatting_qa", "human"]},
+    "mode": {"type": "string", "enum": ["blind", "adversarial", "reproduction", "paper", "final"]},
+    "target_artifacts": {"type": "array", "items": {"type": "string"}},
+    "input_hashes": {"type": "array", "items": {"type": "string"}},
+    "verdict": {"type": "string", "enum": ["PASS", "PASS_WITH_LIMITATIONS", "BLOCKED", "REJECTED"]},
+    "findings": {"type": "array", "items": {"type": "object", "required": ["finding_id", "severity", "statement", "evidence", "impact", "recommended_action", "resolved"], "properties": {"finding_id": {"type": "string"}, "severity": {"type": "string", "enum": ["P0", "P1", "P2", "P3"]}, "statement": {"type": "string"}, "evidence": {"type": "array", "items": {"type": "string"}}, "impact": {"type": "string"}, "recommended_action": {"type": "string"}, "resolved": {"type": "boolean"}, "resolved_by": {"type": ["string", "null"]}}, "additionalProperties": false}},
+    "unresolved_questions": {"type": "array", "items": {"type": "string"}},
+    "reviewer_signature": {"type": "string"},
+    "created_at": {"type": "string"}
+  },
+  "additionalProperties": false
+}

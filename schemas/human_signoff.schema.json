@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://math-modeling-agent.local/schema/human_signoff.json",
+  "type": "object",
+  "required": ["record_type", "signoff_id", "case_id", "signer", "signed_at", "git_revision", "pdf_sha256", "approved_gates", "open_limitations", "decision"],
+  "properties": {
+    "record_type": {"const": "human_signoff"},
+    "signoff_id": {"type": "string"},
+    "case_id": {"type": "string"},
+    "signer": {"type": "string"},
+    "signed_at": {"type": "string"},
+    "git_revision": {"type": "string"},
+    "pdf_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+    "approved_gates": {"type": "array", "items": {"type": "string"}},
+    "open_limitations": {"type": "array", "items": {"type": "string"}},
+    "decision": {"type": "string", "enum": ["approved", "approved_with_limits", "rejected"]},
+    "notes": {"type": "string"}
+  },
+  "additionalProperties": false
+}
