@@ -70,6 +70,33 @@ def validate_human_signoff(
         errors.append("signoff actor does not match transition actor")
     if signoff.get("signer_id") != signoff.get("actor"):
         errors.append("signer_id must match actor")
+    manifest_relative = _safe_relative(signoff.get("project_manifest_path"))
+    if manifest_relative is None:
+        errors.append("project_manifest_path must be a safe relative path")
+    elif not isinstance(signoff.get("project_manifest_sha256"), str) or not HEX64.fullmatch(signoff["project_manifest_sha256"]):
+        errors.append("project_manifest_sha256 is invalid")
+    elif workspace is None:
+        errors.append("workspace is required to verify the frozen project manifest")
+    else:
+        manifest_file = (workspace / manifest_relative).resolve()
+        try:
+            manifest_file.relative_to(workspace.resolve())
+        except ValueError:
+            errors.append("project_manifest_path escapes workspace")
+        else:
+            if not manifest_file.is_file():
+                errors.append(f"project manifest does not exist: {manifest_relative}")
+            elif sha256_file(manifest_file).lower() != signoff["project_manifest_sha256"].lower():
+                errors.append("project manifest hash does not match signoff")
+            else:
+                try:
+                    file_manifest = load_record(manifest_file)
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(f"project manifest cannot be parsed: {exc}")
+                else:
+                    if manifest is not None and manifest != file_manifest:
+                        errors.append("provided project manifest does not match the hashed manifest file")
+                    manifest = file_manifest
     if manifest is None:
         errors.append("G12 requires the frozen project manifest identity registry")
     else:
@@ -88,8 +115,13 @@ def validate_human_signoff(
         except ValueError:
             errors.append("signed_at must be an ISO-8601 timestamp")
     resolved_revision = current_revision
-    if resolved_revision is None and workspace is not None:
-        resolved_revision = resolve_head_revision(workspace)
+    if workspace is not None:
+        head_revision = resolve_head_revision(workspace)
+        if not head_revision:
+            errors.append("current Git revision is required and must be resolved from HEAD")
+        elif current_revision is not None and current_revision != head_revision:
+            errors.append("supplied current revision does not match HEAD")
+        resolved_revision = head_revision
     if not resolved_revision:
         errors.append("current Git revision is required and must be resolved from HEAD")
     elif signoff.get("git_revision") != resolved_revision:
@@ -111,22 +143,6 @@ def validate_human_signoff(
     for field in ("review_scope", "checked_items", "not_checked_items", "expertise_limitations"):
         if not isinstance(signoff.get(field), list) or not signoff[field]:
             errors.append(f"{field} must be non-empty")
-    manifest_relative = _safe_relative(signoff.get("project_manifest_path"))
-    if manifest_relative is None:
-        errors.append("project_manifest_path must be a safe relative path")
-    elif not isinstance(signoff.get("project_manifest_sha256"), str) or not HEX64.fullmatch(signoff["project_manifest_sha256"]):
-        errors.append("project_manifest_sha256 is invalid")
-    elif workspace is not None:
-        manifest_file = (workspace / manifest_relative).resolve()
-        try:
-            manifest_file.relative_to(workspace.resolve())
-        except ValueError:
-            errors.append("project_manifest_path escapes workspace")
-        else:
-            if not manifest_file.is_file():
-                errors.append(f"project manifest does not exist: {manifest_relative}")
-            elif sha256_file(manifest_file).lower() != signoff["project_manifest_sha256"].lower():
-                errors.append("project manifest hash does not match signoff")
     relative = _safe_relative(signoff.get("pdf_path"))
     if relative is None:
         errors.append("pdf_path must be a safe relative path")

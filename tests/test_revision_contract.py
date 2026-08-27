@@ -324,6 +324,9 @@ class RevisionContractTests(unittest.TestCase):
                 "status": "approved",
             }
             self.assertEqual(validate_revision_closure(impact, validation, approval, workspace=workspace), [])
+            approval["modified_by"] = "another-modifier"
+            self.assertTrue(any("modified_by" in error for error in validate_revision_closure(impact, validation, approval, workspace=workspace)))
+            approval["modified_by"] = impact["modified_by"]
             approval["base_git_revision"] = "c" * 40
             self.assertTrue(any("approval and impact disagree on base_git_revision" in error for error in validate_revision_closure(impact, validation, approval, workspace=workspace)))
         finally:

@@ -190,7 +190,7 @@ def _validate_approval_identity(
         "approval_id", "case_id", "review_id", "revision_id", "base_git_revision", "new_git_revision",
         "change_level", "change_surfaces", "finding_ids", "required_review_nodes", "review_bindings",
         "candidate_submission_pdf", "candidate_pdf_path", "candidate_pdf_sha256", "affected_gates", "gate_impact",
-        "executor_id", "project_manifest_path", "project_manifest_sha256",
+        "executor_id", "modified_by", "project_manifest_path", "project_manifest_sha256",
     )
     for field in identity_fields:
         impact_value = impact.get("source_review_id") if field == "review_id" else impact.get(field)

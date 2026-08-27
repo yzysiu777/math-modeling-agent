@@ -1,4 +1,5 @@
 import hashlib
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,11 +19,17 @@ class HumanSignoffTests(unittest.TestCase):
             "identity_allowlist:\n  - id: owner-1\n    role: human_owner\n",
             encoding="utf-8",
         )
+        subprocess.run(["git", "init", "-q"], cwd=workspace, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=workspace, check=True)
+        subprocess.run(["git", "config", "user.name", "MMAG Test"], cwd=workspace, check=True)
+        subprocess.run(["git", "add", "manifest.yaml", "paper/main.pdf"], cwd=workspace, check=True)
+        subprocess.run(["git", "commit", "-qm", "test fixture"], cwd=workspace, check=True)
+        head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=workspace, text=True).strip()
         return {
             "record_type": "human_signoff", "signoff_id": "SIGN-1", "case_id": "CASE-1",
             "signer": "owner", "signer_id": "owner-1", "signer_role": "human_owner", "actor": "owner-1",
             "project_manifest_path": "manifest.yaml", "project_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
-            "signed_at": "2026-08-27T00:00:00+00:00", "git_revision": "a" * 40,
+            "signed_at": "2026-08-27T00:00:00+00:00", "git_revision": head,
             "pdf_path": "paper/main.pdf", "pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
             "approved_gates": [f"G{i}" for i in range(13)], "review_scope": ["all"],
             "checked_items": ["pdf"], "not_checked_items": ["none"], "expertise_limitations": ["none"],
@@ -33,7 +40,7 @@ class HumanSignoffTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             workspace = Path(temp)
             signoff = self.make_signoff(workspace)
-            self.assertEqual(validate_human_signoff(signoff, actor="owner-1", current_revision="a" * 40, workspace=workspace, manifest={
+            self.assertEqual(validate_human_signoff(signoff, actor="owner-1", current_revision=signoff["git_revision"], workspace=workspace, manifest={
                 "record_type": "project_manifest", "case_id": "CASE-1",
                 "owner": {"name": "owner", "owner_id": "owner-1", "role": "human_owner"},
                 "identity_allowlist": [{"id": "owner-1", "role": "human_owner"}],
@@ -45,7 +52,7 @@ class HumanSignoffTests(unittest.TestCase):
             signoff = self.make_signoff(workspace)
             signoff["pdf_sha256"] = "0" * 64
             signoff["unresolved_findings"] = [{"finding_id": "P1-F-1", "severity": "P1", "statement": "open"}]
-            errors = validate_human_signoff(signoff, actor="owner-1", current_revision="a" * 40, workspace=workspace, manifest={
+            errors = validate_human_signoff(signoff, actor="owner-1", current_revision=signoff["git_revision"], workspace=workspace, manifest={
                 "record_type": "project_manifest", "case_id": "CASE-1",
                 "owner": {"name": "owner", "owner_id": "owner-1", "role": "human_owner"},
                 "identity_allowlist": [{"id": "owner-1", "role": "human_owner"}],
@@ -57,12 +64,23 @@ class HumanSignoffTests(unittest.TestCase):
             workspace = Path(temp)
             signoff = self.make_signoff(workspace)
             signoff["signer_id"] = signoff["actor"] = "codex-agent"
-            errors = validate_human_signoff(signoff, actor="codex-agent", current_revision="a" * 40, workspace=workspace, manifest={
+            errors = validate_human_signoff(signoff, actor="codex-agent", current_revision=signoff["git_revision"], workspace=workspace, manifest={
                 "record_type": "project_manifest", "case_id": "CASE-1",
                 "owner": {"name": "owner", "owner_id": "owner-1", "role": "human_owner"},
                 "identity_allowlist": [{"id": "owner-1", "role": "human_owner"}],
             })
             self.assertTrue(any("frozen project owner" in error or "registered human identity" in error for error in errors))
+
+    def test_supplied_revision_cannot_override_head(self):
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp)
+            signoff = self.make_signoff(workspace)
+            errors = validate_human_signoff(signoff, actor="owner-1", current_revision="a" * 40, workspace=workspace, manifest={
+                "record_type": "project_manifest", "case_id": "CASE-1",
+                "owner": {"name": "owner", "owner_id": "owner-1", "role": "human_owner"},
+                "identity_allowlist": [{"id": "owner-1", "role": "human_owner"}],
+            })
+            self.assertTrue(any("does not match HEAD" in error for error in errors))
 
 
 if __name__ == "__main__":

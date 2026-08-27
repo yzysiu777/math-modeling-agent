@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import hashlib
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,7 +13,7 @@ from scripts.gate_contract import required_checks_for
 from test_revision_contract import build_records
 
 
-def signoff_for(workspace: Path, revision: str = "a" * 40):
+def signoff_for(workspace: Path, revision: str | None = None):
     pdf = workspace / "paper/build/main.pdf"
     pdf.parent.mkdir(parents=True)
     pdf.write_bytes(b"valid pdf fixture")
@@ -21,6 +24,12 @@ def signoff_for(workspace: Path, revision: str = "a" * 40):
         "identity_allowlist:\n  - id: human-owner\n    role: human_owner\n",
         encoding="utf-8",
     )
+    subprocess.run(["git", "init", "-q"], cwd=workspace, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=workspace, check=True)
+    subprocess.run(["git", "config", "user.name", "MMAG Test"], cwd=workspace, check=True)
+    subprocess.run(["git", "add", "manifest.yaml", "paper/build/main.pdf"], cwd=workspace, check=True)
+    subprocess.run(["git", "commit", "-qm", "test fixture"], cwd=workspace, check=True)
+    revision = revision or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=workspace, text=True).strip()
     return {
         "record_type": "human_signoff",
         "signoff_id": "SIGN-1",
@@ -65,7 +74,7 @@ class StateMachineTests(unittest.TestCase):
             signoff = signoff_for(workspace)
             ok, _ = validate_transition(
                 "pdf_qa_passed", "human_frozen", actor="human-owner", evidence=["signoff.yml"],
-                signoff=signoff, workspace=workspace, current_revision="a" * 40,
+                signoff=signoff, workspace=workspace, current_revision=signoff["git_revision"],
                 project_manifest={
                     "record_type": "project_manifest", "case_id": "CASE-1",
                     "owner": {"name": "owner", "owner_id": "human-owner", "role": "human_owner"},
