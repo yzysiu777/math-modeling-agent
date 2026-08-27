@@ -4,7 +4,7 @@ case_id: CASE-YYYYMMDD-0001
 question: ""
 objective: ""
 input_manifest_hash: "0000000000000000000000000000000000000000000000000000000000000000"
-code_revision: ""
+code_revision: "0000000000000000000000000000000000000000"
 environment:
   os: ""
   python: ""
@@ -15,6 +15,9 @@ command: ""
 parameters: {}
 baseline_or_candidate: baseline
 metrics: {}
-outputs: []
+outputs:
+  - artifact_id: ART-YYYYMMDD-0001
+    path: artifacts/example-output.json
+    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
 failure_or_deviation: ""
 review_status: pending

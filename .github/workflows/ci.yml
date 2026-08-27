@@ -31,8 +31,14 @@ jobs:
       - name: Run synthetic tests
         run: python3 -m unittest discover -s tests -v
 
+      - name: Compile Python contracts
+        run: python3 -m py_compile scripts/*.py tests/*.py
+
       - name: Compile LaTeX CI profile
         run: make paper-ci
+
+      - name: Run paper QA after build
+        run: make qa
 
       - name: Upload preview PDF
         uses: actions/upload-artifact@v4

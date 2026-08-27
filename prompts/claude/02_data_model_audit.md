@@ -20,12 +20,24 @@
 ```yaml
 critical_node: C2
 review_mode: challenge
+reviewer_id: "人工填写稳定审核者 ID"
 review_lens: [alternative_formulation, implementation_consistency, invariant_counterexample]
-primary_method_family: "Codex 当前方法族"
-alternative_method_family: "独立替代方法族"
-methodological_difference: "为何不是同一路线的复述"
+primary_method_family: mixed_integer_programming
+alternative_method_family: constraint_programming
+methodological_difference:
+  axis: feasibility
+  primary_assumption: "Codex 当前方法的核心假设"
+  alternative_assumption: "替代方法族关注的不同可行性/分解假设"
+  discriminating_test: "最小不可行或极端实例"
 critical_decisions_reviewed: []
-disconfirming_tests: []
+disconfirming_tests:
+  - test_id: C2-TEST-001
+    target: "公式—代码一致性"
+    input_or_case: "可手算小实例"
+    expected_falsifier: "约束违反、目标复算不一致或替代假设更合理"
+    actual_result: "待填写实际结果"
+    evidence: ["代码、实验日志或推导位置"]
+    status: planned
 counterexamples: []
 what_was_checked: []
 what_was_not_checked: []

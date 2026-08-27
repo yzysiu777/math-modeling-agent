@@ -15,6 +15,7 @@
     "objective": {"type": "object", "required": ["user_goal", "deliverables", "unacceptable_shortcuts"], "properties": {"user_goal": {"type": "string"}, "deliverables": {"type": "array", "items": {"type": "string"}}, "unacceptable_shortcuts": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false},
     "sources": {"type": "array", "items": {"type": "object", "required": ["source_id", "path", "origin", "authority", "sha256", "readonly"], "properties": {"source_id": {"type": "string"}, "path": {"type": "string"}, "origin": {"type": "string"}, "authority": {"type": "string", "enum": ["A", "B", "C", "D"]}, "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}, "readonly": {"type": "boolean"}}, "additionalProperties": false}},
     "acceptance": {"type": "object", "required": ["required_gates", "primary_metrics", "reproducibility_requirement"], "properties": {"required_gates": {"type": "array", "items": {"type": "string", "pattern": "^G([0-9]|1[0-2])$"}}, "primary_metrics": {"type": "array", "items": {"type": "string"}}, "reproducibility_requirement": {"type": "string"}}, "additionalProperties": false},
+    "coordination": {"type": "object", "required": ["path", "contract"], "properties": {"path": {"type": "string"}, "contract": {"type": "string"}}, "additionalProperties": false},
     "roles": {"type": "object", "properties": {"lead": {"type": "string"}, "adversary": {"type": "string"}, "final_approver": {"const": "human"}}, "additionalProperties": false}
   },
   "additionalProperties": false

@@ -1,31 +1,27 @@
-"""Fail-closed checks for the single competition state machine.
-
-The main path is linear. A change after a passed gate enters the explicit
-revision loop and can return only after the recorded targeted checks pass.
-"""
+"""Fail-closed checks for the single competition state machine."""
 
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 try:  # import works as a package and as ``python scripts/check_transition.py``
+    from .check_evidence_graph import load_record
+    from .check_human_signoff import validate_human_signoff
     from .gate_contract import (
         CHANGE_LEVELS,
+        CHANGE_SURFACES,
         MAIN_TRANSITIONS,
         REVISION_TRANSITIONS,
         SAFE_CHECK_IDS,
         STATES,
+        required_checks_for,
         validate_revision_scope,
     )
 except ImportError:  # pragma: no cover
-    from gate_contract import (
-        CHANGE_LEVELS,
-        MAIN_TRANSITIONS,
-        REVISION_TRANSITIONS,
-        SAFE_CHECK_IDS,
-        STATES,
-        validate_revision_scope,
-    )
+    from check_evidence_graph import load_record
+    from check_human_signoff import validate_human_signoff
+    from gate_contract import CHANGE_LEVELS, CHANGE_SURFACES, MAIN_TRANSITIONS, REVISION_TRANSITIONS, SAFE_CHECK_IDS, STATES, required_checks_for, validate_revision_scope
 
 
 def _revision_transition_allowed(from_state: str, to_state: str) -> bool:
@@ -43,11 +39,17 @@ def validate_transition(
     evidence: list[str] | tuple[str, ...] = (),
     author: str | None = None,
     change_level: str | None = None,
+    change_surfaces: list[str] | tuple[str, ...] = (),
     affected_gates: list[str] | tuple[str, ...] = (),
+    gate_impact: str | None = None,
     required_checks: list[str] | tuple[str, ...] = (),
     validation_status: str | None = None,
+    signoff: dict | None = None,
+    workspace=None,
+    current_revision: str | None = None,
+    unresolved_high_risk: list[str] | tuple[str, ...] = (),
 ) -> tuple[bool, str]:
-    """Validate one state event; caller must persist the event separately."""
+    """Validate one state event; the caller persists the event separately."""
 
     if from_state not in STATES or to_state not in STATES:
         return False, "unknown state"
@@ -59,8 +61,23 @@ def validate_transition(
         return False, "transition requires evidence"
     if to_state == "reviewed" and author and actor == author:
         return False, "review author cannot approve its own review"
-    if to_state == "human_frozen" and actor not in {"human", "human_owner"}:
-        return False, "human_frozen requires human_owner"
+    if to_state == "human_frozen":
+        signoff_role = signoff.get("signer_role") if isinstance(signoff, dict) else None
+        actor_is_human = actor in {"human", "human_owner"} or (
+            signoff is not None and signoff.get("actor") == actor and signoff_role in {"human", "human_owner"}
+        )
+        if not actor_is_human:
+            return False, "human_frozen requires human_owner"
+        if signoff is None:
+            return False, "human_frozen requires a validated human_signoff record"
+        signoff_errors = validate_human_signoff(
+            signoff,
+            actor=actor,
+            current_revision=current_revision,
+            workspace=workspace,
+        )
+        if signoff_errors:
+            return False, "invalid human signoff: " + "; ".join(signoff_errors)
 
     revision_edge = (from_state, to_state)
     if revision_edge == ("gate_passed", "revision_pending"):
@@ -69,6 +86,8 @@ def validate_transition(
     elif revision_edge == ("revision_pending", "impact_classified"):
         if change_level not in CHANGE_LEVELS:
             return False, "impact_classified requires R0, R1, R2, or R3"
+        if change_surfaces and any(surface not in CHANGE_SURFACES for surface in change_surfaces):
+            return False, "impact_classified contains an unknown change surface"
     elif revision_edge == ("impact_classified", "targeted_validation"):
         if change_level not in CHANGE_LEVELS:
             return False, "targeted_validation requires a change level"
@@ -92,14 +111,27 @@ def validate_transition(
     elif revision_edge == ("validation_passed", "restore_affected_gate"):
         if change_level not in CHANGE_LEVELS:
             return False, "restore_affected_gate requires a change level"
-        if not affected_gates:
-            return False, "restore_affected_gate requires affected gates"
-        scope_ok, scope_message = validate_revision_scope(change_level, affected_gates)
+        if change_level == "R0":
+            if affected_gates:
+                return False, "R0 restore must keep affected_gates empty"
+            if gate_impact != "no_gate_impact" or not any("no_gate_impact" in item for item in evidence):
+                return False, "R0 restore requires explicit no_gate_impact evidence"
+        else:
+            if not affected_gates:
+                return False, "non-R0 restore requires affected gates"
+        scope_ok, scope_message = validate_revision_scope(
+            change_level,
+            affected_gates,
+            change_surfaces=change_surfaces,
+            gate_impact=gate_impact,
+        )
         if not scope_ok:
             return False, scope_message
     elif revision_edge == ("restore_affected_gate", "gate_passed"):
         if not any("restore" in item.lower() or "regression" in item.lower() for item in evidence):
             return False, "restored gate requires restoration or regression evidence"
+        if unresolved_high_risk:
+            return False, "cannot restore a gate with unresolved P0/P1 findings"
     return True, "ok"
 
 
@@ -111,10 +143,17 @@ def main() -> int:
     parser.add_argument("--evidence", action="append", default=[])
     parser.add_argument("--author")
     parser.add_argument("--change-level", choices=CHANGE_LEVELS)
+    parser.add_argument("--change-surface", action="append", default=[], choices=sorted(CHANGE_SURFACES))
     parser.add_argument("--affected-gate", action="append", default=[])
+    parser.add_argument("--gate-impact", choices=["no_gate_impact", "affected"])
     parser.add_argument("--required-check", action="append", default=[])
     parser.add_argument("--validation-status", choices=["passed", "failed"])
+    parser.add_argument("--signoff", type=argparse.FileType("r"))
+    parser.add_argument("--workspace")
+    parser.add_argument("--current-revision")
+    parser.add_argument("--unresolved-high-risk", action="append", default=[])
     args = parser.parse_args()
+    signoff = load_record(Path(args.signoff.name)) if args.signoff else None
     ok, message = validate_transition(
         args.from_state,
         args.to_state,
@@ -122,9 +161,15 @@ def main() -> int:
         evidence=args.evidence,
         author=args.author,
         change_level=args.change_level,
+        change_surfaces=args.change_surface,
         affected_gates=args.affected_gate,
+        gate_impact=args.gate_impact,
         required_checks=args.required_check,
         validation_status=args.validation_status,
+        signoff=signoff,
+        workspace=Path(args.workspace).resolve() if args.workspace else None,
+        current_revision=args.current_revision,
+        unresolved_high_risk=args.unresolved_high_risk,
     )
     print(message)
     return 0 if ok else 1

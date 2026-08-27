@@ -20,12 +20,24 @@
 ```yaml
 critical_node: C1
 review_mode: blind
+reviewer_id: "人工填写稳定审核者 ID"
 review_lens: [semantic_constraint_audit, invariant_counterexample]
-primary_method_family: "题面要求/主解拟采用的方法族；未知则写未知"
-alternative_method_family: "独立的替代解释或方法族"
-methodological_difference: "两种视角如何不同"
+primary_method_family: unknown
+alternative_method_family: other
+methodological_difference:
+  axis: invariant
+  primary_assumption: "题面中可直接确认的约束和对象"
+  alternative_assumption: "不依赖主解的边界解释或不变量"
+  discriminating_test: "一个能区分两种解释的最小反例"
 critical_decisions_reviewed: []
-disconfirming_tests: []
+disconfirming_tests:
+  - test_id: C1-TEST-001
+    target: "待审目标或约束"
+    input_or_case: "题面中的最小实例"
+    expected_falsifier: "什么结果会证明当前理解错误"
+    actual_result: "待填写实际观察"
+    evidence: ["审核包内文件或行号"]
+    status: planned
 counterexamples: []
 what_was_checked: []
 what_was_not_checked: []

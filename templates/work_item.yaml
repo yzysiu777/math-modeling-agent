@@ -1,0 +1,26 @@
+record_type: work_item
+work_item_id: WI-YYYYMMDD-0001
+case_id: CASE-YYYYMMDD-0001
+source_git_revision: "0000000"
+objective: "待填写一个可验收的协作目标"
+scope: ["待填写允许执行的工作"]
+non_goals: ["不修改题目输入", "不改变未授权章节"]
+allowed_files: [cases/CASE-YYYYMMDD-0001/coordination/]
+affected_claims: []
+affected_experiments: []
+affected_gates: []
+required_checks: [file_allowlist, basic_markdown_latex_syntax]
+change_level: R0
+change_surfaces: [text_only]
+required_review_nodes: []
+executor_id: executor-luna
+reviewer_id: reviewer-codex
+write_owner_id: executor-luna
+result_git_revision: null
+test_evidence: []
+status: proposed
+unresolved_items: []
+revision_id: REVISION-YYYYMMDD-0001
+report_path: cases/CASE-YYYYMMDD-0001/coordination/executor-report.md
+human_decisions_required: []
+notes: "工作项只属于案例 coordination/，不承载控制面开发记录。"

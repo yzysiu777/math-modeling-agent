@@ -26,31 +26,33 @@ def _normalize_relative(raw: str) -> str:
     return str(path)
 
 
-def changed_files(base_ref: str, head_ref: str = "HEAD") -> list[str]:
+def changed_files(base_ref: str, head_ref: str = "HEAD", *, workspace: Path | None = None) -> list[str]:
     result = subprocess.run(
         ["git", "diff", "--name-only", f"{base_ref}...{head_ref}"],
         text=True,
         capture_output=True,
         check=False,
+        cwd=str(workspace) if workspace else None,
     )
     if result.returncode:
         raise RuntimeError(result.stderr.strip() or "git diff failed")
     return [_normalize_relative(line) for line in result.stdout.splitlines() if line]
 
 
-def git_file_sha256(ref: str, relative: str) -> str | None:
+def git_file_sha256(ref: str, relative: str, *, workspace: Path | None = None) -> str | None:
     result = subprocess.run(
         ["git", "show", f"{ref}:{relative}"],
         capture_output=True,
         check=False,
+        cwd=str(workspace) if workspace else None,
     )
     if result.returncode:
         return None
     return hashlib.sha256(result.stdout).hexdigest()
 
 
-def git_revision(ref: str) -> str | None:
-    result = subprocess.run(["git", "rev-parse", ref], text=True, capture_output=True, check=False)
+def git_revision(ref: str, *, workspace: Path | None = None) -> str | None:
+    result = subprocess.run(["git", "rev-parse", ref], text=True, capture_output=True, check=False, cwd=str(workspace) if workspace else None)
     if result.returncode:
         return None
     return result.stdout.strip()
@@ -62,6 +64,7 @@ def validate_revision_boundary(
     *,
     base_ref: str = "main",
     head_ref: str = "HEAD",
+    workspace: Path | None = None,
 ) -> list[str]:
     errors: list[str] = []
     if approval.get("record_type") != "approved_findings":
@@ -83,16 +86,16 @@ def validate_revision_boundary(
         errors.append("validation_check_ids cannot be empty")
 
     recorded_base = impact.get("base_git_revision")
-    actual_base = git_revision(base_ref)
+    actual_base = git_revision(base_ref, workspace=workspace)
     if recorded_base and actual_base and recorded_base != actual_base:
         errors.append("base_git_revision does not match base_ref")
     recorded_head = impact.get("new_git_revision")
-    actual_head = git_revision(head_ref)
+    actual_head = git_revision(head_ref, workspace=workspace)
     if recorded_head and actual_head and recorded_head != actual_head:
         errors.append("new_git_revision does not match head_ref")
 
     try:
-        actual = changed_files(base_ref, head_ref)
+        actual = changed_files(base_ref, head_ref, workspace=workspace)
     except Exception as exc:  # noqa: BLE001
         return errors + [str(exc)]
     recorded = [_normalize_relative(item) for item in (impact.get("changed_files") or [])]
@@ -103,11 +106,11 @@ def validate_revision_boundary(
     for path in actual:
         if path in forbidden or any(path.startswith(item.rstrip("/") + "/") for item in forbidden):
             errors.append(f"forbidden file changed: {path}")
-        if path not in allowed:
+        if path not in allowed and not any(path.startswith(item.rstrip("/") + "/") for item in allowed):
             errors.append(f"file outside non-empty allowlist changed: {path}")
 
-        before = git_file_sha256(base_ref, path)
-        after = git_file_sha256(head_ref, path)
+        before = git_file_sha256(base_ref, path, workspace=workspace)
+        after = git_file_sha256(head_ref, path, workspace=workspace)
         before_hashes = impact.get("before_hashes") or {}
         after_hashes = impact.get("after_hashes") or {}
         if path not in before_hashes:
@@ -130,13 +133,15 @@ def main() -> int:
     parser.add_argument("--validation-record", type=Path, required=True)
     parser.add_argument("--base-ref", default="main")
     parser.add_argument("--head-ref", default="HEAD")
+    parser.add_argument("--workspace", type=Path, required=True)
     args = parser.parse_args()
     try:
         approval = load_yaml(args.approved_findings)
         impact = load_yaml(args.change_record)
         validation = load_yaml(args.validation_record)
         boundary_errors = validate_revision_boundary(
-            approval, impact, base_ref=args.base_ref, head_ref=args.head_ref
+            approval, impact, base_ref=args.base_ref, head_ref=args.head_ref,
+            workspace=args.workspace.resolve() if args.workspace else None,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"FAIL {exc}", file=sys.stderr)
@@ -146,7 +151,15 @@ def main() -> int:
         print("\n".join(f"- {error}" for error in boundary_errors))
         return 1
     print("PASS modification boundary")
-    closure_errors = validate_revision_closure(impact, validation, approval)
+    closure_errors = validate_revision_closure(
+        impact,
+        validation,
+        approval,
+        workspace=args.workspace.resolve() if args.workspace else None,
+        base_ref=args.base_ref,
+        head_ref=args.head_ref,
+        verify_git=bool(args.workspace),
+    )
     if closure_errors:
         print("FAIL targeted validation closure")
         print("\n".join(f"- {error}" for error in closure_errors))

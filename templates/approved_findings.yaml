@@ -4,10 +4,21 @@ case_id: CASE-YYYYMMDD-0001
 review_id: REV-YYYYMMDD-0001
 approver: human_owner
 approved_at: "YYYY-MM-DDThh:mm:ss+08:00"
+expires_at: null
 finding_ids: [F-001]
+revision_id: REVISION-YYYYMMDD-0001
+base_git_revision: "待填写"
+new_git_revision: "待填写"
 change_level: R1
-allowed_files: []
+change_surfaces: [paper_claim]
+affected_gates: [G9, G10, G11]
+gate_impact: affected
+allowed_files: [paper/sections/example.tex]
 forbidden_files: [input/]
 validation_check_ids: [file_allowlist, latex_compile]
-status: approved
+required_review_nodes: [C3]
+candidate_submission_pdf: false
+candidate_pdf_path: null
+candidate_pdf_sha256: null
+status: draft
 notes: ""

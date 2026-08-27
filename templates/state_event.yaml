@@ -10,6 +10,8 @@ timestamp: "YYYY-MM-DDThh:mm:ss+08:00"
 supersedes_event_id: null
 revision_id: null
 change_level: null
+change_surfaces: []
 affected_gates: []
+gate_impact: null
 required_checks: []
 validation_status: null

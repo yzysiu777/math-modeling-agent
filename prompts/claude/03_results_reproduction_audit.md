@@ -20,12 +20,24 @@ register、论文片段和必要代码；不要求全量重跑全部实验，也
 ```yaml
 critical_node: C3
 review_mode: results
+reviewer_id: "人工填写稳定审核者 ID"
 review_lens: [evidence_claim_audit, implementation_consistency, invariant_counterexample]
-primary_method_family: "Codex 当前结果生成方法"
-alternative_method_family: "独立复算/证据审计方法"
-methodological_difference: "局部复算、证据审计或反例与主流程的差异"
+primary_method_family: simulation_optimization
+alternative_method_family: other
+methodological_difference:
+  axis: evidence_audit
+  primary_assumption: "主结果依赖的实验设计与指标定义"
+  alternative_assumption: "独立复算只接受哈希绑定且主动寻找反例"
+  discriminating_test: "对一个强结论做局部复算并尝试证伪"
 critical_decisions_reviewed: []
-disconfirming_tests: []
+disconfirming_tests:
+  - test_id: C3-TEST-001
+    target: "论文强结论"
+    input_or_case: "对应实验记录和输出"
+    expected_falsifier: "数字、输入哈希、代码版本或约束复算不一致"
+    actual_result: "待填写实际结果"
+    evidence: ["实验记录、输出哈希和论文定位"]
+    status: planned
 counterexamples: []
 what_was_checked: []
 what_was_not_checked: []

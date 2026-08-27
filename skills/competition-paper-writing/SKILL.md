@@ -34,6 +34,11 @@ At competition time, also read the current official paper standard document and 
 8. Compile the shared `paper/` XeLaTeX project locally and in CI; export PDF, extract text, inspect metadata, render representative pages, and obtain human sign-off.
 9. Compute final hashes and freeze the submitted PDF.
 
+Every numeric or strong paper claim must pass the evidence-graph binding. If a paper
+or candidate PDF changes after a Gate, declare `paper_claim` or `candidate_pdf` and
+use the trusted runner's fixed checks; visual review remains `manual_required` until
+an independent reviewer or human supplies evidence.
+
 ## Required artifacts
 
 - draft/paper_plan.md

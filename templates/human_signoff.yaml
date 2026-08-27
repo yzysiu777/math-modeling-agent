@@ -1,15 +1,20 @@
 record_type: human_signoff
 signoff_id: SIGN-YYYYMMDD-0001
 case_id: CASE-YYYYMMDD-0001
-signer: ""
+signer: "human owner (填写)"
+signer_id: human-owner
+signer_role: human_owner
+actor: human-owner
 signed_at: "YYYY-MM-DDThh:mm:ss+08:00"
-git_revision: ""
+git_revision: "0000000"
+pdf_path: paper/build/main.pdf
 pdf_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-approved_gates: []
+approved_gates: [G0, G1, G2, G3, G4, G5, G6, G7, G8, G9, G10, G11, G12]
 review_scope: ["待填写审核范围"]
 checked_items: ["待填写已检查项"]
 not_checked_items: ["待填写未检查项"]
 expertise_limitations: ["待填写能力边界"]
 open_limitations: []
+unresolved_findings: []
 decision: rejected
 notes: ""

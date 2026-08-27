@@ -25,6 +25,11 @@ Use canonical roles under `roles/`: `solution_lead`, `optimization_modeler`, `da
 6. Require deterministic evidence, independent reproduction or explicit human approval for important claims.
 7. Mark uncertainty and missing provenance; never silently fill gaps.
 8. Do not run unknown executables or mutate raw inputs.
+9. For post-Gate changes, declare a semantic change surface; filenames alone do not
+   choose R0–R3. Use `run_trusted_check.py` for fixed checks and keep
+   `manual_required` checks explicitly human-owned.
+10. Bind important claims through the evidence graph and use a single-writer
+    `work_item` under `cases/<case_id>/coordination/` for team handoffs.
 
 ## Route-specific emphasis
 
@@ -54,9 +59,9 @@ disconfirming test or counterexample is invalid.
 
 `problem_contract.md`, data dictionary/contract, input hash manifest, routing record,
 experiment records, claim register, review records, failure log, decision log,
-`change_impact_record`, `revision_validation_record`, `human_review_card` and final
-handoff. For papers, add claim/evidence map, citation audit, AI-use record and final
-PDF QA.
+`change_impact_record`, `revision_validation_record`, `human_review_card`, `work_item`
+and final handoff. For papers, add claim/evidence map, citation audit, AI-use record,
+candidate PDF path/hash and final PDF QA.
 
 ## Failure conditions
 

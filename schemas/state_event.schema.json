@@ -16,7 +16,9 @@
     "supersedes_event_id": {"type": ["string", "null"]},
     "revision_id": {"type": ["string", "null"]},
     "change_level": {"type": ["string", "null"], "enum": ["R0", "R1", "R2", "R3", null]},
+    "change_surfaces": {"type": "array", "items": {"type": "string", "enum": ["text_only", "paper_claim", "code_only", "experiment_logic", "data_contract", "model_formula", "objective_constraint", "candidate_pdf"]}},
     "affected_gates": {"type": "array", "items": {"type": "string", "pattern": "^G([0-9]|1[0-2])$"}},
+    "gate_impact": {"type": ["string", "null"], "enum": ["no_gate_impact", "affected", null]},
     "required_checks": {"type": "array", "items": {"type": "string"}},
     "validation_status": {"type": ["string", "null"], "enum": ["pending", "passed", "failed", null]}
   },

@@ -79,7 +79,9 @@ Gate 编号和状态以 `protocol/gates.md`、`protocol/workflow.md`、
 -> targeted_validation -> validation_passed|validation_failed -> restore_affected_gate`
 循环。R0–R3 只重跑受影响的检查，不得以形式签字替代退出证据。
 
-P0/P1 问题未解决时停止向论文定稿推进。修改模型、数据、标签、目标、约束、求解器、随机种子或论文强结论后，必须创建新版本和新实验记录。
+P0/P1 问题未解决时停止向论文定稿推进。修改模型、数据、标签、目标、约束、求解器、随机种子或论文强结论后，必须创建新版本和新实验记录。G8 的闭环只接受可信运行器生成的结构化 `check_results`；缺失日志、日志哈希、输出哈希或运行器身份时 fail closed。证据图校验必须贯穿 G9、R1、R2、R3。
+
+案例协作只在 `cases/<case_id>/coordination/` 记录工作项、审核和证据；一个工作项只有一个写入者，执行者不能担任该项 reviewer。`accepted` 不等于 `human_frozen`，G12 必须验证人类签字人、时间、当前 Git revision、最终 PDF 路径/哈希、完整 G0–G12 和无 P0/P1。
 
 ## 论文规则
 

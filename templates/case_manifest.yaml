@@ -26,3 +26,6 @@ roles:
   lead: codex
   adversary: claude
   final_approver: human
+coordination:
+  path: coordination/
+  contract: protocol/team-collaboration.md

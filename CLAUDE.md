@@ -51,8 +51,13 @@ Claude 只输出 `review_record` 和审核报告，按 P0–P3 标记证据、�
 人工把允许处理的 finding、变更级别、文件白名单和安全检查 ID 写入
 `approved_findings`。Claude 只能输出 `proposed.patch` 或逐文件替换内容；
 不得执行或生成可被自动解释为授权的任意 shell 命令，不得修改白名单之外
-的文件。Codex 应用后按 R0–R3 计划定向验证，原审核者不能关闭自己的
-P0/P1。
+的文件。Codex 应用后按声明的变更表面和 R0–R3 计划定向验证；审核者、
+修改者和 P0/P1 关闭者必须通过稳定 ID 区分，原审核者不能关闭自己的 P0/P1。
+
+可信运行器只接受固定 check ID，并保存命令结果的时间戳、stdout/stderr 哈希、
+输出哈希和运行器版本。Claude 不能把 `manual_required` 改写为 `passed`，也不能
+伪造 `revision_validation_record`。候选 PDF、证据图和 G12 signoff 均由确定性
+检查器加人工完成。
 
 ## 输出最低格式
 

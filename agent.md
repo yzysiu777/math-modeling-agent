@@ -37,13 +37,20 @@
 任何通过 Gate 后的变更先用 `scripts/classify_change.py` 分类，再用
 `scripts/plan_targeted_validation.py` 生成安全检查 ID。使用
 `change_impact_record` 和 `revision_validation_record` 保存前后哈希、受影响
-工件、退出码和输出哈希；禁止从 YAML 自动执行任意命令。
+工件、可信运行器日志、退出码和输出哈希；只使用 `scripts/run_trusted_check.py`
+中的固定命令映射，禁止从 YAML 自动执行任意命令。每个修订声明语义变更表面，
+不能只根据文件名猜测 R0–R3；证据图必须把输入、代码、实验、输出、图表、claim
+和论文位置连起来。
+
+案例级团队协作使用 `protocol/team-collaboration.md` 和 `work_item`，只允许
+单一写入者，执行者与 reviewer 身份必须不同。工作项 `accepted` 不得自动推进
+到 `human_frozen`。
 
 ## 论文规则
 
 论文开始前读取 `writing/` 全部规则和当届官方文件。先建立“问题—模型—实验—图表—结论—引用”映射，再写正文。严格区分关联/因果、可行/最优、单次/稳定和模型重要性/实际影响。
 
-LaTeX 使用 `paper/` 工程、XeLaTeX、`biber` 和统一 `.bib`。正式 PDF 必须经过静态检查、编译检查、文本/元数据检查、渲染检查和人工签字；历史模板不能替代比赛日官方模板。
+LaTeX 使用 `paper/` 工程、XeLaTeX、`biber` 和统一 `.bib`。正式 PDF 必须经过静态检查、编译检查、文本/元数据检查、渲染检查和人工签字；候选 PDF 必须登记路径和 SHA-256，任何字节变化都重新跑 PDF 检查；历史模板不能替代比赛日官方模板。
 
 ## 固定输出
 

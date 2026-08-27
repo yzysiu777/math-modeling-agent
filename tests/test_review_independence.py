@@ -5,20 +5,44 @@ from scripts.check_review_independence import validate_review_record
 
 def valid_review(**overrides):
     record = {
+        "record_type": "review_record",
+        "review_id": "REV-TEST-001",
+        "case_id": "CASE-TEST-001",
+        "reviewer_role": "independent_adversary",
+        "reviewer_id": "claude-reviewer-1",
         "critical_node": "C2",
         "review_mode": "challenge",
         "review_lens": ["alternative_formulation", "invariant_counterexample"],
-        "primary_method_family": "mixed integer programming",
-        "alternative_method_family": "constraint programming",
-        "methodological_difference": "the alternative tests propagation and feasibility before objective quality",
+        "primary_method_family": "mixed_integer_programming",
+        "alternative_method_family": "constraint_programming",
+        "methodological_difference": {
+            "axis": "feasibility",
+            "primary_assumption": "目标函数优先",
+            "alternative_assumption": "先传播可行性",
+            "discriminating_test": "两任务一资源的小实例",
+        },
         "critical_decisions_reviewed": ["capacity constraint"],
-        "disconfirming_tests": ["enumerate a two-item instance"],
+        "disconfirming_tests": [{
+            "test_id": "TEST-1",
+            "target": "capacity constraint",
+            "input_or_case": "two tasks one resource",
+            "expected_falsifier": "over-capacity schedule",
+            "actual_result": "no violation",
+            "evidence": ["evidence/test-1.log"],
+            "status": "passed",
+        }],
         "counterexamples": [],
         "what_was_checked": ["formula-to-code mapping"],
         "what_was_not_checked": ["large-scale solver performance"],
         "uncertainty": ["large-scale solver performance was not independently rerun"],
         "human_decisions_required": ["choose the risk preference"],
+        "target_artifacts": ["model.md"],
+        "input_hashes": ["0" * 64],
         "verdict": "PASS_WITH_LIMITATIONS",
+        "findings": [],
+        "unresolved_questions": [],
+        "reviewer_signature": "claude-reviewer-1",
+        "created_at": "2026-08-27T00:00:00+00:00",
     }
     record.update(overrides)
     return record
@@ -37,13 +61,12 @@ class ReviewIndependenceTests(unittest.TestCase):
     def test_same_model_without_difference_fails(self):
         ok, errors = validate_review_record(
             valid_review(
-                primary_method_family="same model",
-                alternative_method_family="same model",
-                methodological_difference="same",
+                primary_method_family="mixed_integer_programming",
+                alternative_method_family="mixed_integer_programming",
             )
         )
         self.assertFalse(ok)
-        self.assertTrue(any("methodological_difference" in error for error in errors))
+        self.assertTrue(any("different alternative" in error for error in errors))
 
     def test_pass_without_counterexample_fails(self):
         ok, errors = validate_review_record(
@@ -51,6 +74,13 @@ class ReviewIndependenceTests(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertTrue(any("counterexample" in error or "disconfirming" in error for error in errors))
+
+    def test_planned_only_falsification_cannot_claim_pass(self):
+        review = valid_review()
+        review["disconfirming_tests"][0]["status"] = "planned"
+        ok, errors = validate_review_record(review)
+        self.assertFalse(ok)
+        self.assertTrue(any("actual result" in error for error in errors))
 
 
 if __name__ == "__main__":

@@ -39,11 +39,23 @@ agent/
 └── config/                           不含密钥的模型配置示例
 ```
 
+案例内的团队协作记录只放在 `cases/<case_id>/coordination/`，契约见
+[protocol/team-collaboration.md](protocol/team-collaboration.md)。任何仓库外的
+Planner/Executor 控制面、交接单或开发审核记录都不复制进本仓库，也不由竞赛
+运行时自动加载。
+
 修订闭环的三个入口是：`scripts/classify_change.py`（R0–R3）、
 `scripts/plan_targeted_validation.py`（安全检查 ID）和
 `scripts/check_revision_closure.py`（验证记录关闭）。
 `scripts/check_approved_revision.py` 先检查非空文件白名单与前后哈希，
 再单独检查回归验证，二者不会互相替代。
+
+`scripts/run_trusted_check.py` 只接受固定 check ID，并为实际执行写入时间戳、
+stdout/stderr 路径与哈希；尚未自动化的检查会明确记录为 `manual_required`，
+不能伪装成通过。`scripts/check_evidence_graph.py` 校验“输入/附件哈希 → 代码
+版本 → 实验 → 输出哈希 → 图表/表格 → claim → 论文定位”的证据链。
+`scripts/check_work_item.py` 校验案例级单写入者、非自审、源/结果 revision 和
+工作范围冲突。
 
 ## 一次案例的推荐目录
 
@@ -79,6 +91,7 @@ case-workspace/
 - PR 必须通过结构检查、合成测试和 LaTeX CI；高风险发现未关闭时禁止合并。仓库不提供互相竞争的工作流模式。
 - 通过 Gate 后的改动按 R0–R3 分级；R0 只做局部语法/快速编译，R1 检查论文证据，R2 重跑受影响代码与实验，R3 重新检查数据/模型、可行性、目标和稳健性。
 - `scripts/check_approved_revision.py` 分别报告修改范围和回归验证；`allowed_files` 为空时 fail closed。
+- 变更先声明 `text_only`、`paper_claim`、`code_only`、`experiment_logic`、`data_contract`、`model_formula`、`objective_constraint` 或 `candidate_pdf`；仅凭文件名不能自动判为 R0–R3。
 - `paper/main.tex` 只做装配，正文分散在 `paper/sections/`；引用统一维护在 `paper/bibliography/references.bib`。
 - `make paper` 编译本地版本，`make paper-ci` 编译 CI 预览，`make qa` 执行静态检查。
 - CI 使用可携带字体完成编译；正式投稿必须以当届官方模板、规则和比赛日字体预检为准。

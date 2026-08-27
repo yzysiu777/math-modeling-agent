@@ -23,6 +23,27 @@ intake
   -> human_frozen           G12 人工冻结
 ```
 
+### Gate 合同镜像
+
+下表必须与 `scripts/gate_contract.py` 的 Gate ID、名称、进入状态和退出证据逐项一致；
+脚本校验完整行内容和顺序，修改流程文档时必须同步更新。
+
+| Gate | 名称 | 进入状态 | 首次通过的退出证据 |
+|---|---|---|---|
+| G0 | 目标、题意与权限 | `routed` | 人工确认目标、交付物和权限边界 |
+| G1 | 输入和数据冻结 | `frozen` | 输入清单、来源、只读状态和哈希 |
+| G2 | 数据契约、假设、符号和指标 | `contracted` | 数据/模型契约、假设表和指标定义 |
+| G3 | Baseline | `baseline_ready` | 可解释 baseline、小案例和运行记录 |
+| G4 | 正式模型和算法 | `model_ready` | 公式、算法、代码版本和参数记录 |
+| G5 | 正确性、可行性与边界 | `validated` | 手算/穷举、维度、约束和边界检查 |
+| G6 | 结果可信度与稳健性 | `results_verified` | 对照、复算、敏感性和稳健性证据 |
+| G7 | 独立审核 | `reviewed` | C1/C2/C3 审核记录和未解决问题 |
+| G8 | 修订与回归 | `gate_passed` | 变更影响、定向验证和关闭记录 |
+| G9 | 论文证据绑定 | `paper_ready` | claim—实验—图表—引用映射 |
+| G10 | 官方格式和 AI 合规 | `format_checked` | 当届规则、匿名和 AI 记录预检 |
+| G11 | LaTeX/PDF 检查 | `pdf_qa_passed` | 编译、文本、元数据、渲染和 PDF 哈希 |
+| G12 | 人工冻结 | `human_frozen` | 人工 signoff、最终提交文件和版本冻结 |
+
 ### G0：目标、题意与权限
 
 记录用户目标、比赛截止时间、交付物、允许/禁止的资料处理方式、语言
@@ -78,10 +99,12 @@ gate_passed
   -> gate_passed
 ```
 
-`scripts/classify_change.py` 生成 R0–R3 影响等级；
+`scripts/classify_change.py` 只有在声明语义变更表面后才生成 R0–R3 影响等级；
+仅凭 `03-model.tex`、`modeling-paper.sty` 等路径只能给出风险提示并要求人工分类；
 `scripts/plan_targeted_validation.py` 只生成预定义安全检查 ID；
 `change_impact_record` 与 `revision_validation_record` 保存前后哈希、受影响
-Gate、claim、实验、图表、退出码和输出哈希。验证失败时不能关闭 finding。
+Gate、claim、实验、图表、可信运行器日志哈希和输出哈希。R0 的空 Gate 影响
+必须同时有 `no_gate_impact` 证据；验证失败时不能关闭 finding。
 
 ### G9–G12：论文和交付
 

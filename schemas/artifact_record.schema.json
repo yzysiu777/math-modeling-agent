@@ -13,6 +13,9 @@
     "created_by": {"type": "string"},
     "status": {"type": "string", "enum": ["draft", "frozen", "superseded", "approved", "rejected"]},
     "parents": {"type": "array", "items": {"type": "string"}},
+    "experiment_ids": {"type": "array", "items": {"type": "string"}},
+    "claim_ids": {"type": "array", "items": {"type": "string"}},
+    "paper_locators": {"type": "array", "items": {"type": "string"}},
     "sensitivity": {"type": "string", "enum": ["public", "team", "private"]}
   },
   "additionalProperties": false

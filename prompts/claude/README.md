@@ -14,3 +14,7 @@
 Claude 的报告进入 `reviews/`；修订提案进入 `reviews/<review-id>/proposed.patch`，
 不得直接写入 `main`。LaTeX 只在 C3 的强结论和证据范围内审核，普通排版
 由确定性检查器和 R0/R1 规则处理。
+
+`../claude-blind-review.md` 仅是重定向入口，不是第四个审核节点。所有审核
+报告必须使用 `schemas/review_record.schema.json` 的结构化字段，尤其是稳定
+`reviewer_id`、规范方法族和带实际结果的可证伪测试。

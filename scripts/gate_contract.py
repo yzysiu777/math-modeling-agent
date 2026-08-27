@@ -66,6 +66,16 @@ REVISION_TRANSITIONS = {
 STATES = MAIN_STATES + REVISION_STATES
 
 CHANGE_LEVELS = ("R0", "R1", "R2", "R3")
+CHANGE_SURFACES = (
+    "text_only",
+    "paper_claim",
+    "code_only",
+    "experiment_logic",
+    "data_contract",
+    "model_formula",
+    "objective_constraint",
+    "candidate_pdf",
+)
 
 # These are identifiers, not shell commands.  A record may request these
 # checks, but no script executes arbitrary command strings from YAML.
@@ -98,11 +108,109 @@ SAFE_CHECK_IDS = frozenset(
     }
 )
 
+# The catalog is intentionally explicit. ``implemented`` means that the
+# trusted runner has a deterministic implementation; ``manual_required``
+# means that a human or an independent reviewer must supply signed evidence;
+# ``not_implemented`` is a hard failure until a future runner is added.
+CHECK_IMPLEMENTATION_STATUS = {
+    "file_allowlist": "implemented",
+    "basic_markdown_latex_syntax": "implemented",
+    "latex_fast_compile": "implemented",
+    "claim_experiment_binding": "implemented",
+    "figure_table_source_check": "manual_required",
+    "citation_crossref_check": "implemented",
+    "latex_compile": "implemented",
+    "code_tests": "implemented",
+    "small_case_check": "manual_required",
+    "affected_experiment_rerun": "manual_required",
+    "new_experiment_record": "manual_required",
+    "output_hash": "implemented",
+    "claim_revalidation": "manual_required",
+    "paper_consistency_check": "manual_required",
+    "data_or_model_contract": "manual_required",
+    "small_case_or_hand_check": "manual_required",
+    "units_dimensions_check": "manual_required",
+    "feasibility_check": "manual_required",
+    "objective_recompute": "manual_required",
+    "robustness_check": "manual_required",
+    "independent_or_human_closure": "implemented",
+    "pdf_static_qa": "implemented",
+    "pdf_visual_qa": "manual_required",
+    "pdf_hash": "implemented",
+}
+
+if set(CHECK_IMPLEMENTATION_STATUS) != SAFE_CHECK_IDS:  # pragma: no cover - contract guard
+    raise RuntimeError("check implementation catalog must cover every safe check ID")
+
 MINIMUM_AFFECTED_GATES = {
     "R0": frozenset(),
     "R1": frozenset({"G9", "G10", "G11"}),
-    "R2": frozenset({"G4", "G5", "G6", "G7", "G8", "G9"}),
+    "R2": frozenset({"G4", "G5", "G6", "G8", "G9"}),
     "R3": frozenset({"G1", "G2", "G4", "G5", "G6", "G7", "G8", "G9"}),
+}
+
+BASE_CHECKS = {
+    "R0": ["file_allowlist", "basic_markdown_latex_syntax"],
+    "R1": [
+        "file_allowlist",
+        "claim_experiment_binding",
+        "figure_table_source_check",
+        "citation_crossref_check",
+        "latex_compile",
+        "paper_consistency_check",
+    ],
+    "R2": [
+        "file_allowlist",
+        "code_tests",
+        "claim_experiment_binding",
+        "small_case_check",
+        "affected_experiment_rerun",
+        "new_experiment_record",
+        "output_hash",
+        "claim_revalidation",
+        "paper_consistency_check",
+    ],
+    "R3": [
+        "file_allowlist",
+        "claim_experiment_binding",
+        "data_or_model_contract",
+        "small_case_or_hand_check",
+        "units_dimensions_check",
+        "feasibility_check",
+        "objective_recompute",
+        "affected_experiment_rerun",
+        "new_experiment_record",
+        "output_hash",
+        "robustness_check",
+        "claim_revalidation",
+        "independent_or_human_closure",
+        "paper_consistency_check",
+    ],
+}
+
+
+def _surface_policy(level: str, gates: frozenset[str], checks: list[str], reviews: tuple[str, ...] = ()) -> dict:
+    return {"change_level": level, "affected_gates": gates, "required_checks": tuple(checks), "required_review_nodes": reviews}
+
+
+SURFACE_POLICIES = {
+    "text_only": _surface_policy("R0", frozenset(), BASE_CHECKS["R0"]),
+    "paper_claim": _surface_policy("R1", MINIMUM_AFFECTED_GATES["R1"], BASE_CHECKS["R1"], ("C3",)),
+    "code_only": _surface_policy("R2", MINIMUM_AFFECTED_GATES["R2"], BASE_CHECKS["R2"]),
+    "experiment_logic": _surface_policy(
+        "R2",
+        frozenset({"G4", "G5", "G6", "G7", "G8", "G9"}),
+        BASE_CHECKS["R2"] + ["independent_or_human_closure"],
+        ("C2", "C3"),
+    ),
+    "data_contract": _surface_policy("R3", MINIMUM_AFFECTED_GATES["R3"], BASE_CHECKS["R3"], ("C1", "C2", "C3")),
+    "model_formula": _surface_policy("R3", MINIMUM_AFFECTED_GATES["R3"], BASE_CHECKS["R3"], ("C2", "C3")),
+    "objective_constraint": _surface_policy("R3", MINIMUM_AFFECTED_GATES["R3"], BASE_CHECKS["R3"], ("C1", "C2", "C3")),
+    "candidate_pdf": _surface_policy(
+        "R1",
+        MINIMUM_AFFECTED_GATES["R1"],
+        BASE_CHECKS["R1"] + ["pdf_static_qa", "pdf_visual_qa", "pdf_hash"],
+    ),
 }
 
 
@@ -115,56 +223,61 @@ def required_checks_for(
     changed_files: Iterable[str] = (),
     *,
     candidate_submission_pdf: bool = False,
+    change_surfaces: Iterable[str] = (),
 ) -> list[str]:
     """Return safe check IDs for a change level; never return shell commands."""
 
     if change_level not in CHANGE_LEVELS:
         raise ValueError(f"unknown change level: {change_level}")
     paths = [PurePosixPath(path.replace("\\", "/")) for path in changed_files]
-    checks: list[str]
-    if change_level == "R0":
-        checks = ["file_allowlist", "basic_markdown_latex_syntax"]
-        if any(path.suffix in {".tex", ".sty", ".cls"} for path in paths):
+    surfaces = list(change_surfaces)
+    invalid_surfaces = set(surfaces).difference(CHANGE_SURFACES)
+    if invalid_surfaces:
+        raise ValueError(f"unknown change surfaces: {sorted(invalid_surfaces)}")
+    checks: list[str] = []
+    if surfaces:
+        for surface in surfaces:
+            checks.extend(SURFACE_POLICIES[surface]["required_checks"])
+        if "text_only" in surfaces and any(path.suffix in {".tex", ".sty", ".cls"} for path in paths):
             checks.append("latex_fast_compile")
-    elif change_level == "R1":
-        checks = [
-            "file_allowlist",
-            "claim_experiment_binding",
-            "figure_table_source_check",
-            "citation_crossref_check",
-            "latex_compile",
-            "paper_consistency_check",
-        ]
-    elif change_level == "R2":
-        checks = [
-            "file_allowlist",
-            "code_tests",
-            "small_case_check",
-            "affected_experiment_rerun",
-            "new_experiment_record",
-            "output_hash",
-            "claim_revalidation",
-            "paper_consistency_check",
-        ]
     else:
-        checks = [
-            "file_allowlist",
-            "data_or_model_contract",
-            "small_case_or_hand_check",
-            "units_dimensions_check",
-            "feasibility_check",
-            "objective_recompute",
-            "affected_experiment_rerun",
-            "new_experiment_record",
-            "output_hash",
-            "robustness_check",
-            "claim_revalidation",
-            "independent_or_human_closure",
-            "paper_consistency_check",
-        ]
-    if candidate_submission_pdf:
+        checks.extend(BASE_CHECKS[change_level])
+        if change_level == "R0" and any(path.suffix in {".tex", ".sty", ".cls"} for path in paths):
+            checks.append("latex_fast_compile")
+    if candidate_submission_pdf and "candidate_pdf" not in surfaces:
         checks.extend(["pdf_static_qa", "pdf_visual_qa", "pdf_hash"])
     return _dedupe(checks)
+
+
+def change_level_for_surfaces(change_surfaces: Iterable[str]) -> str:
+    surfaces = list(change_surfaces)
+    if not surfaces:
+        raise ValueError("at least one change surface is required")
+    invalid = set(surfaces).difference(CHANGE_SURFACES)
+    if invalid:
+        raise ValueError(f"unknown change surfaces: {sorted(invalid)}")
+    return max((SURFACE_POLICIES[surface]["change_level"] for surface in surfaces), key={level: i for i, level in enumerate(CHANGE_LEVELS)}.get)
+
+
+def affected_gates_for_surfaces(change_surfaces: Iterable[str]) -> list[str]:
+    surfaces = list(change_surfaces)
+    if not surfaces:
+        return []
+    gates: set[str] = set()
+    for surface in surfaces:
+        if surface not in SURFACE_POLICIES:
+            raise ValueError(f"unknown change surface: {surface}")
+        gates.update(SURFACE_POLICIES[surface]["affected_gates"])
+    return [gate_id for gate_id in GATE_IDS if gate_id in gates]
+
+
+def required_review_nodes_for(change_surfaces: Iterable[str]) -> list[str]:
+    nodes: set[str] = set()
+    for surface in change_surfaces:
+        if surface not in SURFACE_POLICIES:
+            raise ValueError(f"unknown change surface: {surface}")
+        nodes.update(SURFACE_POLICIES[surface]["required_review_nodes"])
+    return sorted(nodes)
 
 
 def validate_gate_ids(gate_ids: Iterable[str]) -> list[str]:
@@ -173,15 +286,39 @@ def validate_gate_ids(gate_ids: Iterable[str]) -> list[str]:
     return [gate_id for gate_id in gate_ids if gate_id not in GATE_BY_ID]
 
 
-def validate_revision_scope(change_level: str, affected_gates: Iterable[str]) -> tuple[bool, str]:
+def validate_revision_scope(
+    change_level: str,
+    affected_gates: Iterable[str],
+    *,
+    change_surfaces: Iterable[str] = (),
+    gate_impact: str | None = None,
+) -> tuple[bool, str]:
     """Check that a revision does not claim an implausibly small scope."""
 
     if change_level not in CHANGE_LEVELS:
         return False, f"unknown change level: {change_level}"
+    surfaces = list(change_surfaces)
+    if surfaces:
+        invalid_surfaces = set(surfaces).difference(CHANGE_SURFACES)
+        if invalid_surfaces:
+            return False, f"unknown change surfaces: {sorted(invalid_surfaces)}"
+        inferred_level = change_level_for_surfaces(surfaces)
+        if inferred_level != change_level:
+            return False, f"change level {change_level} disagrees with change surfaces {surfaces}"
+        inferred_gates = set(affected_gates_for_surfaces(surfaces))
+        if set(affected_gates) != inferred_gates:
+            return False, f"affected gates do not match declared surfaces: expected {sorted(inferred_gates)}"
     affected = set(affected_gates)
     invalid = affected.difference(GATE_BY_ID)
     if invalid:
         return False, f"unknown affected gates: {sorted(invalid)}"
+    if change_level == "R0":
+        if gate_impact not in {None, "no_gate_impact"}:
+            return False, "R0 must declare gate_impact=no_gate_impact"
+        if affected:
+            return False, "R0 cannot affect any Gate"
+    elif gate_impact == "no_gate_impact":
+        return False, f"{change_level} cannot declare no_gate_impact"
     if change_level in {"R0", "R1"} and affected.intersection({f"G{i}" for i in range(0, 9)}):
         return False, f"{change_level} cannot affect modeling gates G0-G8"
     if change_level == "R2" and affected.intersection({"G0", "G1", "G2", "G3"}):

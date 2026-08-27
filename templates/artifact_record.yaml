@@ -7,4 +7,7 @@ sha256: "0000000000000000000000000000000000000000000000000000000000000000"
 created_by: solution_lead
 status: draft
 parents: []
+experiment_ids: []
+claim_ids: []
+paper_locators: []
 sensitivity: team
