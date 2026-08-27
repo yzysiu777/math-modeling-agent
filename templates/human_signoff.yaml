@@ -6,6 +6,10 @@ signed_at: "YYYY-MM-DDThh:mm:ss+08:00"
 git_revision: ""
 pdf_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
 approved_gates: []
+review_scope: ["待填写审核范围"]
+checked_items: ["待填写已检查项"]
+not_checked_items: ["待填写未检查项"]
+expertise_limitations: ["待填写能力边界"]
 open_limitations: []
 decision: rejected
 notes: ""

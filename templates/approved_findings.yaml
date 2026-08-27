@@ -5,8 +5,9 @@ review_id: REV-YYYYMMDD-0001
 approver: human_owner
 approved_at: "YYYY-MM-DDThh:mm:ss+08:00"
 finding_ids: [F-001]
+change_level: R1
 allowed_files: []
 forbidden_files: [input/]
-validation_commands: []
+validation_check_ids: [file_allowlist, latex_compile]
 status: approved
 notes: ""

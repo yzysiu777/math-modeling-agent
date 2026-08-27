@@ -66,9 +66,18 @@ Codex 是默认主执行模型，Claude 是人工触发的独立审核模型；�
 - “可行解”“当前算法最好解”“给定模型下最优解”“全局最优解”必须严格区分。
 - “相关”“预测重要”“因果”“实际影响”必须严格区分。
 
-## 质量门
+## 固定竞赛质量门
 
-阶段依次经过：目标批准、题意路由、输入冻结、数据契约、假设与符号、baseline、正式模型、可行性与边界、结果可信度、敏感性/稳健性、Claude 审核、证据绑定、官方格式与 AI 合规、PDF QA、人工冻结。
+阶段固定经过 G0–G12：目标/题意/权限，输入冻结，数据契约/假设/符号/指标，
+baseline，正式模型/算法，正确性/可行性/边界，结果可信度/稳健性，独立审核，
+修订/回归，论文证据绑定，官方格式/AI 合规，LaTeX/PDF 检查，人工冻结。
+
+Gate 编号和状态以 `protocol/gates.md`、`protocol/workflow.md`、
+`protocol/state-machine.md` 与 `scripts/gate_contract.py` 的同一份合同为准。
+
+通过 Gate 后的改动必须进入 `gate_passed -> revision_pending -> impact_classified
+-> targeted_validation -> validation_passed|validation_failed -> restore_affected_gate`
+循环。R0–R3 只重跑受影响的检查，不得以形式签字替代退出证据。
 
 P0/P1 问题未解决时停止向论文定稿推进。修改模型、数据、标签、目标、约束、求解器、随机种子或论文强结论后，必须创建新版本和新实验记录。
 

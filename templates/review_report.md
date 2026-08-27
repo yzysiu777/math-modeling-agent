@@ -3,7 +3,11 @@
 Review ID：
 案例 ID：
 审查者：
-模式：blind / adversarial / reproduction / paper / final
+关键节点：C1 / C2 / C3
+审核视角：semantic_constraint_audit / alternative_formulation / invariant_counterexample / implementation_consistency / evidence_claim_audit
+主方法族：
+替代方法族：
+方法论差异：
 目标工件：
 输入哈希：
 日期：
@@ -19,10 +23,16 @@ PASS / PASS_WITH_LIMITATIONS / BLOCKED / REJECTED
 
 ## 独立重建
 
-## 反例、复现或测试
+## 反例或可证伪测试
+
+## 已检查项
+
+## 未检查项
 
 ## 仍然支持的结论
 
 ## 不确定性
 
 ## 需要人工裁决
+
+## 能力边界

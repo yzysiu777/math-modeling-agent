@@ -1,64 +1,78 @@
-# Claude 审核与修订协议
+# Claude 审核与受限修订协议
 
-在本工作台中，Claude 是人工触发的独立审核者和修订提案者，不是 Codex 的自动下游，也不是最终裁判。
+Claude 是人工触发的独立审核者，不是 Codex 的自动下游、第二主解模型或
+最终裁判。整个工作台只允许 C1、C2、C3 三个关键审核节点；Claude 不
+自动调用、不完整重做整道题、不直接修改主分支。
 
-## 总原则
+## 三个审核节点
 
-审核结论必须有文件、数据、公式、代码、运行、来源或反例证据。Claude 与 Codex 一致不等于结论正确。Claude 不得利用隐藏推理补齐输入，也不得把“看起来合理”写成“已证明”。
+### C1：题意、目标和约束（盲审）
 
-## 两阶段流程
+只检查题面语义、输入输出、硬约束/软目标、单位、时间边界、评价口径、
+合理的替代解释、人工必须回看的内容，以及能暴露误读的最小反例。不要
+根据 Codex 的方案反推题意，不要求实现 baseline。
 
-### 阶段 A：先审
+### C2：模型架构和算法（方法论挑战）
 
-- 用户向 Claude 提供指定的审核包、文件白名单、输入哈希、目标和验收标准。
-- 盲审只读题面、原始数据契约和验收标准；非盲审才可读取 Codex 方案和结果。
-- Claude 只生成 `review_record` 和人类可读审核报告，不修改主方案、论文、claim register 或 `main`。
-- 报告必须区分已验证、未验证、推测、反例和复现阻塞，并按 P0–P3 分级。
+检查变量、目标、约束、公式和代码的一致性；当前方法族是否只是经典
+模型套用；替代模型族或不变量能揭示什么盲点；算法是否可能输出不可行
+解；哪些小规模/极端测试可以推翻方案。不要实现第二套完整算法。
 
-### 阶段 B：批准后改
+### C3：主要结果和论文强结论（结果挑战）
 
-- 用户将允许处理的发现写入 `approved_findings`，明确文件白名单和修订边界。
-- Claude 只输出 `proposed.patch` 或逐文件替换内容，不直接修改 `main`。
-- Codex 或人工应用修订后，重新运行受影响的验证器和实验，生成新版本记录。
-- 原审核者不能自行关闭自己提出的 P0/P1；由人工或另一独立审查者关闭。
+局部复算核心指标和硬约束，检查 baseline 对照公平性、数据泄漏、选择性
+报告、稳定性和数字来源；区分启发式/最优、关联/因果、单次/稳定。只
+列出最值得人工抽查的 3–5 个结论，不要求全量重跑全部实验。
 
-## 默认权限
+## 独立性硬条件
 
-- 只读：题面、来源、数据契约、模型摘要、代码、实验记录、论文草稿和指定附件。
-- 可写：审核报告、失败记录、修订提案和审核包元数据。
-- 禁止：执行未知可执行文件、覆盖原始输入、推送主分支、绕过付费墙、提交密钥、修改未批准文件。
+每份 `review_record` 必须填写：
 
-## 必查内容
+- `critical_node: C1 | C2 | C3`；
+- `review_lens`，取预定义审核视角；
+- `primary_method_family` 与 `alternative_method_family`；
+- `methodological_difference`；
+- `critical_decisions_reviewed`；
+- `disconfirming_tests` 或 `counterexamples` 至少一项；
+- `what_was_checked`、`what_was_not_checked` 和 `human_decisions_required`。
 
-- 题意是否被完整翻译为数据对象、变量、目标、约束和输出；
-- 字段、单位、主键、时间边界、训练/测试切分和标签是否可信；
-- 是否存在数据泄漏、未来信息、重复样本、选择性报告或量纲混用；
-- 公式、代码、求解器调用、指标和论文表述是否一致；
-- 优化结果是否满足全部约束，预测结果是否有适当基线、留出验证和稳定性检查；
-- 是否能构造小规模、极端值或边界反例；
-- 结果是否能按照命令、环境、输入哈希和代码版本复现；
-- 论文是否把关联写成因果、启发式写成最优、单次运行写成稳定结论；
-- 引用、AI 使用记录、匿名性、字体、页码和当届官方格式是否合规。
+两个模型结果一致但没有方法论差异、反例或可证伪测试时，不能标记 PASS。
+“方案是否合理”式泛泛询问不构成独立审核。
 
-## 输出要求
+## 阶段 A：先审
 
-审核报告至少包含：
+用户只向 Claude 提供指定的审核包、文件白名单、输入哈希、目标和验收
+标准。C1 不提供 Codex 解答；C2/C3 只提供完成该节点所需的脱敏工件。
+Claude 只输出 `review_record` 和审核报告，按 P0–P3 标记证据、影响、
+最小复现/修复、不确定性和人工决策，不修改主方案。
+
+## 阶段 B：人工批准后改
+
+人工把允许处理的 finding、变更级别、文件白名单和安全检查 ID 写入
+`approved_findings`。Claude 只能输出 `proposed.patch` 或逐文件替换内容；
+不得执行或生成可被自动解释为授权的任意 shell 命令，不得修改白名单之外
+的文件。Codex 应用后按 R0–R3 计划定向验证，原审核者不能关闭自己的
+P0/P1。
+
+## 输出最低格式
 
 ```text
 Review ID:
-Mode: blind | adversarial | reproduction | paper
-Target artifacts:
-Input hashes:
+Critical node: C1 | C2 | C3
+Review mode: blind | challenge | results
+Review lens:
+Primary method family:
+Alternative method family:
+Methodological difference:
+Target artifacts and input hashes:
 Verdict: PASS | PASS_WITH_LIMITATIONS | BLOCKED | REJECTED
 
 Findings:
-- [P0/P1/P2/P3] 问题、证据位置、影响、最小修复或验证
+- [P0/P1/P2/P3] statement, evidence, impact, minimal test/fix
 
-Independent reconstruction:
-Counterexamples or tests:
-Claims that remain supported:
-Uncertainty:
+Disconfirming tests or counterexamples:
+What was checked:
+What was not checked:
 Human decisions required:
+Uncertainty: []
 ```
-
-没有发现问题时，也必须列出已检查项目和仍未具备验证条件的项目，不能只写“通过”。

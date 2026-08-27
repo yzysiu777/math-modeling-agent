@@ -2,7 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://math-modeling-agent.local/schema/human_signoff.json",
   "type": "object",
-  "required": ["record_type", "signoff_id", "case_id", "signer", "signed_at", "git_revision", "pdf_sha256", "approved_gates", "open_limitations", "decision"],
+  "required": [
+    "record_type", "signoff_id", "case_id", "signer", "signed_at", "git_revision",
+    "pdf_sha256", "approved_gates", "review_scope", "checked_items", "not_checked_items",
+    "expertise_limitations", "open_limitations", "decision"
+  ],
   "properties": {
     "record_type": {"const": "human_signoff"},
     "signoff_id": {"type": "string"},
@@ -11,7 +15,11 @@
     "signed_at": {"type": "string"},
     "git_revision": {"type": "string"},
     "pdf_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
-    "approved_gates": {"type": "array", "items": {"type": "string"}},
+    "approved_gates": {"type": "array", "items": {"type": "string", "pattern": "^G([0-9]|1[0-2])$"}},
+    "review_scope": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "checked_items": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "not_checked_items": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "expertise_limitations": {"type": "array", "minItems": 1, "items": {"type": "string"}},
     "open_limitations": {"type": "array", "items": {"type": "string"}},
     "decision": {"type": "string", "enum": ["approved", "approved_with_limits", "rejected"]},
     "notes": {"type": "string"}

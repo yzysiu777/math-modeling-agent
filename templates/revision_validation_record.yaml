@@ -1,0 +1,17 @@
+record_type: revision_validation_record
+revision_id: REVISION-YYYYMMDD-0001
+case_id: CASE-YYYYMMDD-0001
+base_git_revision: "待填写"
+new_git_revision: "待填写"
+change_level: R0
+changed_files: ["待填写文件"]
+executed_checks: [file_allowlist, basic_markdown_latex_syntax]
+check_exit_codes: {file_allowlist: 0, basic_markdown_latex_syntax: 0}
+check_outputs: {file_allowlist: "待填写", basic_markdown_latex_syntax: "待填写"}
+output_hashes: {}
+new_experiment_ids: []
+claim_status_updates: []
+closed_findings: []
+unresolved_findings: []
+validator: "待填写"
+validation_status: pending

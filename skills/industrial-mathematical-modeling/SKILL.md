@@ -7,7 +7,7 @@ metadata:
 
 # Industrial Mathematical Modeling
 
-Use this Skill for competition or research-grade tasks involving messy attachments, statistical analysis, prediction, graph/network decisions, scheduling, resource allocation, multi-objective optimization, robust/stochastic decisions, or a final technical report.
+Use this Skill for Huawei Cup competition tasks involving messy attachments, statistical analysis, prediction, graph/network decisions, scheduling, resource allocation, multi-objective optimization, robust/stochastic decisions, or the final competition paper.
 
 ## Required workspace contract
 
@@ -40,22 +40,27 @@ Check entity grain, keys, labels, missingness, duplicates, outliers, time order,
 
 Freeze the upstream-to-downstream interface: field names, types, units, time semantics, uncertainty, allowed range, scenario handling and validation tests. Check how upstream error changes downstream feasibility and objective.
 
-## Modes
+## Fixed competition workflow
 
-- **Intake:** inventory sources, fields, units, constraints, outputs and risks.
-- **Baseline:** implement the smallest verifiable model and tests.
-- **Candidate:** compare model/algorithm variants through experiment records.
-- **Review:** run blind or non-blind adversarial review and focused gates.
-- **Reproduction:** rerun from recorded commands and versions without guessing.
-- **Handoff:** summarize route, Gate status, claims, evidence, unresolved issues and next actions.
+This Skill does not expose selectable workflows. Always use the single G0–G12
+competition sequence in `protocol/workflow.md`. After a Gate has passed, use the
+R0–R3 revision loop rather than restarting every stage.
+
+Claude is invoked only at C1 (problem/constraints), C2 (model/algorithm), or C3
+(results/strong claims). A review without a methodological difference and a
+disconfirming test or counterexample is invalid.
 
 ## Required artifacts
 
-`problem_contract.md`, data dictionary/contract, input hash manifest, routing record, experiment records, claim register, review records, failure log, decision log and final handoff. For papers, add claim/evidence map, citation audit, AI-use record and final PDF QA.
+`problem_contract.md`, data dictionary/contract, input hash manifest, routing record,
+experiment records, claim register, review records, failure log, decision log,
+`change_impact_record`, `revision_validation_record`, `human_review_card` and final
+handoff. For papers, add claim/evidence map, citation audit, AI-use record and final
+PDF QA.
 
 ## Failure conditions
 
-Block delivery when the route or objective is unclear, key input fields/constraints are unknown, baseline cannot run, a core claim lacks evidence, data leakage is present, constraints are violated, results cannot be reproduced, the official format is unknown, or P0/P1 findings remain unresolved.
+Block delivery when the route or objective is unclear, key input fields/constraints are unknown, baseline cannot run, a core claim lacks evidence, data leakage is present, constraints are violated, results cannot be independently rerun, the official format is unknown, or P0/P1 findings remain unresolved.
 
 ## Project-local references
 

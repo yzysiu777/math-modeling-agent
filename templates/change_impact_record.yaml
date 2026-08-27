@@ -1,0 +1,18 @@
+record_type: change_impact_record
+revision_id: REVISION-YYYYMMDD-0001
+case_id: CASE-YYYYMMDD-0001
+base_git_revision: "待填写"
+new_git_revision: "待填写"
+change_level: R0
+changed_files: ["待填写文件"]
+before_hashes: {"待填写文件": null}
+after_hashes: {"待填写文件": "0000000000000000000000000000000000000000000000000000000000000000"}
+affected_gates: []
+affected_claims: []
+affected_experiments: []
+affected_figures: []
+required_checks: [file_allowlist, basic_markdown_latex_syntax]
+unresolved_findings: []
+modified_by: "待填写"
+validation_status: pending
+approval_id: null

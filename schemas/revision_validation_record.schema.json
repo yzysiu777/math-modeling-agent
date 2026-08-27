@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://math-modeling-agent.local/schema/revision_validation_record.json",
+  "type": "object",
+  "required": [
+    "record_type", "revision_id", "case_id", "base_git_revision", "new_git_revision",
+    "change_level", "changed_files", "executed_checks", "check_exit_codes", "check_outputs",
+    "output_hashes", "new_experiment_ids", "claim_status_updates", "closed_findings",
+    "unresolved_findings", "validator", "validation_status"
+  ],
+  "properties": {
+    "record_type": {"const": "revision_validation_record"},
+    "revision_id": {"type": "string", "minLength": 1},
+    "case_id": {"type": "string", "minLength": 1},
+    "base_git_revision": {"type": "string", "minLength": 1},
+    "new_git_revision": {"type": "string", "minLength": 1},
+    "change_level": {"type": "string", "enum": ["R0", "R1", "R2", "R3"]},
+    "changed_files": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "executed_checks": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "check_exit_codes": {"type": "object", "additionalProperties": {"type": "integer"}},
+    "check_outputs": {"type": "object", "additionalProperties": {"type": "string"}},
+    "output_hashes": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}},
+    "new_experiment_ids": {"type": "array", "items": {"type": "string"}},
+    "claim_status_updates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim_id", "status"],
+        "properties": {
+          "claim_id": {"type": "string"},
+          "status": {"type": "string", "enum": ["downgraded", "revalidated"]},
+          "evidence": {"type": "array", "items": {"type": "string"}}
+        },
+        "additionalProperties": false
+      }
+    },
+    "closed_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["finding_id", "severity", "closed_by"],
+        "properties": {
+          "finding_id": {"type": "string"},
+          "severity": {"type": "string", "enum": ["P0", "P1", "P2", "P3"]},
+          "closed_by": {"type": "string"},
+          "modified_by": {"type": "string"},
+          "evidence": {"type": "array", "items": {"type": "string"}}
+        },
+        "additionalProperties": false
+      }
+    },
+    "unresolved_findings": {"type": "array", "items": {"type": "string"}},
+    "validator": {"type": "string", "minLength": 1},
+    "validation_status": {"type": "string", "enum": ["pending", "passed", "failed"]}
+  },
+  "additionalProperties": false
+}

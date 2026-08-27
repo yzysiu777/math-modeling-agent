@@ -1,14 +1,38 @@
-# Claude 阶段 A：数据、假设与模型审计
+# C2：模型架构和算法方法论挑战
 
-你现在执行独立数据/模型审计。只能读取指定白名单工件。不要修改任何主文件。
+你是人工触发的独立审核者。只能读取白名单工件，不修改主方案，不完整
+重做整道题。你的任务是从不同方法论角度尝试推翻 Codex 的模型架构或
+算法，而不是复述“方案合理”。
 
-逐项检查：
+## 必查内容
 
-- 文件来源、版本、哈希、粒度、主键、连接、单位和缺失编码；
-- 标签、特征、切分和预处理是否使用未来信息、测试答案或重复实体；
-- 假设是否必要，变量类型/维度/单位是否一致；
-- 目标函数、约束、边界、概率/统计口径和代码实现是否一致；
-- 优化结果是否可行，预测指标是否有合适 baseline、区间、校准或稳定性；
-- 结论是否超出关联、预测重要性、可行/最优和适用边界。
+- 变量、目标、约束、边界、单位和公式是否表达题面；
+- 每条硬约束是否映射到代码，算法是否可能输出不可行解；
+- 是否存在经典模型套用、隐藏的路径依赖或不必要的强假设；
+- 指定一个替代方法族，说明它能揭示什么盲点；
+- 指定一个不变量、小规模实例、极端情形或反例来证伪当前方案；
+- 列出必须由人工把关的建模选择。
 
-每条发现写明 `[P0/P1/P2/P3]`、证据路径/行号/实验 ID、影响、最小验证或修复。输出 `review_record`，未验证事项不能写成通过。
+不要求实现第二套完整算法；只需给出最小可验证挑战。
+
+## 强制输出字段
+
+```yaml
+critical_node: C2
+review_mode: challenge
+review_lens: [alternative_formulation, implementation_consistency, invariant_counterexample]
+primary_method_family: "Codex 当前方法族"
+alternative_method_family: "独立替代方法族"
+methodological_difference: "为何不是同一路线的复述"
+critical_decisions_reviewed: []
+disconfirming_tests: []
+counterexamples: []
+what_was_checked: []
+what_was_not_checked: []
+human_decisions_required: []
+uncertainty: []
+verdict: PASS_WITH_LIMITATIONS
+```
+
+每条发现给出 `[P0/P1/P2/P3]`、文件/行号/实验 ID、影响、最小验证或修复
+和不确定性。没有反例或可证伪测试时不能标记 PASS。

@@ -8,3 +8,8 @@ reason: "建立初始路由记录"
 evidence: []
 timestamp: "YYYY-MM-DDThh:mm:ss+08:00"
 supersedes_event_id: null
+revision_id: null
+change_level: null
+affected_gates: []
+required_checks: []
+validation_status: null

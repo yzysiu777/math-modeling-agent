@@ -61,5 +61,6 @@ reviews/bundles/
 *.bak
 *.orig
 *.patch
+tmp/
 .cache/
 .harness/

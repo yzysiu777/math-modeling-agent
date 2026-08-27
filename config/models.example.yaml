@@ -4,7 +4,7 @@ lead:
   model: PIN_LOCALLY_FOR_THE_COMPETITION
   reasoning_effort: high_or_max
   workspace_write: true
-  default_mode: plan_then_execute
+  workflow: fixed_competition_g0_g12
   roles: [orchestrator, task_router, solution_lead, paper_architect]
 
 adversary:
@@ -13,7 +13,8 @@ adversary:
   workspace_write: reviews_and_failures_only
   initial_visibility: raw_input_and_contract_only
   nonblind_visibility: explicit_review_bundle_only
-  roles: [independent_adversary, reproducibility_engineer, formatting_qa]
+  roles: [independent_adversary]
+  review_nodes: [C1, C2, C3]
 
 deterministic:
   python: PIN_ENVIRONMENT_VERSION

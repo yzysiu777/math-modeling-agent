@@ -2,7 +2,7 @@ name: workspace-ci
 
 on:
   push:
-    branches: [main, "refactor/**", "model/**", "analysis/**", "paper/**", "review/**"]
+    branches: [main, "refactor/**", "luna/**", "model/**", "analysis/**", "paper/**", "review/**"]
   pull_request:
 
 jobs:

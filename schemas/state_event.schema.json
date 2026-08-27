@@ -7,13 +7,18 @@
     "record_type": {"const": "state_event"},
     "event_id": {"type": "string"},
     "case_id": {"type": "string"},
-    "from_state": {"type": "string", "enum": ["intake", "routed", "frozen", "contracted", "baseline_ready", "model_ready", "validated", "reviewed", "revision_approved", "reproduced", "paper_ready", "pdf_qa_passed", "human_frozen"]},
-    "to_state": {"type": "string", "enum": ["intake", "routed", "frozen", "contracted", "baseline_ready", "model_ready", "validated", "reviewed", "revision_approved", "reproduced", "paper_ready", "pdf_qa_passed", "human_frozen"]},
+    "from_state": {"type": "string", "enum": ["intake", "routed", "frozen", "contracted", "baseline_ready", "model_ready", "validated", "results_verified", "reviewed", "gate_passed", "paper_ready", "format_checked", "pdf_qa_passed", "human_frozen", "revision_pending", "impact_classified", "targeted_validation", "validation_passed", "validation_failed", "restore_affected_gate"]},
+    "to_state": {"type": "string", "enum": ["intake", "routed", "frozen", "contracted", "baseline_ready", "model_ready", "validated", "results_verified", "reviewed", "gate_passed", "paper_ready", "format_checked", "pdf_qa_passed", "human_frozen", "revision_pending", "impact_classified", "targeted_validation", "validation_passed", "validation_failed", "restore_affected_gate"]},
     "actor": {"type": "string"},
     "reason": {"type": "string", "minLength": 1},
     "evidence": {"type": "array", "items": {"type": "string"}},
     "timestamp": {"type": "string"},
-    "supersedes_event_id": {"type": ["string", "null"]}
+    "supersedes_event_id": {"type": ["string", "null"]},
+    "revision_id": {"type": ["string", "null"]},
+    "change_level": {"type": ["string", "null"], "enum": ["R0", "R1", "R2", "R3", null]},
+    "affected_gates": {"type": "array", "items": {"type": "string", "pattern": "^G([0-9]|1[0-2])$"}},
+    "required_checks": {"type": "array", "items": {"type": "string"}},
+    "validation_status": {"type": ["string", "null"], "enum": ["pending", "passed", "failed", null]}
   },
   "additionalProperties": false
 }

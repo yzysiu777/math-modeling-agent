@@ -30,7 +30,7 @@ At competition time, also read the current official paper standard document and 
 4. Write each subproblem as analysis, assumptions, model, solution, results, and checks.
 5. Calibrate wording to evidence; do not turn association into causation or heuristic output into global optimality.
 6. Audit equations, units, figure/table numbering, cross-references, citations, code/source attribution, and AI records.
-7. Run a blind/adversarial review with Claude or a human reviewer.
+7. At C3, run a focused results/strong-claim challenge with Claude or a human reviewer; do not create a separate paper-review track.
 8. Compile the shared `paper/` XeLaTeX project locally and in CI; export PDF, extract text, inspect metadata, render representative pages, and obtain human sign-off.
 9. Compute final hashes and freeze the submitted PDF.
 
@@ -39,9 +39,9 @@ At competition time, also read the current official paper standard document and 
 - draft/paper_plan.md
 - `paper/main.tex` and the section sources, or the current official Word source
 - claim register and experiment cards
-- reviews/paper_adversarial_review.md
-- reviews/citation_review.md
-- reviews/final_pdf_qa.md
+- reviews/C3_results_claim_review.md
+- reviews/citation_review.md (deterministic or human support record)
+- reviews/final_pdf_qa.md (deterministic/人工格式记录)
 - support/AI工具使用详情.pdf or the equivalent required by the current rules
 
 ## Failure conditions

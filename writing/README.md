@@ -47,6 +47,6 @@ CI 预览版不是自动提交版。正式比赛必须用当届官方标准、�
 - `writing/prompts/citation_editor.md`：审计来源与引用；
 - `writing/prompts/figure_table_editor.md`：审计图表、公式和单位；
 - `writing/prompts/formatting_qa.md`：验收最终 PDF；
-- `prompts/claude/04_latex_paper_audit.md`：交给 Claude 做独立论文审查。
+- `prompts/claude/03_results_reproduction_audit.md`：在 C3 节点审核主要结果、论文强结论和证据绑定；普通版式检查由确定性工具完成。
 
 作者、审查者和最终批准者必须分离。没有 claim、实验、来源或人工决定支持的内容不得进入最终强结论。

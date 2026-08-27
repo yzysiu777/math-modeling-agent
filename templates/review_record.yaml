@@ -2,11 +2,23 @@ record_type: review_record
 review_id: REV-YYYYMMDD-0001
 case_id: CASE-YYYYMMDD-0001
 reviewer_role: independent_adversary
-mode: blind
-target_artifacts: []
-input_hashes: []
+critical_node: C1
+review_mode: blind
+review_lens: [semantic_constraint_audit]
+primary_method_family: "待填写：Codex 主方案"
+alternative_method_family: "待填写：独立审核视角"
+methodological_difference: "待填写：审核如何挑战主方案"
+critical_decisions_reviewed: ["待填写"]
+disconfirming_tests: []
+counterexamples: []
+what_was_checked: ["待填写"]
+what_was_not_checked: ["待填写"]
+human_decisions_required: ["待填写"]
+target_artifacts: ["待填写审核工件"]
+input_hashes: ["待填写输入哈希"]
 verdict: BLOCKED
 findings: []
 unresolved_questions: []
+uncertainty: ["待填写不确定性与能力边界"]
 reviewer_signature: ""
 created_at: "YYYY-MM-DDThh:mm:ss+08:00"

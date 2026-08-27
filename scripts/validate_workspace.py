@@ -4,8 +4,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
+
+try:
+    from .gate_contract import GATE_IDS, SAFE_CHECK_IDS
+except ImportError:  # pragma: no cover
+    from gate_contract import GATE_IDS, SAFE_CHECK_IDS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +27,7 @@ EXPECTED_ROLES = {
 FORBIDDEN_ACTIVE_TERMS = (
     "出血性脑卒中", "智能飞行器航迹", "通用神经网络处理器", "核内调度",
     "AI_CDM_for_ICH", "FightRoute", "FlashAttention", "2023 E", "2019 F", "2025 A",
+    "competition_" + "fast", "checkpoint_" + "review", "release_" + "full",
 )
 
 
@@ -53,6 +60,15 @@ def validate_templates() -> list[str]:
             for error in validator.iter_errors(document):
                 location = ".".join(str(item) for item in error.absolute_path)
                 errors.append(f"{template}:{location}: {error.message}")
+            if record_type == "project_manifest":
+                gates = document.get("acceptance", {}).get("required_gates", [])
+                if gates != list(GATE_IDS):
+                    errors.append(f"{template}: required_gates must equal {list(GATE_IDS)}")
+            if record_type in {"change_impact_record", "revision_validation_record"}:
+                checks = document.get("required_checks", []) or document.get("executed_checks", [])
+                unsafe = set(checks).difference(SAFE_CHECK_IDS)
+                if unsafe:
+                    errors.append(f"{template}: unsafe check IDs {sorted(unsafe)}")
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{template}: {exc}")
     return errors
@@ -70,12 +86,33 @@ def validate_static_contract() -> list[str]:
         except json.JSONDecodeError as exc:
             errors.append(f"invalid JSON Schema {schema}: {exc}")
 
-    active_dirs = ["roles", "protocol", "prompts", "schemas", "templates", "skills", "writing", "paper"]
+    expected_gates = set(GATE_IDS)
+    for relative in ("protocol/workflow.md", "protocol/gates.md", "protocol/state-machine.md"):
+        path = ROOT / relative
+        text = path.read_text(encoding="utf-8") if path.exists() else ""
+        found = set(re.findall(r"\bG(?:[0-9]|1[0-2])\b", text))
+        if found != expected_gates:
+            errors.append(f"{path}: Gate IDs {sorted(found)} do not equal {list(GATE_IDS)}")
+        if re.search(r"\bG(?:1[3-9]|[2-9][0-9])\b", text):
+            errors.append(f"{path}: contains Gate ID outside canonical G0-G12")
+    for state in ("gate_passed", "revision_pending", "impact_classified", "targeted_validation", "validation_passed", "validation_failed", "restore_affected_gate"):
+        if state not in (ROOT / "protocol/state-machine.md").read_text(encoding="utf-8"):
+            errors.append(f"protocol/state-machine.md: missing revision state {state}")
+    claude_prompt_text = "\n".join(
+        path.read_text(encoding="utf-8") for path in (ROOT / "prompts/claude").glob("*.md")
+    )
+    for node in ("C1", "C2", "C3"):
+        if node not in claude_prompt_text:
+            errors.append(f"prompts/claude: missing critical node {node}")
+
+    active_dirs = ["roles", "protocol", "prompts", "schemas", "templates", "skills", "writing", "paper", "scripts"]
     for dirname in active_dirs:
         base = ROOT / dirname
         for path in base.rglob("*"):
             if not path.is_file() or "official" in path.parts:
                 continue
+            if path.resolve() == Path(__file__).resolve():
+                continue  # this checker stores forbidden sentinels by design
             try:
                 text = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:

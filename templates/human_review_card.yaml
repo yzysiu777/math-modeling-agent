@@ -1,0 +1,21 @@
+record_type: human_review_card
+critical_node: C1
+decision_id: DECISION-YYYYMMDD-0001
+decision_needed: "待填写需要人工决定的事项"
+why_it_matters: "待填写对题意、模型或结论的影响"
+current_choice: "待填写当前选择"
+alternatives: ["待填写备选方案"]
+key_assumptions: ["待填写关键假设"]
+hard_constraints: ["待填写硬约束"]
+one_key_formula_or_diagram: "待填写公式、变量关系或图示入口"
+deterministic_evidence: ["待填写检查器、实验或推导证据"]
+claude_challenge_summary: "待填写 Claude 的挑战摘要"
+main_risk: "待填写最大风险"
+recommended_choice: "待填写建议选择及其边界"
+human_checked: ["待填写人工实际检查项"]
+human_not_checked: ["待填写人工未检查项"]
+expertise_limitations: ["待填写能力边界或需要升级的专业问题"]
+decision: escalate
+required_followup: ["待填写后续动作"]
+signer: ""
+timestamp: "YYYY-MM-DDThh:mm:ss+08:00"

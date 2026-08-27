@@ -9,4 +9,11 @@
 - 作者不能批准自己写出的审核；
 - 没有 `approved_findings` 不能进入 Claude 修订阶段；
 - 没有输入哈希、代码版本和实验记录的结论不能进入强论文表述；
+- C1/C2/C3 审核必须记录方法论差异、反例/可证伪测试、已检查和未检查范围；
+- `change_impact_record` 与 `revision_validation_record` 必须使用安全检查 ID，不能保存待自动执行的 shell 命令；
+- `human_review_card` 和 `human_signoff` 必须记录人工检查范围、未检查项和能力边界；
 - `human_signoff` 只能由人工产生。
+
+新增修订闭环记录：`change_impact_record`、`revision_validation_record`、
+`human_review_card`。它们分别说明变更影响、定向验证和人工决策，不能互相
+替代。

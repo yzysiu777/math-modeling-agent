@@ -9,7 +9,7 @@
 - 确定性工具：Schema、数据质量、约束、指标、求解器、复现和 PDF 检查。
 - 人工队员：批准目标、解决模型取舍、批准 Claude 修订、确认当届规则和签署最终交付。
 
-## 每个案例启动时
+## 每个竞赛案例启动时
 
 1. 读取 `AGENTS.md`、`README.md`、`case_manifest.yaml`、`protocol/workflow.md` 和 `protocol/gates.md`。
 2. 判断路由：`optimization`、`data_analysis`、`hybrid` 或 `insufficient_information`，记录依据和不确定性。
@@ -28,9 +28,16 @@
 - 不覆盖旧结果；失败、反例、复现差异和被否决路线进入 `failures/` 或 `reviews/`。
 - 重要结论进入 `claim_record`，只有有证据的结论才可进入论文强表述。
 
-## Claude 交接规则
+## Claude C1/C2/C3 交接规则
 
-盲审阶段只交题面、数据契约、验收标准和白名单；对抗阶段才交 Codex 工件。Claude 审核结果必须落盘，不能直接覆盖主方案。人工批准发现后，Claude 只能生成受限修订提案；修订必须经过 Codex 验证和人工/独立审查关闭。
+只在 C1/C2/C3 三个关键节点交接：C1 只交题面契约，C2 交模型架构，C3 交结果和强结论。每次都交文件白名单、输入哈希、主/替代方法族、审核视角和可证伪测试。Claude 审核结果必须落盘，不能直接覆盖主方案。人工批准发现后，Claude 只能生成受限修订提案；修订必须经过 R0–R3 定向验证和人工/独立审查关闭。
+
+## 修订回归
+
+任何通过 Gate 后的变更先用 `scripts/classify_change.py` 分类，再用
+`scripts/plan_targeted_validation.py` 生成安全检查 ID。使用
+`change_impact_record` 和 `revision_validation_record` 保存前后哈希、受影响
+工件、退出码和输出哈希；禁止从 YAML 自动执行任意命令。
 
 ## 论文规则
 

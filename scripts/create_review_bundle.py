@@ -14,6 +14,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+CRITICAL_NODE_TO_MODE = {
+    "C1": "blind",
+    "C2": "challenge",
+    "C3": "results",
+}
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -22,7 +29,9 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def create_bundle(case_dir: Path, output_dir: Path, mode: str, files: list[str], review_id: str) -> Path:
+def create_bundle(case_dir: Path, output_dir: Path, critical_node: str, files: list[str], review_id: str) -> Path:
+    if critical_node not in CRITICAL_NODE_TO_MODE:
+        raise ValueError("critical_node must be C1, C2, or C3")
     case_dir = case_dir.resolve()
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=False)
@@ -42,7 +51,8 @@ def create_bundle(case_dir: Path, output_dir: Path, mode: str, files: list[str],
     manifest = {
         "record_type": "review_bundle_manifest",
         "review_id": review_id,
-        "mode": mode,
+        "critical_node": critical_node,
+        "review_mode": CRITICAL_NODE_TO_MODE[critical_node],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "case_root": str(case_dir),
         "files": entries,
@@ -55,7 +65,8 @@ def create_bundle(case_dir: Path, output_dir: Path, mode: str, files: list[str],
     readme = [
         f"# Review Bundle {review_id}",
         "",
-        f"Mode: `{mode}`",
+        f"Critical node: `{critical_node}`",
+        f"Review mode: `{CRITICAL_NODE_TO_MODE[critical_node]}`",
         "",
         "This bundle was created from an explicit file whitelist. It contains no Codex hidden reasoning.",
         "Claude must not modify the source case or infer missing fields. In review mode write only a review report; in approved revision mode output a patch limited to the approved files.",
@@ -71,11 +82,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--case-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--mode", choices=["blind", "adversarial", "reproduction", "paper"], required=True)
+    parser.add_argument("--critical-node", choices=sorted(CRITICAL_NODE_TO_MODE), required=True)
     parser.add_argument("--review-id", required=True)
     parser.add_argument("--file", action="append", dest="files", required=True)
     args = parser.parse_args()
-    create_bundle(args.case_dir, args.output, args.mode, args.files, args.review_id)
+    create_bundle(args.case_dir, args.output, args.critical_node, args.files, args.review_id)
     print(f"created review bundle: {args.output}")
     return 0
 
