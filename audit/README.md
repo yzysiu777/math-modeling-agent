@@ -1,7 +1,7 @@
 # 数学建模 Agent 工作台审核与架构设计
 
 审核日期：2026-08-26  
-审核范围：`/Users/lambency/Desktop/数学建模/agent` 现有指令、角色、协议、Schema、模板、Skill、适配器与论文系统。  
+审核范围：`/Users/lambency/Desktop/研 0 /数学建模/agent` 现有指令、角色、协议、Schema、模板、Skill、适配器与论文系统。
 明确排除：任何历年赛题、附件、题库和具体题目的建模内容。
 
 审核状态：`STATIC_AUDIT_COMPLETE / INDEPENDENT_REVIEW_PENDING`。本轮作者未自我批准本报告；正式实施前应由独立新会话或人工 reviewer 复核 P1 findings 和目标架构。
