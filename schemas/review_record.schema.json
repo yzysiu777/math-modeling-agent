@@ -45,7 +45,7 @@
     }
   },
   "required": [
-    "record_type", "review_id", "case_id", "reviewer_role", "reviewer_id", "critical_node",
+    "record_type", "review_id", "case_id", "target_revision", "reviewer_role", "reviewer_id", "critical_node",
     "review_mode", "review_lens", "primary_method_family", "alternative_method_family",
     "methodological_difference", "critical_decisions_reviewed", "disconfirming_tests",
     "counterexamples", "what_was_checked", "what_was_not_checked", "human_decisions_required",
@@ -56,7 +56,8 @@
     "record_type": {"const": "review_record"},
     "review_id": {"type": "string", "minLength": 1},
     "case_id": {"type": "string", "minLength": 1},
-    "reviewer_role": {"type": "string", "enum": ["independent_adversary", "human"]},
+    "target_revision": {"type": "string", "minLength": 1},
+    "reviewer_role": {"type": "string", "enum": ["independent_adversary", "independent_reviewer", "human"]},
     "reviewer_id": {"type": "string", "minLength": 1},
     "critical_node": {"type": "string", "enum": ["C1", "C2", "C3"]},
     "review_mode": {"type": "string", "enum": ["blind", "challenge", "results"]},
@@ -108,5 +109,30 @@
     "reviewer_signature": {"type": "string"},
     "created_at": {"type": "string", "minLength": 1}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"critical_node": {"const": "C1"}}},
+      "then": {"properties": {"review_lens": {"allOf": [
+        {"contains": {"const": "semantic_constraint_audit"}},
+        {"contains": {"const": "invariant_counterexample"}}
+      ]}}}
+    },
+    {
+      "if": {"properties": {"critical_node": {"const": "C2"}}},
+      "then": {"properties": {"review_lens": {"allOf": [
+        {"contains": {"const": "alternative_formulation"}},
+        {"contains": {"const": "implementation_consistency"}},
+        {"contains": {"const": "invariant_counterexample"}}
+      ]}}}
+    },
+    {
+      "if": {"properties": {"critical_node": {"const": "C3"}}},
+      "then": {"properties": {"review_lens": {"allOf": [
+        {"contains": {"const": "evidence_claim_audit"}},
+        {"contains": {"const": "implementation_consistency"}},
+        {"contains": {"const": "invariant_counterexample"}}
+      ]}}}
+    }
+  ],
   "additionalProperties": false
 }

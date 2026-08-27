@@ -3,11 +3,23 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 from scripts.check_work_item import validate_work_item, validate_work_item_set
 from scripts.gate_contract import required_checks_for
 
 
 def valid_item(workspace: Path, **overrides):
+    (workspace / "scripts").mkdir(parents=True, exist_ok=True)
+    (workspace / "scripts/run_trusted_check.py").write_text("trusted runner\n", encoding="utf-8")
+    manifest = workspace / "manifest.yaml"
+    manifest.write_text(
+        "record_type: project_manifest\ncase_id: CASE-1\n"
+        "owner:\n  name: owner\n  owner_id: owner-1\n  role: human_owner\n"
+        "identity_allowlist:\n  - id: owner-1\n    role: human_owner\n"
+        "  - id: reviewer-1\n    role: independent_adversary\n",
+        encoding="utf-8",
+    )
     evidence = []
     item = {
         "record_type": "work_item", "work_item_id": "WI-1", "case_id": "CASE-1",
@@ -18,6 +30,13 @@ def valid_item(workspace: Path, **overrides):
         "change_level": "R0", "change_surfaces": ["text_only"], "required_review_nodes": [],
         "executor_id": "executor-1", "reviewer_id": "reviewer-1", "write_owner_id": "executor-1",
         "result_git_revision": "b" * 40, "test_evidence": [], "status": "accepted",
+        "previous_status": "review_ready",
+        "trusted_validation_record_path": "validation.yaml",
+        "trusted_validation_record_sha256": None,
+        "trusted_validation_record_id": "CLOSURE-1",
+        "trusted_change_impact_path": None, "trusted_change_impact_sha256": None,
+        "review_verdict_path": "review.yaml", "review_verdict_sha256": None,
+        "review_id": "REV-C3-1", "reviewer_role": "independent_adversary",
         "unresolved_items": [], "revision_id": "REV-1", "report_path": "cases/CASE-1/coordination/report.md",
         "human_decisions_required": [],
     }
@@ -27,6 +46,41 @@ def valid_item(workspace: Path, **overrides):
         path.write_text("passed\n", encoding="utf-8")
         evidence.append({"check_id": check_id, "status": "passed", "evidence_path": str(path.relative_to(workspace)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
     item["test_evidence"] = evidence
+    validation_results = []
+    for index, check_id in enumerate(item["required_checks"]):
+        stderr_path = workspace / f"evidence/{index}-{check_id}.stderr.log"
+        stderr_path.write_text("", encoding="utf-8")
+        validation_results.append({
+            "check_id": check_id, "status": "passed", "execution_kind": "trusted_runner", "executor": "trusted_check_runner", "exit_code": 0,
+            "stdout_path": str(Path(evidence[index]["evidence_path"])), "stdout_sha256": evidence[index]["sha256"],
+            "stderr_path": str(stderr_path.relative_to(workspace)), "stderr_sha256": hashlib.sha256(stderr_path.read_bytes()).hexdigest(),
+        })
+    validation = {
+        "record_type": "revision_validation_record", "closure_id": "CLOSURE-1", "case_id": "CASE-1", "revision_id": "REV-1",
+        "base_git_revision": "a" * 40, "new_git_revision": "b" * 40, "executor_id": "executor-1", "modifier_id": "modifier-1", "runner_id": "trusted_check_runner", "runner_version": "1.0.0",
+        "change_level": "R0", "change_surfaces": ["text_only"], "execution_started_at": "2026-08-27T00:00:00+00:00", "execution_finished_at": "2026-08-27T00:00:01+00:00", "validation_status": "passed",
+        "runner_script": "scripts/run_trusted_check.py", "runner_script_sha256": hashlib.sha256((workspace / "scripts/run_trusted_check.py").read_bytes()).hexdigest(),
+        "project_manifest_path": "manifest.yaml", "project_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+        "evidence_root": "evidence", "check_results": validation_results,
+    }
+    validation_path = workspace / "validation.yaml"
+    validation_path.write_text(yaml.safe_dump(validation, sort_keys=False), encoding="utf-8")
+    review = {
+        "record_type": "review_record", "review_id": "REV-C3-1", "case_id": "CASE-1", "target_revision": "REV-1",
+        "reviewer_role": "independent_adversary", "reviewer_id": "reviewer-1", "critical_node": "C3", "review_mode": "results",
+        "review_lens": ["evidence_claim_audit", "implementation_consistency", "invariant_counterexample"],
+        "primary_method_family": "mixed_integer_programming", "alternative_method_family": "constraint_programming",
+        "methodological_difference": {"axis": "feasibility", "primary_assumption": "primary", "alternative_assumption": "alternative", "discriminating_test": "small case"},
+        "critical_decisions_reviewed": ["decision"],
+        "disconfirming_tests": [{"test_id": "T-1", "target": "result", "input_or_case": "small", "expected_falsifier": "wrong", "actual_result": "none", "evidence": ["validation.yaml"], "status": "passed"}],
+        "counterexamples": [], "what_was_checked": ["result"], "what_was_not_checked": ["scale"], "human_decisions_required": [],
+        "target_artifacts": ["validation.yaml"], "input_hashes": ["0" * 64], "verdict": "PASS_WITH_LIMITATIONS", "findings": [],
+        "unresolved_questions": [], "uncertainty": ["scale"], "reviewer_signature": "reviewer-1", "created_at": "2026-08-27T00:00:00+00:00",
+    }
+    review_path = workspace / "review.yaml"
+    review_path.write_text(yaml.safe_dump(review, sort_keys=False), encoding="utf-8")
+    item["trusted_validation_record_sha256"] = hashlib.sha256(validation_path.read_bytes()).hexdigest()
+    item["review_verdict_sha256"] = hashlib.sha256(review_path.read_bytes()).hexdigest()
     item.update(overrides)
     return item
 
@@ -35,6 +89,7 @@ class WorkItemTests(unittest.TestCase):
     def test_accepted_item_does_not_imply_human_frozen(self):
         with tempfile.TemporaryDirectory() as temp:
             item = valid_item(Path(temp), status="accepted")
+            item["previous_status"] = "review_ready"
             self.assertEqual(validate_work_item(item, workspace=Path(temp), source_ref="a" * 40, result_ref="b" * 40), [])
             self.assertNotIn("human_frozen", item)
 
@@ -63,6 +118,22 @@ class WorkItemTests(unittest.TestCase):
             right = valid_item(Path(temp), work_item_id="WI-2", status="review_ready", allowed_files=["cases/CASE-1/coordination/report.md"])
             errors = validate_work_item_set([left, right], workspace=Path(temp))
             self.assertTrue(any("overlapping active" in error for error in errors))
+
+    def test_proposed_cannot_jump_directly_to_accepted(self):
+        with tempfile.TemporaryDirectory() as temp:
+            item = valid_item(Path(temp), status="accepted", previous_status="proposed")
+            errors = validate_work_item(item, workspace=Path(temp))
+            self.assertTrue(any("review_ready" in error or "proposed" in error for error in errors))
+
+    def test_fake_logs_and_reviewer_string_cannot_accept(self):
+        with tempfile.TemporaryDirectory() as temp:
+            item = valid_item(Path(temp), trusted_validation_record_path="self-made.log", review_verdict_path="reviewer.log")
+            Path(temp, "self-made.log").write_text("passed", encoding="utf-8")
+            Path(temp, "reviewer.log").write_text("reviewer_id: anyone", encoding="utf-8")
+            item["trusted_validation_record_sha256"] = hashlib.sha256(Path(temp, "self-made.log").read_bytes()).hexdigest()
+            item["review_verdict_sha256"] = hashlib.sha256(Path(temp, "reviewer.log").read_bytes()).hexdigest()
+            errors = validate_work_item(item, workspace=Path(temp))
+            self.assertTrue(any("record" in error or "verdict" in error or "cannot be parsed" in error for error in errors))
 
 
 if __name__ == "__main__":

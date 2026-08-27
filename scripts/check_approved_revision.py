@@ -11,12 +11,15 @@ import argparse
 import hashlib
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 try:
-    from .check_revision_closure import load_yaml, validate_revision_closure
+    from .check_revision_closure import _load_manifest_for_record, load_yaml, validate_revision_closure
+    from .identity_contract import validate_human_owner
 except ImportError:  # pragma: no cover
-    from check_revision_closure import load_yaml, validate_revision_closure
+    from check_revision_closure import _load_manifest_for_record, load_yaml, validate_revision_closure
+    from identity_contract import validate_human_owner
 
 
 def _normalize_relative(raw: str) -> str:
@@ -71,6 +74,40 @@ def validate_revision_boundary(
         errors.append("approval record is not approved_findings")
     if approval.get("status") not in {"approved", "applied"}:
         errors.append("approval record is not active")
+    if approval.get("approver_role") != "human_owner":
+        errors.append("approval approver_role must be human_owner")
+    if workspace is None:
+        errors.append("active approval requires a workspace-bound frozen identity registry")
+    else:
+        manifest_errors: list[str] = []
+        manifest = _load_manifest_for_record(approval, workspace=workspace, errors=manifest_errors, label="approval")
+        errors.extend(manifest_errors)
+        if manifest is not None:
+            validate_human_owner(manifest, approval.get("approver_id"), errors)
+    if approval.get("approver_id") and approval.get("approver_id") in {impact.get("executor_id"), impact.get("modified_by")}:
+        errors.append("executor or modifier cannot approve its own revision")
+    def parse_time(raw: object, label: str) -> datetime | None:
+        if not isinstance(raw, str) or not raw.strip():
+            errors.append(f"{label} is required")
+            return None
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            errors.append(f"{label} must be ISO-8601")
+            return None
+        if parsed.tzinfo is None:
+            errors.append(f"{label} must include a timezone")
+            return None
+        return parsed.astimezone(timezone.utc)
+    approved_at = parse_time(approval.get("approved_at"), "approval.approved_at")
+    expires_at = parse_time(approval.get("expires_at"), "approval.expires_at")
+    current = datetime.now(timezone.utc)
+    if approved_at is not None and approved_at > current:
+        errors.append("approval.approved_at is in the future")
+    if expires_at is not None and expires_at <= current:
+        errors.append("approval has expired; fail closed")
+    if approved_at is not None and expires_at is not None and expires_at <= approved_at:
+        errors.append("approval.expires_at must be after approved_at")
     allowed_raw = approval.get("allowed_files") or []
     if not allowed_raw:
         errors.append("allowed_files is empty; fail closed")

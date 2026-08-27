@@ -3,14 +3,24 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 from scripts.check_transition import validate_transition
 from scripts.gate_contract import required_checks_for
+from test_revision_contract import build_records
 
 
 def signoff_for(workspace: Path, revision: str = "a" * 40):
     pdf = workspace / "paper/build/main.pdf"
     pdf.parent.mkdir(parents=True)
     pdf.write_bytes(b"valid pdf fixture")
+    manifest = workspace / "manifest.yaml"
+    manifest.write_text(
+        "record_type: project_manifest\ncase_id: CASE-1\n"
+        "owner:\n  name: owner\n  owner_id: human-owner\n  role: human_owner\n"
+        "identity_allowlist:\n  - id: human-owner\n    role: human_owner\n",
+        encoding="utf-8",
+    )
     return {
         "record_type": "human_signoff",
         "signoff_id": "SIGN-1",
@@ -19,6 +29,8 @@ def signoff_for(workspace: Path, revision: str = "a" * 40):
         "signer_id": "human-owner",
         "signer_role": "human_owner",
         "actor": "human-owner",
+        "project_manifest_path": "manifest.yaml",
+        "project_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
         "signed_at": "2026-08-27T00:00:00+00:00",
         "git_revision": revision,
         "pdf_path": "paper/build/main.pdf",
@@ -54,6 +66,11 @@ class StateMachineTests(unittest.TestCase):
             ok, _ = validate_transition(
                 "pdf_qa_passed", "human_frozen", actor="human-owner", evidence=["signoff.yml"],
                 signoff=signoff, workspace=workspace, current_revision="a" * 40,
+                project_manifest={
+                    "record_type": "project_manifest", "case_id": "CASE-1",
+                    "owner": {"name": "owner", "owner_id": "human-owner", "role": "human_owner"},
+                    "identity_allowlist": [{"id": "human-owner", "role": "human_owner"}],
+                },
             )
             self.assertTrue(ok)
 
@@ -81,24 +98,50 @@ class StateMachineTests(unittest.TestCase):
         self.assertTrue(ok)
 
     def test_r0_revision_loop_restores_without_model_gate(self):
-        checks = required_checks_for("R0", ["notes.md"], change_surfaces=["text_only"])
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp)
+            (workspace / "scripts").mkdir()
+            (workspace / "scripts/run_trusted_check.py").write_text("trusted runner fixture\n", encoding="utf-8")
+            impact, closure = build_records(workspace)
+            closure_path = workspace / "closure.yaml"
+            closure_path.write_text(yaml.safe_dump(closure, sort_keys=False), encoding="utf-8")
+            closure_hash = hashlib.sha256(closure_path.read_bytes()).hexdigest()
+            common = {
+                "closure_report": closure, "closure_impact": impact, "closure_id": closure["closure_id"],
+                "closure_path": "closure.yaml", "closure_sha256": closure_hash, "workspace": workspace,
+            }
+            ok, _ = validate_transition(
+                "targeted_validation", "validation_passed", actor="validator",
+                evidence=["passed.json"], validation_status="passed", **common,
+            )
+            self.assertTrue(ok)
+            ok, _ = validate_transition(
+                "validation_passed", "restore_affected_gate", actor="orchestrator",
+                evidence=["no_gate_impact"], change_level="R0",
+                change_surfaces=["text_only"], affected_gates=[], gate_impact="no_gate_impact", **common,
+            )
+            self.assertTrue(ok)
+            self.assertTrue(required_checks_for("R0", ["notes.md"], change_surfaces=["text_only"]))
+            ok, _ = validate_transition(
+                "restore_affected_gate", "gate_passed", actor="orchestrator",
+                evidence=["restore regression record"], **common,
+            )
+            self.assertTrue(ok)
+
+    def test_validation_passed_without_closure_report_fails(self):
         ok, _ = validate_transition(
             "targeted_validation", "validation_passed", actor="validator",
             evidence=["passed.json"], validation_status="passed",
         )
-        self.assertTrue(ok)
+        self.assertFalse(ok)
+
+    def test_restore_regression_free_text_without_closure_fails(self):
         ok, _ = validate_transition(
             "validation_passed", "restore_affected_gate", actor="orchestrator",
-            evidence=["no_gate_impact regression record"], change_level="R0",
+            evidence=["restore regression record"], change_level="R0",
             change_surfaces=["text_only"], affected_gates=[], gate_impact="no_gate_impact",
         )
-        self.assertTrue(ok)
-        self.assertTrue(checks)
-        ok, _ = validate_transition(
-            "restore_affected_gate", "gate_passed", actor="orchestrator",
-            evidence=["restore regression record"],
-        )
-        self.assertTrue(ok)
+        self.assertFalse(ok)
 
     def test_non_r0_restore_requires_gate(self):
         ok, _ = validate_transition(

@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 from typing import Iterable
@@ -51,6 +52,26 @@ def _safe_relative(raw: object) -> str:
     if path.is_absolute() or ".." in path.parts or str(path) in {"", "."}:
         raise ValueError(f"path must be relative and confined: {raw}")
     return str(path)
+
+
+def _allowed_git_commit(workspace: Path, revision: str) -> bool:
+    """Require a real commit reachable from the current repository HEAD."""
+
+    object_check = subprocess.run(
+        ["git", "-C", str(workspace), "cat-file", "-e", f"{revision}^{{commit}}"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if object_check.returncode != 0:
+        return False
+    ancestry = subprocess.run(
+        ["git", "-C", str(workspace), "merge-base", "--is-ancestor", revision, "HEAD"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return ancestry.returncode == 0
 
 
 def _records_by_id(records: Iterable[dict], record_type: str, label: str, errors: list[str]) -> dict[str, dict]:
@@ -173,6 +194,10 @@ def validate_evidence_graph(
         code_revision = experiment.get("code_revision")
         if not isinstance(code_revision, str) or not GIT_REVISION_RE.fullmatch(code_revision):
             errors.append(f"experiment {experiment_id} has no immutable code_revision")
+        elif workspace is None:
+            errors.append(f"experiment {experiment_id} requires a Git workspace to verify code_revision")
+        elif not _allowed_git_commit(workspace, code_revision):
+            errors.append(f"experiment {experiment_id} code_revision is not an allowed reachable Git commit")
         input_hash = experiment.get("input_manifest_hash")
         if not isinstance(input_hash, str) or not SHA256_RE.fullmatch(input_hash):
             errors.append(f"experiment {experiment_id} has invalid input_manifest_hash")

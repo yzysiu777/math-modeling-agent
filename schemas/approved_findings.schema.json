@@ -3,10 +3,10 @@
   "$id": "https://math-modeling-agent.local/schema/approved_findings.json",
   "type": "object",
   "required": [
-    "record_type", "approval_id", "case_id", "review_id", "approver", "approved_at",
+    "record_type", "approval_id", "case_id", "review_id", "approver", "approver_id", "approver_role", "approved_at", "expires_at",
     "finding_ids", "revision_id", "base_git_revision", "new_git_revision", "change_level",
     "change_surfaces", "affected_gates", "gate_impact", "allowed_files", "forbidden_files", "validation_check_ids",
-    "required_review_nodes", "candidate_submission_pdf", "candidate_pdf_path", "candidate_pdf_sha256", "status"
+    "required_review_nodes", "review_bindings", "candidate_submission_pdf", "candidate_pdf_path", "candidate_pdf_sha256", "executor_id", "modified_by", "project_manifest_path", "project_manifest_sha256", "status"
   ],
   "properties": {
     "record_type": {"const": "approved_findings"},
@@ -14,8 +14,10 @@
     "case_id": {"type": "string", "minLength": 1},
     "review_id": {"type": "string", "minLength": 1},
     "approver": {"type": "string", "minLength": 1},
+    "approver_id": {"type": "string", "minLength": 1},
+    "approver_role": {"const": "human_owner"},
     "approved_at": {"type": "string", "minLength": 1},
-    "expires_at": {"type": ["string", "null"]},
+    "expires_at": {"type": "string", "minLength": 1},
     "finding_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
     "revision_id": {"type": "string", "minLength": 1},
     "base_git_revision": {"type": "string", "minLength": 1},
@@ -28,9 +30,32 @@
     "forbidden_files": {"type": "array", "items": {"type": "string"}},
     "validation_check_ids": {"type": "array", "items": {"type": "string"}},
     "required_review_nodes": {"type": "array", "items": {"type": "string", "enum": ["C1", "C2", "C3"]}},
+    "review_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["node", "review_id", "path", "sha256", "case_id", "target_revision", "input_hashes", "reviewer_id", "reviewer_role"],
+        "properties": {
+          "node": {"type": "string", "enum": ["C1", "C2", "C3"]},
+          "review_id": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+          "case_id": {"type": "string", "minLength": 1},
+          "target_revision": {"type": "string", "minLength": 1},
+          "input_hashes": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}},
+          "reviewer_id": {"type": "string", "minLength": 1},
+          "reviewer_role": {"type": "string", "enum": ["independent_adversary", "independent_reviewer", "human"]}
+        },
+        "additionalProperties": false
+      }
+    },
     "candidate_submission_pdf": {"type": "boolean"},
     "candidate_pdf_path": {"type": ["string", "null"]},
     "candidate_pdf_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$"},
+    "executor_id": {"type": "string", "minLength": 1},
+    "modified_by": {"type": "string", "minLength": 1},
+    "project_manifest_path": {"type": "string", "minLength": 1},
+    "project_manifest_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
     "status": {"type": "string", "enum": ["draft", "approved", "applied", "rejected", "expired"]},
     "notes": {"type": "string"}
   },

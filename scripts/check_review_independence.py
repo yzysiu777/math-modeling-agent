@@ -17,6 +17,11 @@ REVIEW_LENSES = {
     "evidence_claim_audit",
 }
 EXPECTED_REVIEW_MODE = {"C1": "blind", "C2": "challenge", "C3": "results"}
+MINIMUM_REVIEW_LENSES = {
+    "C1": {"semantic_constraint_audit", "invariant_counterexample"},
+    "C2": {"alternative_formulation", "implementation_consistency", "invariant_counterexample"},
+    "C3": {"evidence_claim_audit", "implementation_consistency", "invariant_counterexample"},
+}
 METHOD_FAMILIES = {
     "unknown", "other", "linear_programming", "mixed_integer_programming", "nonlinear_programming",
     "dynamic_programming", "shortest_path", "constraint_programming", "metaheuristic",
@@ -81,11 +86,16 @@ def _validate_disconfirming_tests(value: object, field: str, errors: list[str]) 
 
 def validate_review_record(record: dict) -> tuple[bool, list[str]]:
     errors: list[str] = []
+    if record.get("record_type") != "review_record":
+        errors.append("record_type must be review_record")
+    for field in ("review_id", "case_id", "target_revision"):
+        if not _nonempty(record.get(field)):
+            errors.append(f"{field} is required and cannot be generic")
     node = record.get("critical_node")
     if node not in CRITICAL_NODES:
         errors.append("critical_node must be C1, C2, or C3")
-    if record.get("reviewer_role") not in {"independent_adversary", "human"}:
-        errors.append("reviewer_role must be independent_adversary or human")
+    if record.get("reviewer_role") not in {"independent_adversary", "independent_reviewer", "human"}:
+        errors.append("reviewer_role must be independent_adversary, independent_reviewer, or human")
     if not _nonempty(record.get("reviewer_id")):
         errors.append("reviewer_id is required")
     lenses = record.get("review_lens")
@@ -93,6 +103,10 @@ def validate_review_record(record: dict) -> tuple[bool, list[str]]:
         errors.append("review_lens is required and cannot be empty")
     elif any(lens not in REVIEW_LENSES for lens in lenses):
         errors.append("review_lens contains an unsupported lens")
+    if node in MINIMUM_REVIEW_LENSES and isinstance(lenses, list):
+        missing_lenses = MINIMUM_REVIEW_LENSES[node].difference(lenses)
+        if missing_lenses:
+            errors.append(f"{node} is missing minimum review lens: {sorted(missing_lenses)}")
     if node in EXPECTED_REVIEW_MODE and record.get("review_mode") != EXPECTED_REVIEW_MODE[node]:
         errors.append(f"{node} must use review_mode={EXPECTED_REVIEW_MODE[node]}")
 
@@ -123,6 +137,13 @@ def validate_review_record(record: dict) -> tuple[bool, list[str]]:
         value = record.get(field)
         if not isinstance(value, list) or not value:
             errors.append(f"{field} must list at least one item")
+    input_hashes = record.get("input_hashes")
+    if not isinstance(input_hashes, list) or not input_hashes:
+        errors.append("input_hashes must contain at least one input hash")
+    elif any(not isinstance(value, str) or len(value) != 64 or any(char not in "0123456789abcdefABCDEF" for char in value) for value in input_hashes):
+        errors.append("input_hashes must contain only valid SHA-256 values")
+    if not isinstance(record.get("target_artifacts"), list) or not record.get("target_artifacts"):
+        errors.append("target_artifacts must contain at least one artifact")
     disconfirming = _validate_disconfirming_tests(record.get("disconfirming_tests"), "disconfirming_tests", errors)
     counterexamples = _validate_disconfirming_tests(record.get("counterexamples"), "counterexamples", errors)
     all_tests = disconfirming + counterexamples

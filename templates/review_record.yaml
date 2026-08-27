@@ -1,11 +1,12 @@
 record_type: review_record
 review_id: REV-YYYYMMDD-0001
 case_id: CASE-YYYYMMDD-0001
+target_revision: REVISION-YYYYMMDD-0001
 reviewer_role: independent_adversary
 reviewer_id: claude-reviewer-001
 critical_node: C1
 review_mode: blind
-review_lens: [semantic_constraint_audit]
+review_lens: [semantic_constraint_audit, invariant_counterexample]
 primary_method_family: mixed_integer_programming
 alternative_method_family: constraint_programming
 methodological_difference:

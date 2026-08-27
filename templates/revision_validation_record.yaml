@@ -1,4 +1,5 @@
 record_type: revision_validation_record
+closure_id: CLOSURE-YYYYMMDD-0001
 revision_id: REVISION-YYYYMMDD-0001
 case_id: CASE-YYYYMMDD-0001
 approval_id: null
@@ -6,9 +7,13 @@ source_review_id: null
 finding_ids: []
 base_git_revision: "待填写"
 new_git_revision: "待填写"
+executor_id: "执行者 ID"
+modifier_id: "修改者 ID"
 change_level: R0
 change_surfaces: [text_only]
 changed_files: ["待填写文件"]
+project_manifest_path: cases/CASE-YYYYMMDD-0001/manifest.yaml
+project_manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
 evidence_root: cases/CASE-YYYYMMDD-0001/coordination/evidence/REVISION-YYYYMMDD-0001
 runner_id: trusted_check_runner
 runner_version: 1.0.0
@@ -31,9 +36,12 @@ check_results:
     artifact_hashes: {}
     attestation_path: null
     attestation_sha256: null
+    attestation_id: null
     notes: "示例模板：实际记录必须由可信运行器生成"
 output_hashes: {}
 new_experiment_ids: []
+required_review_nodes: []
+review_bindings: []
 claim_status_updates: []
 closed_findings: []
 unresolved_findings: []

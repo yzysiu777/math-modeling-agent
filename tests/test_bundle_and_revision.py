@@ -1,4 +1,5 @@
 import json
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -46,23 +47,30 @@ class RevisionBoundaryTests(unittest.TestCase):
         self.assertTrue(any("empty" in error for error in errors))
 
     def test_boundary_checks_before_and_after_hashes(self):
-        approval = {
-            "record_type": "approved_findings",
-            "status": "approved",
-            "allowed_files": ["paper/main.tex"],
-            "forbidden_files": ["input/"],
-            "validation_check_ids": ["latex_compile"],
-        }
-        impact = {
-            "changed_files": ["paper/main.tex"],
-            "before_hashes": {"paper/main.tex": "before"},
-            "after_hashes": {"paper/main.tex": "after"},
-        }
-        with patch("scripts.check_approved_revision.changed_files", return_value=["paper/main.tex"]), patch(
-            "scripts.check_approved_revision.git_file_sha256", side_effect=["before", "after"]
-        ):
-            errors = validate_revision_boundary(approval, impact)
-        self.assertEqual(errors, [])
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp)
+            manifest = workspace / "manifest.yaml"
+            manifest.write_text(
+                "record_type: project_manifest\ncase_id: CASE-1\n"
+                "owner:\n  name: owner\n  owner_id: owner-1\n  role: human_owner\n"
+                "identity_allowlist:\n  - id: owner-1\n    role: human_owner\n",
+                encoding="utf-8",
+            )
+            approval = {
+                "record_type": "approved_findings", "status": "approved", "case_id": "CASE-1", "approver_id": "owner-1", "approver_role": "human_owner",
+                "approved_at": "2026-08-27T00:00:00+00:00", "expires_at": "2027-01-01T00:00:00+00:00",
+                "allowed_files": ["paper/main.tex"], "forbidden_files": ["input/"], "validation_check_ids": ["latex_compile"],
+                "project_manifest_path": "manifest.yaml", "project_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+            }
+            impact = {
+                "case_id": "CASE-1", "changed_files": ["paper/main.tex"], "before_hashes": {"paper/main.tex": "before"},
+                "after_hashes": {"paper/main.tex": "after"}, "executor_id": "executor-1", "modified_by": "modifier-1",
+            }
+            with patch("scripts.check_approved_revision.changed_files", return_value=["paper/main.tex"]), patch(
+                "scripts.check_approved_revision.git_file_sha256", side_effect=["before", "after"]
+            ):
+                errors = validate_revision_boundary(approval, impact, workspace=workspace)
+            self.assertEqual(errors, [])
 
 
 if __name__ == "__main__":

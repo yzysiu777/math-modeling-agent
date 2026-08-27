@@ -4,8 +4,16 @@ title: "通用数学建模案例模板"
 language_policy: zh-human-readable-en-schema
 route: insufficient_information
 owner:
-  name: ""
+  name: "人工负责人（填写）"
+  owner_id: "human-owner-id（填写）"
   role: human_owner
+identity_allowlist:
+  - id: "human-owner-id（填写）"
+    role: human_owner
+    name: "人工负责人（填写）"
+  - id: "independent-reviewer-id（填写）"
+    role: independent_adversary
+    name: "独立审核者（填写）"
 deadline: null
 objective:
   user_goal: ""

@@ -28,12 +28,13 @@ try:
         CHECK_IMPLEMENTATION_STATUS,
         SAFE_CHECK_IDS,
         required_checks_for,
+        required_review_nodes_for,
     )
 except ImportError:  # pragma: no cover
     from check_approved_revision import validate_revision_boundary
     from check_evidence_graph import load_record, validate_evidence_graph
     from check_review_independence import load_record as load_review_yaml, validate_review_record
-    from gate_contract import CHANGE_LEVELS, CHANGE_SURFACES, CHECK_IMPLEMENTATION_STATUS, SAFE_CHECK_IDS, required_checks_for
+    from gate_contract import CHANGE_LEVELS, CHANGE_SURFACES, CHECK_IMPLEMENTATION_STATUS, SAFE_CHECK_IDS, required_checks_for, required_review_nodes_for
 
 
 RUNNER_ID = "trusted_check_runner"
@@ -182,6 +183,24 @@ def _internal_pdf_hash(args: argparse.Namespace, workspace: Path) -> tuple[int, 
     return 0, f"candidate PDF SHA-256: {digest}\n", ""
 
 
+def _structured_unresolved(raw_values: list[object]) -> list[dict]:
+    """Accept only an explicit ``finding_id|severity|statement`` encoding."""
+
+    findings: list[dict] = []
+    for raw in raw_values:
+        if isinstance(raw, dict):
+            findings.append(raw)
+            continue
+        parts = str(raw).split("|", 2)
+        if len(parts) != 3:
+            raise ValueError("--unresolved-finding must be finding_id|severity|statement")
+        finding_id, severity, statement = parts
+        if severity not in {"P0", "P1", "P2", "P3"} or not finding_id or not statement:
+            raise ValueError("--unresolved-finding has invalid structured severity")
+        findings.append({"finding_id": finding_id, "severity": severity, "statement": statement})
+    return findings
+
+
 def _fixed_subprocess(check_id: str, args: argparse.Namespace) -> list[str] | None:
     if check_id in {"latex_fast_compile", "latex_compile"}:
         return ["make", "paper-ci"]
@@ -286,6 +305,7 @@ def run_checks(args: argparse.Namespace) -> dict:
             "artifact_hashes": artifact_hashes,
             "attestation_path": None,
             "attestation_sha256": None,
+            "attestation_id": None,
             "notes": "fixed command or internal validator" if implementation == "implemented" else "human evidence must be attached",
         }
         check_results.append(result)
@@ -293,8 +313,11 @@ def run_checks(args: argparse.Namespace) -> dict:
     runner_path = workspace / SCRIPT_RELATIVE
     if not runner_path.is_file():
         raise FileNotFoundError(runner_path)
+    manifest_path = relative_path(args.manifest) if getattr(args, "manifest", None) else None
+    manifest_file = workspace / manifest_path if manifest_path else None
     record = {
         "record_type": "revision_validation_record",
+        "closure_id": getattr(args, "closure_id", None) or f"CLOSURE-{args.revision_id}",
         "revision_id": args.revision_id,
         "case_id": args.case_id,
         "approval_id": args.approval_id,
@@ -302,9 +325,13 @@ def run_checks(args: argparse.Namespace) -> dict:
         "finding_ids": list(args.finding_id),
         "base_git_revision": args.base_git_revision,
         "new_git_revision": args.new_git_revision,
+        "executor_id": getattr(args, "executor_id", None) or "trusted_check_runner",
+        "modifier_id": getattr(args, "modifier_id", None) or "unknown-modifier",
         "change_level": args.change_level,
         "change_surfaces": surfaces,
         "changed_files": [relative_path(path) for path in args.changed_file],
+        "project_manifest_path": manifest_path,
+        "project_manifest_sha256": sha256_file(manifest_file) if manifest_file and manifest_file.is_file() else None,
         "evidence_root": evidence_root_rel,
         "runner_id": RUNNER_ID,
         "runner_version": RUNNER_VERSION,
@@ -313,11 +340,13 @@ def run_checks(args: argparse.Namespace) -> dict:
         "execution_started_at": started_at,
         "execution_finished_at": finished_at,
         "check_results": check_results,
+        "required_review_nodes": required_review_nodes_for(surfaces),
+        "review_bindings": [],
         "output_hashes": output_hashes,
         "new_experiment_ids": list(args.new_experiment_id),
         "claim_status_updates": [],
         "closed_findings": [],
-        "unresolved_findings": list(args.unresolved_finding),
+        "unresolved_findings": _structured_unresolved(list(args.unresolved_finding)),
         "validator": RUNNER_ID,
         "validation_status": "passed" if all(item["status"] == "passed" for item in check_results) else "failed",
     }
@@ -363,6 +392,9 @@ def main() -> int:
     parser.add_argument("--output-file", action="append", default=[])
     parser.add_argument("--base-ref", default="main")
     parser.add_argument("--head-ref", default="HEAD")
+    parser.add_argument("--closure-id")
+    parser.add_argument("--executor-id")
+    parser.add_argument("--modifier-id")
     args = parser.parse_args()
     try:
         record = run_checks(args)

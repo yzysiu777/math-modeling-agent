@@ -11,9 +11,17 @@ class HumanSignoffTests(unittest.TestCase):
         pdf = workspace / "paper/main.pdf"
         pdf.parent.mkdir(parents=True)
         pdf.write_bytes(b"pdf fixture")
+        manifest = workspace / "manifest.yaml"
+        manifest.write_text(
+            "record_type: project_manifest\ncase_id: CASE-1\n"
+            "owner:\n  name: owner\n  owner_id: owner-1\n  role: human_owner\n"
+            "identity_allowlist:\n  - id: owner-1\n    role: human_owner\n",
+            encoding="utf-8",
+        )
         return {
             "record_type": "human_signoff", "signoff_id": "SIGN-1", "case_id": "CASE-1",
             "signer": "owner", "signer_id": "owner-1", "signer_role": "human_owner", "actor": "owner-1",
+            "project_manifest_path": "manifest.yaml", "project_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
             "signed_at": "2026-08-27T00:00:00+00:00", "git_revision": "a" * 40,
             "pdf_path": "paper/main.pdf", "pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
             "approved_gates": [f"G{i}" for i in range(13)], "review_scope": ["all"],
@@ -24,16 +32,37 @@ class HumanSignoffTests(unittest.TestCase):
     def test_valid_signoff(self):
         with tempfile.TemporaryDirectory() as temp:
             workspace = Path(temp)
-            self.assertEqual(validate_human_signoff(self.make_signoff(workspace), actor="owner-1", current_revision="a" * 40, workspace=workspace), [])
+            signoff = self.make_signoff(workspace)
+            self.assertEqual(validate_human_signoff(signoff, actor="owner-1", current_revision="a" * 40, workspace=workspace, manifest={
+                "record_type": "project_manifest", "case_id": "CASE-1",
+                "owner": {"name": "owner", "owner_id": "owner-1", "role": "human_owner"},
+                "identity_allowlist": [{"id": "owner-1", "role": "human_owner"}],
+            }), [])
 
     def test_hash_or_open_p1_blocks_freeze(self):
         with tempfile.TemporaryDirectory() as temp:
             workspace = Path(temp)
             signoff = self.make_signoff(workspace)
             signoff["pdf_sha256"] = "0" * 64
-            signoff["unresolved_findings"] = ["P1-F-1"]
-            errors = validate_human_signoff(signoff, actor="owner-1", current_revision="a" * 40, workspace=workspace)
+            signoff["unresolved_findings"] = [{"finding_id": "P1-F-1", "severity": "P1", "statement": "open"}]
+            errors = validate_human_signoff(signoff, actor="owner-1", current_revision="a" * 40, workspace=workspace, manifest={
+                "record_type": "project_manifest", "case_id": "CASE-1",
+                "owner": {"name": "owner", "owner_id": "owner-1", "role": "human_owner"},
+                "identity_allowlist": [{"id": "owner-1", "role": "human_owner"}],
+            })
             self.assertTrue(any("hash" in error or "P0/P1" in error for error in errors))
+
+    def test_model_cannot_claim_human_owner(self):
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp)
+            signoff = self.make_signoff(workspace)
+            signoff["signer_id"] = signoff["actor"] = "codex-agent"
+            errors = validate_human_signoff(signoff, actor="codex-agent", current_revision="a" * 40, workspace=workspace, manifest={
+                "record_type": "project_manifest", "case_id": "CASE-1",
+                "owner": {"name": "owner", "owner_id": "owner-1", "role": "human_owner"},
+                "identity_allowlist": [{"id": "owner-1", "role": "human_owner"}],
+            })
+            self.assertTrue(any("frozen project owner" in error or "registered human identity" in error for error in errors))
 
 
 if __name__ == "__main__":

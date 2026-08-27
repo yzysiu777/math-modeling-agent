@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 from scripts.check_revision_closure import validate_revision_closure
 from scripts.classify_change import classify_change
 from scripts.gate_contract import (
@@ -34,7 +36,47 @@ def build_records(workspace: Path, *, level="R0", surfaces=None, changed_files=N
     affected_claims = affected_claims or []
     revision_id = "REV-TEST-001"
     case_id = "CASE-TEST-001"
+    manifest_path = workspace / "manifest.yaml"
+    manifest_path.write_text(
+        "record_type: project_manifest\n"
+        f"case_id: {case_id}\n"
+        "owner:\n  name: Test Owner\n  owner_id: owner-1\n  role: human_owner\n"
+        "identity_allowlist:\n"
+        "  - id: owner-1\n    role: human_owner\n"
+        "  - id: reviewer-1\n    role: independent_adversary\n",
+        encoding="utf-8",
+    )
     checks = required_checks_for(level, changed_files, change_surfaces=surfaces)
+    review_nodes = required_review_nodes_for(surfaces)
+    review_bindings = []
+    for node in review_nodes:
+        review_path = workspace / f"reviews/{node}.yaml"
+        review_path.parent.mkdir(parents=True, exist_ok=True)
+        review = {
+            "record_type": "review_record", "review_id": f"REV-{node}-TEST", "case_id": case_id,
+            "target_revision": revision_id, "reviewer_role": "independent_adversary", "reviewer_id": "reviewer-1",
+            "critical_node": node, "review_mode": {"C1": "blind", "C2": "challenge", "C3": "results"}[node],
+            "review_lens": {
+                "C1": ["semantic_constraint_audit", "invariant_counterexample"],
+                "C2": ["alternative_formulation", "implementation_consistency", "invariant_counterexample"],
+                "C3": ["evidence_claim_audit", "implementation_consistency", "invariant_counterexample"],
+            }[node],
+            "primary_method_family": "mixed_integer_programming", "alternative_method_family": "constraint_programming",
+            "methodological_difference": {"axis": "feasibility", "primary_assumption": "primary", "alternative_assumption": "alternative", "discriminating_test": "small counterexample"},
+            "critical_decisions_reviewed": ["decision"],
+            "disconfirming_tests": [{"test_id": "T-1", "target": "constraint", "input_or_case": "small case", "expected_falsifier": "violation", "actual_result": "none", "evidence": ["evidence/review.log"], "status": "passed"}],
+            "counterexamples": [], "what_was_checked": ["contract"], "what_was_not_checked": ["scale"],
+            "human_decisions_required": [], "target_artifacts": ["model.md"], "input_hashes": ["0" * 64],
+            "verdict": "PASS_WITH_LIMITATIONS", "findings": [], "unresolved_questions": [],
+            "uncertainty": ["scale"], "reviewer_signature": "reviewer-1", "created_at": "2026-08-27T00:00:00+00:00",
+        }
+        review_path.write_text(yaml.safe_dump(review, sort_keys=False), encoding="utf-8")
+        review_bindings.append({
+            "node": node, "review_id": review["review_id"], "path": str(review_path.relative_to(workspace)),
+            "sha256": digest(review_path), "case_id": case_id, "target_revision": revision_id,
+            "input_hashes": ["0" * 64], "reviewer_id": "reviewer-1", "reviewer_role": "independent_adversary",
+        })
+    source_review_id = (review_bindings[0]["review_id"] if review_nodes else "REV-MANUAL-TEST") if any(CHECK_IMPLEMENTATION_STATUS[check] == "manual_required" for check in checks) or review_nodes else None
     evidence_root = workspace / "evidence" / revision_id
     evidence_root.mkdir(parents=True)
     check_results = []
@@ -63,9 +105,20 @@ def build_records(workspace: Path, *, level="R0", surfaces=None, changed_files=N
         }
         if implementation == "manual_required":
             attestation = evidence_root / f"{index:02d}-{check_id}.attestation"
-            attestation.write_text("human evidence\n", encoding="utf-8")
+            evidence_artifact = workspace / f"manual-evidence/{index:02d}-{check_id}.log"
+            evidence_artifact.parent.mkdir(parents=True, exist_ok=True)
+            evidence_artifact.write_text(f"evidence for {check_id}\n", encoding="utf-8")
+            attestation_record = {
+                "record_type": "manual_attestation", "attestation_id": f"ATT-{check_id}", "case_id": case_id,
+                "revision_id": revision_id, "check_id": check_id, "attestor_role": "independent_adversary",
+                "attestor_id": "reviewer-1", "source_review_id": source_review_id,
+                "evidence_artifacts": [{"artifact_id": f"ART-{check_id}", "path": str(evidence_artifact.relative_to(workspace)), "sha256": digest(evidence_artifact), "kind": "manual_check_evidence"}],
+                "signed_at": "2026-08-27T00:00:00+00:00", "decision": "passed", "executor_id": "executor-1", "modifier_id": "modifier-1",
+            }
+            attestation.write_text(yaml.safe_dump(attestation_record, sort_keys=False), encoding="utf-8")
             entry["attestation_path"] = str(attestation.relative_to(workspace))
             entry["attestation_sha256"] = digest(attestation)
+            entry["attestation_id"] = attestation_record["attestation_id"]
         check_results.append(entry)
     output_hashes = {}
     if affected_experiments:
@@ -79,8 +132,9 @@ def build_records(workspace: Path, *, level="R0", surfaces=None, changed_files=N
         "case_id": case_id,
         "base_git_revision": "a" * 40,
         "new_git_revision": "b" * 40,
+        "executor_id": "executor-1",
         "approval_id": None,
-        "source_review_id": None,
+        "source_review_id": source_review_id,
         "finding_ids": [],
         "change_level": level,
         "change_surfaces": surfaces,
@@ -98,21 +152,29 @@ def build_records(workspace: Path, *, level="R0", surfaces=None, changed_files=N
         "candidate_pdf_path": None,
         "candidate_pdf_sha256": None,
         "unresolved_findings": [],
-        "modified_by": "executor-1",
+        "modified_by": "modifier-1",
+        "project_manifest_path": str(manifest_path.relative_to(workspace)),
+        "project_manifest_sha256": digest(manifest_path),
+        "review_bindings": review_bindings,
         "validation_status": "pending",
     }
     validation = {
         "record_type": "revision_validation_record",
+        "closure_id": "CLOSURE-TEST-001",
         "revision_id": revision_id,
         "case_id": case_id,
         "approval_id": None,
-        "source_review_id": None,
+        "source_review_id": source_review_id,
         "finding_ids": [],
         "base_git_revision": impact["base_git_revision"],
         "new_git_revision": impact["new_git_revision"],
+        "executor_id": impact["executor_id"],
+        "modifier_id": impact["modified_by"],
         "change_level": level,
         "change_surfaces": surfaces,
         "changed_files": changed_files,
+        "project_manifest_path": impact["project_manifest_path"],
+        "project_manifest_sha256": impact["project_manifest_sha256"],
         "evidence_root": str(evidence_root.relative_to(workspace)),
         "runner_id": "trusted_check_runner",
         "runner_version": "1.0.0",
@@ -121,6 +183,8 @@ def build_records(workspace: Path, *, level="R0", surfaces=None, changed_files=N
         "execution_started_at": "2026-08-27T00:00:00+00:00",
         "execution_finished_at": "2026-08-27T00:01:00+00:00",
         "check_results": check_results,
+        "required_review_nodes": review_nodes,
+        "review_bindings": review_bindings,
         "output_hashes": output_hashes,
         "new_experiment_ids": ["EXP-NEW"] if affected_experiments else [],
         "claim_status_updates": [{"claim_id": item, "status": "revalidated"} for item in affected_claims],
@@ -246,14 +310,17 @@ class RevisionContractTests(unittest.TestCase):
             validation.update({"approval_id": "APR-1", "source_review_id": "REV-REVIEW-1", "finding_ids": ["F-1"]})
             approval = {
                 "record_type": "approved_findings", "approval_id": "APR-1", "case_id": impact["case_id"],
-                "review_id": "REV-REVIEW-1", "approver": "human_owner", "approved_at": "2026-08-27T00:00:00+00:00",
+                "review_id": "REV-REVIEW-1", "approver": "human_owner", "approver_id": "owner-1", "approver_role": "human_owner",
+                "approved_at": "2026-08-27T00:00:00+00:00", "expires_at": "2027-01-01T00:00:00+00:00",
                 "finding_ids": ["F-1"], "revision_id": impact["revision_id"],
                 "base_git_revision": impact["base_git_revision"], "new_git_revision": impact["new_git_revision"],
                 "change_level": impact["change_level"], "change_surfaces": impact["change_surfaces"],
                 "affected_gates": impact["affected_gates"], "gate_impact": impact["gate_impact"],
                 "allowed_files": ["notes.md"], "forbidden_files": [],
-                "validation_check_ids": impact["required_checks"], "required_review_nodes": [],
+                "validation_check_ids": impact["required_checks"], "required_review_nodes": [], "review_bindings": [],
                 "candidate_submission_pdf": False, "candidate_pdf_path": None, "candidate_pdf_sha256": None,
+                "executor_id": impact["executor_id"], "modified_by": impact["modified_by"],
+                "project_manifest_path": impact["project_manifest_path"], "project_manifest_sha256": impact["project_manifest_sha256"],
                 "status": "approved",
             }
             self.assertEqual(validate_revision_closure(impact, validation, approval, workspace=workspace), [])

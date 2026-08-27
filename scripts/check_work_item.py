@@ -11,6 +11,9 @@ from pathlib import Path, PurePosixPath
 
 try:
     from .check_evidence_graph import load_record
+    from .check_manual_attestation import validate_manual_attestation
+    from .check_review_independence import validate_review_record
+    from .identity_contract import validate_independent_reviewer, validate_manifest_registry
     from .gate_contract import (
         CHANGE_LEVELS,
         CHANGE_SURFACES,
@@ -22,12 +25,23 @@ try:
     )
 except ImportError:  # pragma: no cover
     from check_evidence_graph import load_record
+    from check_manual_attestation import validate_manual_attestation
+    from check_review_independence import validate_review_record
+    from identity_contract import validate_independent_reviewer, validate_manifest_registry
     from gate_contract import CHANGE_LEVELS, CHANGE_SURFACES, SAFE_CHECK_IDS, affected_gates_for_surfaces, change_level_for_surfaces, required_checks_for, required_review_nodes_for
 
 
 HEX64 = re.compile(r"^[0-9a-fA-F]{64}$")
 ACTIVE_STATUSES = {"executing", "review_ready"}
 RESULT_STATUSES = {"review_ready", "accepted", "revision_requested", "blocked"}
+WORK_ITEM_TRANSITIONS = {
+    "proposed": {"approved"},
+    "approved": {"executing"},
+    "executing": {"review_ready"},
+    "review_ready": {"accepted", "revision_requested", "blocked"},
+    "revision_requested": {"executing", "blocked"},
+    "blocked": {"approved"},
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -54,12 +68,187 @@ def _files_overlap(left: str, right: str) -> bool:
     return a == b or a.startswith(b + "/") or b.startswith(a + "/")
 
 
+def validate_work_item_transition(from_state: str, to_state: str) -> list[str]:
+    if from_state not in WORK_ITEM_TRANSITIONS:
+        return [f"unknown work-item state transition: {from_state} -> {to_state}"]
+    if to_state not in WORK_ITEM_TRANSITIONS[from_state]:
+        return [f"illegal work-item transition: {from_state} -> {to_state}"]
+    return []
+
+
+def _verify_hashed_file(workspace: Path | None, raw_path: object, expected_hash: object, label: str, errors: list[str]) -> Path | None:
+    path = safe_relative(raw_path)
+    if path is None:
+        errors.append(f"{label} path must be safe and relative")
+        return None
+    if not isinstance(expected_hash, str) or not HEX64.fullmatch(expected_hash):
+        errors.append(f"{label} hash is invalid")
+        return None
+    if workspace is None:
+        errors.append(f"{label} requires a workspace")
+        return None
+    candidate = (workspace / path).resolve()
+    try:
+        candidate.relative_to(workspace.resolve())
+    except ValueError:
+        errors.append(f"{label} path escapes workspace")
+        return None
+    if not candidate.is_file():
+        errors.append(f"{label} file does not exist: {path}")
+        return None
+    if sha256_file(candidate).lower() != expected_hash.lower():
+        errors.append(f"{label} hash mismatch: {path}")
+        return None
+    return candidate
+
+
+def _validate_trusted_validation_record(item: dict, workspace: Path, errors: list[str]) -> dict | None:
+    path = _verify_hashed_file(
+        workspace,
+        item.get("trusted_validation_record_path"),
+        item.get("trusted_validation_record_sha256"),
+        "trusted validation record",
+        errors,
+    )
+    if path is None:
+        return None
+    try:
+        record = load_record(path)
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"trusted validation record cannot be parsed: {exc}")
+        return None
+    if record.get("record_type") != "revision_validation_record":
+        errors.append("trusted validation record has the wrong record_type")
+    if record.get("closure_id") != item.get("trusted_validation_record_id"):
+        errors.append("trusted validation record ID does not match the work item")
+    for field in ("case_id", "revision_id"):
+        if record.get(field) != item.get(field):
+            errors.append(f"trusted validation record {field} does not match the work item")
+    if record.get("new_git_revision") != item.get("result_git_revision"):
+        errors.append("trusted validation record new_git_revision does not match result_git_revision")
+    if record.get("base_git_revision") != item.get("source_git_revision"):
+        errors.append("trusted validation record base_git_revision does not match source_git_revision")
+    if record.get("change_level") != item.get("change_level") or record.get("change_surfaces") != item.get("change_surfaces"):
+        errors.append("trusted validation record change scope does not match the work item")
+    if not record.get("runner_version") or not record.get("execution_started_at") or not record.get("execution_finished_at"):
+        errors.append("trusted validation record lacks execution metadata")
+    if record.get("runner_id") != "trusted_check_runner":
+        errors.append("accepted work item requires a trusted_check_runner record")
+    if record.get("validation_status") != "passed":
+        errors.append("trusted validation record is not passed")
+    if not record.get("executor_id"):
+        errors.append("trusted validation record executor_id is required")
+    elif record.get("executor_id") != item.get("executor_id"):
+        errors.append("trusted validation record executor_id does not match the work item")
+    if not record.get("modifier_id"):
+        errors.append("trusted validation record modifier_id is required")
+    runner_path = safe_relative(record.get("runner_script"))
+    if runner_path is None or not isinstance(record.get("runner_script_sha256"), str) or not HEX64.fullmatch(record["runner_script_sha256"]):
+        errors.append("trusted validation record has no valid runner script binding")
+    elif not (workspace / runner_path).is_file() or sha256_file(workspace / runner_path).lower() != record["runner_script_sha256"].lower():
+        errors.append("trusted validation record runner script binding is invalid")
+    evidence_root = safe_relative(record.get("evidence_root"))
+    if evidence_root is None or not (workspace / evidence_root).is_dir():
+        errors.append("trusted validation record evidence_root is missing")
+    manifest_path = safe_relative(record.get("project_manifest_path"))
+    manifest: dict | None = None
+    if manifest_path is None:
+        errors.append("trusted validation record requires a frozen project manifest")
+    else:
+        manifest_hash = record.get("project_manifest_sha256")
+        manifest_file = (workspace / manifest_path).resolve()
+        try:
+            manifest_file.relative_to(workspace.resolve())
+        except ValueError:
+            errors.append("trusted validation record project manifest escapes workspace")
+            return None
+        if not isinstance(manifest_hash, str) or not HEX64.fullmatch(manifest_hash) or not manifest_file.is_file() or sha256_file(manifest_file).lower() != manifest_hash.lower():
+            errors.append("trusted validation record project manifest binding is invalid")
+        else:
+            try:
+                manifest = load_record(manifest_file)
+                validate_manifest_registry(manifest, errors)
+                if manifest.get("case_id") != item.get("case_id"):
+                    errors.append("trusted validation record project manifest case_id does not match the work item")
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"trusted validation record project manifest cannot be parsed: {exc}")
+    required = set(item.get("required_checks") or [])
+    results = record.get("check_results") or []
+    result_ids = {entry.get("check_id") for entry in results if isinstance(entry, dict)}
+    if result_ids != required:
+        errors.append("trusted validation record does not cover every required check")
+    for entry in results:
+        if not isinstance(entry, dict) or entry.get("check_id") not in required:
+            continue
+        if entry.get("status") != "passed":
+            errors.append(f"trusted validation record contains a non-passed check: {entry.get('check_id')}")
+        for field, hash_field in (("stdout_path", "stdout_sha256"), ("stderr_path", "stderr_sha256")):
+            path = safe_relative(entry.get(field))
+            expected = entry.get(hash_field)
+            if path is None or not isinstance(expected, str) or not HEX64.fullmatch(expected):
+                errors.append(f"trusted validation record has invalid {field}: {entry.get('check_id')}")
+            elif not (workspace / path).is_file() or sha256_file(workspace / path).lower() != expected.lower():
+                errors.append(f"trusted validation record {field} hash is invalid: {entry.get('check_id')}")
+        if entry.get("execution_kind") == "trusted_runner":
+            if entry.get("executor") != "trusted_check_runner" or entry.get("exit_code") != 0:
+                errors.append(f"trusted validation record trusted check executor/exit is invalid: {entry.get('check_id')}")
+        elif entry.get("execution_kind") == "human_attestation":
+            if not entry.get("attestation_id"):
+                errors.append(f"manual check lacks structured attestation: {entry.get('check_id')}")
+            attestation_path = safe_relative(entry.get("attestation_path"))
+            attestation_hash = entry.get("attestation_sha256")
+            if attestation_path is None or not isinstance(attestation_hash, str) or not HEX64.fullmatch(attestation_hash):
+                errors.append(f"manual check has no hashed attestation: {entry.get('check_id')}")
+            elif not (workspace / attestation_path).is_file() or sha256_file(workspace / attestation_path).lower() != attestation_hash.lower():
+                errors.append(f"manual check attestation hash is invalid: {entry.get('check_id')}")
+        else:
+            errors.append(f"trusted validation record has unknown execution_kind: {entry.get('check_id')}")
+    return manifest
+
+
+def _validate_independent_verdict(item: dict, workspace: Path, errors: list[str], manifest: dict | None) -> None:
+    path = _verify_hashed_file(
+        workspace,
+        item.get("review_verdict_path"),
+        item.get("review_verdict_sha256"),
+        "independent reviewer verdict",
+        errors,
+    )
+    if path is None:
+        return
+    try:
+        record = load_record(path)
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"independent reviewer verdict cannot be parsed: {exc}")
+        return
+    if record.get("review_id") != item.get("review_id"):
+        errors.append("review verdict review_id does not match the work item")
+    if record.get("case_id") != item.get("case_id"):
+        errors.append("review verdict case_id does not match the work item")
+    if record.get("target_revision") != item.get("revision_id"):
+        errors.append("review verdict target_revision does not match the work item revision")
+    if record.get("reviewer_id") != item.get("reviewer_id"):
+        errors.append("review verdict reviewer_id does not match the work item")
+    if record.get("reviewer_role") != item.get("reviewer_role") or record.get("reviewer_role") not in {"independent_adversary", "independent_reviewer"}:
+        errors.append("accepted work item requires an independent reviewer verdict")
+    elif manifest is None:
+        errors.append("accepted work item requires a frozen project identity registry for its reviewer")
+    else:
+        validate_independent_reviewer(manifest, record.get("reviewer_id"), record.get("reviewer_role"), errors)
+    if record.get("verdict") not in {"PASS", "PASS_WITH_LIMITATIONS"}:
+        errors.append("independent reviewer verdict is not passing")
+    ok, review_errors = validate_review_record(record)
+    if not ok:
+        errors.extend(f"invalid independent reviewer verdict: {error}" for error in review_errors)
+
+
 def validate_work_item(
     item: dict,
     *,
     workspace: Path | None = None,
     source_ref: str | None = None,
     result_ref: str | None = None,
+    from_status: str | None = None,
 ) -> list[str]:
     errors: list[str] = []
     if item.get("record_type") != "work_item":
@@ -70,6 +259,17 @@ def validate_work_item(
     status = item.get("status")
     if status not in {"proposed", "approved", "executing", "review_ready", "accepted", "revision_requested", "blocked"}:
         errors.append("status is invalid")
+    previous_status = item.get("previous_status")
+    if from_status is not None:
+        if previous_status != from_status:
+            errors.append("previous_status does not match the requested transition source")
+        else:
+            errors.extend(validate_work_item_transition(from_status, status))
+    if status == "accepted":
+        if previous_status != "review_ready":
+            errors.append("accepted work item must transition from review_ready, never directly from proposed")
+        else:
+            errors.extend(validate_work_item_transition(previous_status, status))
     if "human_frozen" in item:
         errors.append("work item acceptance cannot imply human_frozen")
     if item.get("executor_id") == item.get("reviewer_id"):
@@ -153,7 +353,15 @@ def validate_work_item(
                     errors.append(f"test evidence file does not exist: {path}")
                 elif sha256_file(evidence_path).lower() != entry["sha256"].lower():
                     errors.append(f"test evidence hash mismatch: {path}")
+        if workspace is None:
+            errors.append("accepted work item requires a workspace for trusted evidence verification")
+        else:
+            manifest = _validate_trusted_validation_record(item, workspace, errors)
+            _validate_independent_verdict(item, workspace, errors, manifest)
     unresolved = item.get("unresolved_items") or []
+    for index, entry in enumerate(unresolved):
+        if not isinstance(entry, dict) or entry.get("severity") not in {"P0", "P1", "P2", "P3"}:
+            errors.append(f"unresolved_items[{index}] must be structured with severity")
     if status == "accepted" and any(isinstance(entry, dict) and entry.get("severity") in {"P0", "P1"} for entry in unresolved):
         errors.append("accepted work item cannot contain unresolved P0/P1 items")
     return sorted(set(errors))
@@ -188,6 +396,7 @@ def main() -> int:
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--source-ref")
     parser.add_argument("--result-ref")
+    parser.add_argument("--from-status")
     args = parser.parse_args()
     try:
         items = [load_record(path) for path in args.work_item]
@@ -196,6 +405,7 @@ def main() -> int:
             workspace=args.workspace.resolve() if args.workspace else None,
             source_ref=args.source_ref,
             result_ref=args.result_ref,
+            from_status=args.from_status,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"FAIL work item: {exc}", file=sys.stderr)

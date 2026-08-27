@@ -3,6 +3,7 @@ revision_id: REVISION-YYYYMMDD-0001
 case_id: CASE-YYYYMMDD-0001
 base_git_revision: "待填写"
 new_git_revision: "待填写"
+executor_id: "执行者 ID"
 change_level: R0
 approval_id: null
 source_review_id: null
@@ -18,9 +19,12 @@ affected_experiments: []
 affected_figures: []
 required_checks: [file_allowlist, basic_markdown_latex_syntax]
 required_review_nodes: []
+review_bindings: []
 candidate_submission_pdf: false
 candidate_pdf_path: null
 candidate_pdf_sha256: null
 unresolved_findings: []
 modified_by: "待填写"
+project_manifest_path: cases/CASE-YYYYMMDD-0001/manifest.yaml
+project_manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
 validation_status: pending

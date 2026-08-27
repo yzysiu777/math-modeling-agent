@@ -7,7 +7,10 @@
     "allowed_files", "affected_claims", "affected_experiments", "affected_gates", "required_checks",
     "change_level", "change_surfaces", "required_review_nodes", "executor_id", "reviewer_id",
     "write_owner_id", "result_git_revision", "test_evidence", "status", "unresolved_items",
-    "revision_id", "report_path", "human_decisions_required"
+    "revision_id", "report_path", "human_decisions_required", "previous_status",
+    "trusted_validation_record_path", "trusted_validation_record_sha256", "trusted_validation_record_id",
+    "trusted_change_impact_path", "trusted_change_impact_sha256", "review_verdict_path",
+    "review_verdict_sha256", "review_id", "reviewer_role"
   ],
   "properties": {
     "record_type": {"const": "work_item"},
@@ -29,6 +32,16 @@
     "reviewer_id": {"type": "string", "minLength": 1},
     "write_owner_id": {"type": "string", "minLength": 1},
     "result_git_revision": {"type": ["string", "null"], "minLength": 7},
+    "trusted_validation_record_path": {"type": ["string", "null"]},
+    "trusted_validation_record_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$"},
+    "trusted_validation_record_id": {"type": ["string", "null"]},
+    "trusted_change_impact_path": {"type": ["string", "null"]},
+    "trusted_change_impact_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$"},
+    "review_verdict_path": {"type": ["string", "null"]},
+    "review_verdict_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$"},
+    "review_id": {"type": ["string", "null"]},
+    "reviewer_role": {"type": ["string", "null"], "enum": ["independent_adversary", "independent_reviewer", "human", null]},
+    "previous_status": {"type": ["string", "null"], "enum": ["proposed", "approved", "executing", "review_ready", "accepted", "revision_requested", "blocked", null]},
     "test_evidence": {
       "type": "array",
       "items": {
@@ -63,5 +76,25 @@
     "human_decisions_required": {"type": "array", "items": {"type": "string"}},
     "notes": {"type": "string"}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "accepted"}}},
+      "then": {
+        "required": [
+          "trusted_validation_record_path", "trusted_validation_record_sha256", "trusted_validation_record_id",
+          "review_verdict_path", "review_verdict_sha256", "review_id", "reviewer_role"
+        ],
+        "properties": {
+          "trusted_validation_record_path": {"type": "string", "minLength": 1},
+          "trusted_validation_record_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+          "trusted_validation_record_id": {"type": "string", "minLength": 1},
+          "review_verdict_path": {"type": "string", "minLength": 1},
+          "review_verdict_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+          "review_id": {"type": "string", "minLength": 1},
+          "reviewer_role": {"enum": ["independent_adversary", "independent_reviewer"]}
+        }
+      }
+    }
+  ],
   "additionalProperties": false
 }

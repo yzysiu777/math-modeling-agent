@@ -1,4 +1,5 @@
 import hashlib
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,6 +19,12 @@ class EvidenceGraphTests(unittest.TestCase):
             manifest_path.write_text("record_type: project_manifest\ncase_id: CASE-1\n", encoding="utf-8")
             output = workspace / "results.json"
             output.write_text("{\"score\": 1}\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=workspace, check=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=workspace, check=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=workspace, check=True)
+            subprocess.run(["git", "add", "manifest.yaml", "results.json"], cwd=workspace, check=True)
+            subprocess.run(["git", "commit", "-qm", "fixture"], cwd=workspace, check=True)
+            code_revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=workspace, text=True).strip()
             artifact = {
                 "record_type": "artifact_record", "artifact_id": "ART-OUT", "case_id": "CASE-1",
                 "path": "results.json", "kind": "table", "sha256": file_hash(output),
@@ -35,7 +42,7 @@ class EvidenceGraphTests(unittest.TestCase):
             experiment = {
                 "record_type": "experiment_record", "experiment_id": "EXP-1", "case_id": "CASE-1",
                 "question": "does it work?", "objective": "verify", "input_manifest_hash": file_hash(manifest_path),
-                "code_revision": "a" * 40, "environment": {"os": "test", "python": "3", "packages": [], "solver": "none"},
+                "code_revision": code_revision, "environment": {"os": "test", "python": "3", "packages": [], "solver": "none"},
                 "command": "fixed test", "baseline_or_candidate": "candidate", "metrics": {},
                 "outputs": [{"artifact_id": "ART-OUT", "path": "results.json", "sha256": file_hash(output)}],
                 "review_status": "accepted",
@@ -60,6 +67,18 @@ class EvidenceGraphTests(unittest.TestCase):
                 workspace=workspace, manifest_path=manifest_path,
             )
             self.assertTrue(any("does not exist" in error or "paper_locators" in error for error in errors))
+
+    def test_fake_hex_revision_is_not_an_allowed_git_commit(self):
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp)
+            manifest_path = workspace / "manifest.yaml"
+            manifest_path.write_text("record_type: project_manifest\ncase_id: CASE-1\n", encoding="utf-8")
+            errors, _ = validate_evidence_graph(
+                {"record_type": "project_manifest", "case_id": "CASE-1"}, [], [],
+                [{"record_type": "experiment_record", "experiment_id": "E", "case_id": "CASE-1", "input_manifest_hash": file_hash(manifest_path), "code_revision": "a" * 40, "outputs": []}],
+                workspace=workspace, manifest_path=manifest_path,
+            )
+            self.assertTrue(any("allowed reachable Git commit" in error for error in errors))
 
 
 if __name__ == "__main__":

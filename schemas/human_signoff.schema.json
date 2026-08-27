@@ -4,6 +4,7 @@
   "type": "object",
   "required": [
     "record_type", "signoff_id", "case_id", "signer", "signer_id", "signer_role", "actor",
+    "project_manifest_path", "project_manifest_sha256",
     "signed_at", "git_revision", "pdf_path", "pdf_sha256", "approved_gates", "review_scope",
     "checked_items", "not_checked_items", "expertise_limitations", "open_limitations",
     "unresolved_findings", "decision"
@@ -14,8 +15,10 @@
     "case_id": {"type": "string", "minLength": 1},
     "signer": {"type": "string", "minLength": 1},
     "signer_id": {"type": "string", "minLength": 1},
-    "signer_role": {"type": "string", "enum": ["human", "human_owner"]},
+    "signer_role": {"const": "human_owner"},
     "actor": {"type": "string", "minLength": 1},
+    "project_manifest_path": {"type": "string", "minLength": 1},
+    "project_manifest_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
     "signed_at": {"type": "string", "minLength": 1},
     "git_revision": {"type": "string", "minLength": 7},
     "pdf_path": {"type": "string", "minLength": 1},
@@ -26,7 +29,19 @@
     "not_checked_items": {"type": "array", "minItems": 1, "items": {"type": "string"}},
     "expertise_limitations": {"type": "array", "minItems": 1, "items": {"type": "string"}},
     "open_limitations": {"type": "array", "items": {"type": "string"}},
-    "unresolved_findings": {"type": "array", "items": {"type": "string"}},
+    "unresolved_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["finding_id", "severity", "statement"],
+        "properties": {
+          "finding_id": {"type": "string", "minLength": 1},
+          "severity": {"type": "string", "enum": ["P0", "P1", "P2", "P3"]},
+          "statement": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
     "decision": {"type": "string", "enum": ["approved", "approved_with_limits", "rejected"]},
     "notes": {"type": "string"}
   },

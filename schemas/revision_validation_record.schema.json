@@ -7,7 +7,8 @@
       "type": "object",
       "required": [
         "check_id", "status", "execution_kind", "executor", "started_at", "finished_at",
-        "exit_code", "stdout_path", "stdout_sha256", "stderr_path", "stderr_sha256", "artifact_hashes"
+        "exit_code", "stdout_path", "stdout_sha256", "stderr_path", "stderr_sha256", "artifact_hashes",
+        "attestation_path", "attestation_sha256", "attestation_id"
       ],
       "properties": {
         "check_id": {"type": "string", "minLength": 1},
@@ -24,6 +25,7 @@
         "artifact_hashes": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}},
         "attestation_path": {"type": ["string", "null"]},
         "attestation_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$"},
+        "attestation_id": {"type": ["string", "null"]},
         "notes": {"type": "string"}
       },
       "additionalProperties": false
@@ -47,17 +49,36 @@
         "closure_evidence": {"type": "array", "minItems": 1, "items": {"type": "string"}}
       },
       "additionalProperties": false
+    },
+    "review_binding": {
+      "type": "object",
+      "required": ["node", "review_id", "path", "sha256", "case_id", "target_revision", "input_hashes", "reviewer_id", "reviewer_role"],
+      "properties": {
+        "node": {"type": "string", "enum": ["C1", "C2", "C3"]},
+        "review_id": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+        "case_id": {"type": "string", "minLength": 1},
+        "target_revision": {"type": "string", "minLength": 1},
+        "input_hashes": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}},
+        "reviewer_id": {"type": "string", "minLength": 1},
+        "reviewer_role": {"type": "string", "enum": ["independent_adversary", "independent_reviewer", "human"]}
+      },
+      "additionalProperties": false
     }
   },
   "required": [
-    "record_type", "revision_id", "case_id", "approval_id", "source_review_id", "finding_ids",
+    "record_type", "closure_id", "revision_id", "case_id", "approval_id", "source_review_id", "finding_ids",
     "base_git_revision", "new_git_revision", "change_level", "change_surfaces", "changed_files",
     "evidence_root", "runner_id", "runner_version", "runner_script", "runner_script_sha256",
     "execution_started_at", "execution_finished_at", "check_results", "output_hashes", "new_experiment_ids",
-    "claim_status_updates", "closed_findings", "unresolved_findings", "validator", "validation_status"
+    "claim_status_updates", "closed_findings", "unresolved_findings", "validator", "validation_status",
+    "executor_id", "modifier_id", "project_manifest_path", "project_manifest_sha256",
+    "required_review_nodes", "review_bindings"
   ],
   "properties": {
     "record_type": {"const": "revision_validation_record"},
+    "closure_id": {"type": "string", "minLength": 1},
     "revision_id": {"type": "string", "minLength": 1},
     "case_id": {"type": "string", "minLength": 1},
     "approval_id": {"type": ["string", "null"]},
@@ -65,9 +86,13 @@
     "finding_ids": {"type": "array", "items": {"type": "string"}},
     "base_git_revision": {"type": "string", "minLength": 1},
     "new_git_revision": {"type": "string", "minLength": 1},
+    "executor_id": {"type": "string", "minLength": 1},
+    "modifier_id": {"type": "string", "minLength": 1},
     "change_level": {"type": "string", "enum": ["R0", "R1", "R2", "R3"]},
     "change_surfaces": {"type": "array", "minItems": 1, "items": {"type": "string", "enum": ["text_only", "paper_claim", "code_only", "experiment_logic", "data_contract", "model_formula", "objective_constraint", "candidate_pdf"]}},
     "changed_files": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "project_manifest_path": {"type": ["string", "null"]},
+    "project_manifest_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$"},
     "evidence_root": {"type": "string", "minLength": 1},
     "runner_id": {"type": "string", "minLength": 1},
     "runner_version": {"type": "string", "minLength": 1},
@@ -76,6 +101,8 @@
     "execution_started_at": {"type": "string", "minLength": 1},
     "execution_finished_at": {"type": "string", "minLength": 1},
     "check_results": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/check_result"}},
+    "required_review_nodes": {"type": "array", "items": {"type": "string", "enum": ["C1", "C2", "C3"]}},
+    "review_bindings": {"type": "array", "items": {"$ref": "#/$defs/review_binding"}},
     "output_hashes": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}},
     "new_experiment_ids": {"type": "array", "items": {"type": "string"}},
     "claim_status_updates": {
@@ -92,7 +119,19 @@
       }
     },
     "closed_findings": {"type": "array", "items": {"$ref": "#/$defs/closed_finding"}},
-    "unresolved_findings": {"type": "array", "items": {"type": "string"}},
+    "unresolved_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["finding_id", "severity", "statement"],
+        "properties": {
+          "finding_id": {"type": "string", "minLength": 1},
+          "severity": {"type": "string", "enum": ["P0", "P1", "P2", "P3"]},
+          "statement": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    },
     "validator": {"type": "string", "minLength": 1},
     "validation_status": {"type": "string", "enum": ["pending", "passed", "failed"]}
   },

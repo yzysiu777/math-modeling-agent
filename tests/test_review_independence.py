@@ -8,11 +8,12 @@ def valid_review(**overrides):
         "record_type": "review_record",
         "review_id": "REV-TEST-001",
         "case_id": "CASE-TEST-001",
+        "target_revision": "REVISION-TEST-001",
         "reviewer_role": "independent_adversary",
         "reviewer_id": "claude-reviewer-1",
         "critical_node": "C2",
         "review_mode": "challenge",
-        "review_lens": ["alternative_formulation", "invariant_counterexample"],
+        "review_lens": ["alternative_formulation", "implementation_consistency", "invariant_counterexample"],
         "primary_method_family": "mixed_integer_programming",
         "alternative_method_family": "constraint_programming",
         "methodological_difference": {
@@ -81,6 +82,15 @@ class ReviewIndependenceTests(unittest.TestCase):
         ok, errors = validate_review_record(review)
         self.assertFalse(ok)
         self.assertTrue(any("actual result" in error for error in errors))
+
+    def test_generic_review_without_binding_identity_fails(self):
+        review = valid_review()
+        review.pop("case_id")
+        review.pop("target_revision")
+        review["input_hashes"] = []
+        ok, errors = validate_review_record(review)
+        self.assertFalse(ok)
+        self.assertTrue(any("case_id" in error or "target_revision" in error or "input_hashes" in error for error in errors))
 
 
 if __name__ == "__main__":

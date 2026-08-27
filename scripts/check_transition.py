@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import re
 from pathlib import Path
+from pathlib import PurePosixPath
 
 try:  # import works as a package and as ``python scripts/check_transition.py``
     from .check_evidence_graph import load_record
     from .check_human_signoff import validate_human_signoff
+    from .check_revision_closure import load_yaml, validate_revision_closure
     from .gate_contract import (
         CHANGE_LEVELS,
         CHANGE_SURFACES,
@@ -21,6 +25,7 @@ try:  # import works as a package and as ``python scripts/check_transition.py``
 except ImportError:  # pragma: no cover
     from check_evidence_graph import load_record
     from check_human_signoff import validate_human_signoff
+    from check_revision_closure import load_yaml, validate_revision_closure
     from gate_contract import CHANGE_LEVELS, CHANGE_SURFACES, MAIN_TRANSITIONS, REVISION_TRANSITIONS, SAFE_CHECK_IDS, STATES, required_checks_for, validate_revision_scope
 
 
@@ -29,6 +34,65 @@ def _revision_transition_allowed(from_state: str, to_state: str) -> bool:
     if isinstance(expected, tuple):
         return to_state in expected
     return expected == to_state
+
+
+HEX64 = re.compile(r"^[0-9a-fA-F]{64}$")
+
+
+def _safe_relative(raw: object) -> str | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    path = PurePosixPath(raw.replace("\\", "/"))
+    if path.is_absolute() or ".." in path.parts or str(path) in {"", "."}:
+        return None
+    return str(path)
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _validated_closure(
+    *,
+    closure_report: dict | None,
+    closure_impact: dict | None,
+    closure_id: str | None,
+    closure_path: str | None,
+    closure_sha256: str | None,
+    workspace: Path | None,
+    approval: dict | None = None,
+) -> tuple[bool, str]:
+    if not isinstance(closure_report, dict) or not isinstance(closure_impact, dict):
+        return False, "transition requires a structured revision closure report and change impact record"
+    if not closure_id or closure_report.get("closure_id") != closure_id:
+        return False, "transition closure_id does not match the closure report"
+    relative = _safe_relative(closure_path)
+    if workspace is None or relative is None:
+        return False, "transition requires a workspace-bound closure_path"
+    if not isinstance(closure_sha256, str) or not HEX64.fullmatch(closure_sha256):
+        return False, "transition requires a valid closure_sha256"
+    path = (workspace / relative).resolve()
+    try:
+        path.relative_to(workspace.resolve())
+    except ValueError:
+        return False, "closure_path escapes workspace"
+    if not path.is_file():
+        return False, "closure report file does not exist"
+    if _sha256(path).lower() != closure_sha256.lower():
+        return False, "closure report file hash does not match the state event"
+    try:
+        file_report = load_record(path)
+    except Exception as exc:  # noqa: BLE001
+        return False, f"closure report file cannot be parsed: {exc}"
+    if file_report != closure_report:
+        return False, "closure report object does not match the hashed closure report file"
+    closure_report = file_report
+    if closure_report.get("validation_status") != "passed":
+        return False, "closure report is not successful"
+    errors = validate_revision_closure(closure_impact, closure_report, approval, workspace=workspace)
+    if errors:
+        return False, "invalid revision closure: " + "; ".join(errors)
+    return True, "ok"
 
 
 def validate_transition(
@@ -48,6 +112,13 @@ def validate_transition(
     workspace=None,
     current_revision: str | None = None,
     unresolved_high_risk: list[str] | tuple[str, ...] = (),
+    closure_report: dict | None = None,
+    closure_impact: dict | None = None,
+    approved_findings: dict | None = None,
+    closure_id: str | None = None,
+    closure_path: str | None = None,
+    closure_sha256: str | None = None,
+    project_manifest: dict | None = None,
 ) -> tuple[bool, str]:
     """Validate one state event; the caller persists the event separately."""
 
@@ -75,6 +146,7 @@ def validate_transition(
             actor=actor,
             current_revision=current_revision,
             workspace=workspace,
+            manifest=project_manifest,
         )
         if signoff_errors:
             return False, "invalid human signoff: " + "; ".join(signoff_errors)
@@ -105,10 +177,33 @@ def validate_transition(
         expected = "passed" if to_state == "validation_passed" else "failed"
         if validation_status != expected:
             return False, f"{to_state} requires validation_status={expected}"
+        if to_state == "validation_passed":
+            closure_ok, closure_message = _validated_closure(
+                closure_report=closure_report,
+                closure_impact=closure_impact,
+                closure_id=closure_id,
+                closure_path=closure_path,
+                closure_sha256=closure_sha256,
+                workspace=workspace,
+                approval=approved_findings,
+            )
+            if not closure_ok:
+                return False, closure_message
     elif revision_edge == ("validation_failed", "targeted_validation"):
         if not required_checks or set(required_checks).difference(SAFE_CHECK_IDS):
             return False, "retry requires a safe validation plan"
     elif revision_edge == ("validation_passed", "restore_affected_gate"):
+        closure_ok, closure_message = _validated_closure(
+            closure_report=closure_report,
+            closure_impact=closure_impact,
+            closure_id=closure_id,
+            closure_path=closure_path,
+            closure_sha256=closure_sha256,
+            workspace=workspace,
+            approval=approved_findings,
+        )
+        if not closure_ok:
+            return False, closure_message
         if change_level not in CHANGE_LEVELS:
             return False, "restore_affected_gate requires a change level"
         if change_level == "R0":
@@ -128,9 +223,20 @@ def validate_transition(
         if not scope_ok:
             return False, scope_message
     elif revision_edge == ("restore_affected_gate", "gate_passed"):
+        closure_ok, closure_message = _validated_closure(
+            closure_report=closure_report,
+            closure_impact=closure_impact,
+            closure_id=closure_id,
+            closure_path=closure_path,
+            closure_sha256=closure_sha256,
+            workspace=workspace,
+            approval=approved_findings,
+        )
+        if not closure_ok:
+            return False, closure_message
         if not any("restore" in item.lower() or "regression" in item.lower() for item in evidence):
             return False, "restored gate requires restoration or regression evidence"
-        if unresolved_high_risk:
+        if any(not isinstance(item, dict) or item.get("severity") in {"P0", "P1"} for item in unresolved_high_risk):
             return False, "cannot restore a gate with unresolved P0/P1 findings"
     return True, "ok"
 
@@ -152,8 +258,19 @@ def main() -> int:
     parser.add_argument("--workspace")
     parser.add_argument("--current-revision")
     parser.add_argument("--unresolved-high-risk", action="append", default=[])
+    parser.add_argument("--closure-report", type=Path)
+    parser.add_argument("--closure-impact", type=Path)
+    parser.add_argument("--approved-findings", type=Path)
+    parser.add_argument("--closure-id")
+    parser.add_argument("--closure-path")
+    parser.add_argument("--closure-sha256")
+    parser.add_argument("--project-manifest", type=Path)
     args = parser.parse_args()
     signoff = load_record(Path(args.signoff.name)) if args.signoff else None
+    closure_report = load_record(args.closure_report) if args.closure_report else None
+    closure_impact = load_record(args.closure_impact) if args.closure_impact else None
+    approved_findings = load_record(args.approved_findings) if args.approved_findings else None
+    project_manifest = load_record(args.project_manifest) if args.project_manifest else None
     ok, message = validate_transition(
         args.from_state,
         args.to_state,
@@ -170,6 +287,13 @@ def main() -> int:
         workspace=Path(args.workspace).resolve() if args.workspace else None,
         current_revision=args.current_revision,
         unresolved_high_risk=args.unresolved_high_risk,
+        closure_report=closure_report,
+        closure_impact=closure_impact,
+        approved_findings=approved_findings,
+        closure_id=args.closure_id,
+        closure_path=args.closure_path,
+        closure_sha256=args.closure_sha256,
+        project_manifest=project_manifest,
     )
     print(message)
     return 0 if ok else 1

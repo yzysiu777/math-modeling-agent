@@ -3,8 +3,10 @@ approval_id: APR-YYYYMMDD-0001
 case_id: CASE-YYYYMMDD-0001
 review_id: REV-YYYYMMDD-0001
 approver: human_owner
+approver_id: "登记的人工负责人 ID"
+approver_role: human_owner
 approved_at: "YYYY-MM-DDThh:mm:ss+08:00"
-expires_at: null
+expires_at: "YYYY-MM-DDThh:mm:ss+08:00"
 finding_ids: [F-001]
 revision_id: REVISION-YYYYMMDD-0001
 base_git_revision: "待填写"
@@ -17,8 +19,13 @@ allowed_files: [paper/sections/example.tex]
 forbidden_files: [input/]
 validation_check_ids: [file_allowlist, latex_compile]
 required_review_nodes: [C3]
+review_bindings: []
 candidate_submission_pdf: false
 candidate_pdf_path: null
 candidate_pdf_sha256: null
+executor_id: "执行者 ID"
+modified_by: "修改者 ID"
+project_manifest_path: cases/CASE-YYYYMMDD-0001/manifest.yaml
+project_manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
 status: draft
 notes: ""

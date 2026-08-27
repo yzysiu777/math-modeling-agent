@@ -5,6 +5,8 @@ signer: "human owner (填写)"
 signer_id: human-owner
 signer_role: human_owner
 actor: human-owner
+project_manifest_path: cases/CASE-YYYYMMDD-0001/manifest.yaml
+project_manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
 signed_at: "YYYY-MM-DDThh:mm:ss+08:00"
 git_revision: "0000000"
 pdf_path: paper/build/main.pdf

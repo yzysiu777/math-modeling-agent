@@ -20,7 +20,21 @@
     "affected_gates": {"type": "array", "items": {"type": "string", "pattern": "^G([0-9]|1[0-2])$"}},
     "gate_impact": {"type": ["string", "null"], "enum": ["no_gate_impact", "affected", null]},
     "required_checks": {"type": "array", "items": {"type": "string"}},
-    "validation_status": {"type": ["string", "null"], "enum": ["pending", "passed", "failed", null]}
+    "validation_status": {"type": ["string", "null"], "enum": ["pending", "passed", "failed", null]},
+    "closure_id": {"type": ["string", "null"]},
+    "closure_path": {"type": ["string", "null"]},
+    "closure_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$"},
+    "gate_hashes": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"to_state": {"enum": ["validation_passed", "restore_affected_gate"]}}},
+      "then": {"required": ["closure_id", "closure_path", "closure_sha256"]}
+    },
+    {
+      "if": {"properties": {"from_state": {"const": "restore_affected_gate"}}},
+      "then": {"required": ["closure_id", "closure_path", "closure_sha256"]}
+    }
+  ],
   "additionalProperties": false
 }

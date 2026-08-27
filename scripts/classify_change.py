@@ -46,6 +46,28 @@ def _risk_hints_for_path(path: str) -> list[str]:
     return hints
 
 
+def _semantic_conflicts_with_text_only(changed_files: list[str], declared: list[str]) -> list[str]:
+    """Detect declarations that would hide an executable/data change.
+
+    Generic words such as ``model`` in a paper filename are deliberately not
+    used here.  Only strong directory/extension evidence can make a declared
+    text-only change fail closed.
+    """
+
+    non_text_surfaces = set(declared).difference({"text_only", "paper_claim", "candidate_pdf"})
+    if "text_only" not in declared or non_text_surfaces:
+        return []
+    conflicts: list[str] = []
+    for raw in changed_files:
+        normalized = raw.replace("\\", "/").lower()
+        path = PurePosixPath(normalized)
+        data_path = normalized.startswith(("data/", "input/")) and path.suffix in {".csv", ".tsv", ".xlsx", ".xls", ".parquet", ".json"}
+        executable_path = normalized.startswith(("src/", "code/", "scripts/")) and path.suffix in {".py", ".ipynb", ".r", ".jl"}
+        if data_path or executable_path:
+            conflicts.append(raw)
+    return conflicts
+
+
 def classify_change(
     changed_files: list[str],
     signals: list[str] | None = None,
@@ -82,6 +104,21 @@ def classify_change(
             "required_checks": [],
             "candidate_submission_pdf": candidate_submission_pdf,
         }
+    conflicts = _semantic_conflicts_with_text_only(changed_files, declared)
+    if conflicts:
+        return {
+            "change_level": None,
+            "change_surfaces": declared,
+            "changed_files": changed_files,
+            "risk_hints": hints,
+            "reasons": reasons + [f"text_only conflicts with data or executable path: {path}" for path in conflicts],
+            "classification_conflicts": conflicts,
+            "requires_human_classification": True,
+            "affected_gates": [],
+            "required_review_nodes": [],
+            "required_checks": [],
+            "candidate_submission_pdf": candidate_submission_pdf,
+        }
     level = change_level_for_surfaces(declared)
     return {
         "change_level": level,
@@ -89,6 +126,7 @@ def classify_change(
         "changed_files": changed_files,
         "risk_hints": hints,
         "reasons": reasons + [f"declared semantic surfaces: {', '.join(declared)}"],
+        "classification_conflicts": [],
         "requires_human_classification": False,
         "affected_gates": affected_gates_for_surfaces(declared),
         "required_review_nodes": required_review_nodes_for(declared),

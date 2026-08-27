@@ -204,8 +204,20 @@ SURFACE_POLICIES = {
         ("C2", "C3"),
     ),
     "data_contract": _surface_policy("R3", MINIMUM_AFFECTED_GATES["R3"], BASE_CHECKS["R3"], ("C1", "C2", "C3")),
-    "model_formula": _surface_policy("R3", MINIMUM_AFFECTED_GATES["R3"], BASE_CHECKS["R3"], ("C2", "C3")),
-    "objective_constraint": _surface_policy("R3", MINIMUM_AFFECTED_GATES["R3"], BASE_CHECKS["R3"], ("C1", "C2", "C3")),
+    # A formula or objective revision changes the model contract and downstream
+    # validation, but it does not silently rewrite the frozen input set.
+    "model_formula": _surface_policy(
+        "R3",
+        frozenset({"G2", "G4", "G5", "G6", "G7", "G8", "G9"}),
+        BASE_CHECKS["R3"],
+        ("C2", "C3"),
+    ),
+    "objective_constraint": _surface_policy(
+        "R3",
+        frozenset({"G2", "G4", "G5", "G6", "G7", "G8", "G9"}),
+        BASE_CHECKS["R3"],
+        ("C1", "C2", "C3"),
+    ),
     "candidate_pdf": _surface_policy(
         "R1",
         MINIMUM_AFFECTED_GATES["R1"],
