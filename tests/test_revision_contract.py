@@ -238,6 +238,30 @@ class RevisionContractTests(unittest.TestCase):
         finally:
             holder.cleanup()
 
+    def test_approval_join_rejects_cross_revision_reuse(self):
+        holder, workspace = make_workspace()
+        try:
+            impact, validation = build_records(workspace)
+            impact.update({"approval_id": "APR-1", "source_review_id": "REV-REVIEW-1", "finding_ids": ["F-1"]})
+            validation.update({"approval_id": "APR-1", "source_review_id": "REV-REVIEW-1", "finding_ids": ["F-1"]})
+            approval = {
+                "record_type": "approved_findings", "approval_id": "APR-1", "case_id": impact["case_id"],
+                "review_id": "REV-REVIEW-1", "approver": "human_owner", "approved_at": "2026-08-27T00:00:00+00:00",
+                "finding_ids": ["F-1"], "revision_id": impact["revision_id"],
+                "base_git_revision": impact["base_git_revision"], "new_git_revision": impact["new_git_revision"],
+                "change_level": impact["change_level"], "change_surfaces": impact["change_surfaces"],
+                "affected_gates": impact["affected_gates"], "gate_impact": impact["gate_impact"],
+                "allowed_files": ["notes.md"], "forbidden_files": [],
+                "validation_check_ids": impact["required_checks"], "required_review_nodes": [],
+                "candidate_submission_pdf": False, "candidate_pdf_path": None, "candidate_pdf_sha256": None,
+                "status": "approved",
+            }
+            self.assertEqual(validate_revision_closure(impact, validation, approval, workspace=workspace), [])
+            approval["base_git_revision"] = "c" * 40
+            self.assertTrue(any("approval and impact disagree on base_git_revision" in error for error in validate_revision_closure(impact, validation, approval, workspace=workspace)))
+        finally:
+            holder.cleanup()
+
     def test_r3_omitting_feasibility_or_objective_check_cannot_close(self):
         holder, workspace = make_workspace()
         try:
