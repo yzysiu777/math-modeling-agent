@@ -1,76 +1,78 @@
 ---
 name: industrial-mathematical-modeling
-description: Run evidence-backed, reviewer-gated mathematical modeling workflows for operations research, data analysis, hybrid decision problems, reproducible experiments, and competition papers.
+description: Build fast, evidence-backed operations research, data analysis, hybrid models and competition papers.
 metadata:
-  short-description: Industrial-grade operations and data modeling workflow
+  short-description: Industrial-grade modeling and experiment race
 ---
 
 # Industrial Mathematical Modeling
 
-Use this Skill for Huawei Cup competition tasks involving messy attachments, statistical analysis, prediction, graph/network decisions, scheduling, resource allocation, multi-objective optimization, robust/stochastic decisions, or the final competition paper.
+Use this Skill for Huawei Cup problems involving planning, networks, paths,
+scheduling, allocation, multi-objective decisions, robust or stochastic models,
+messy data, prediction, classification, clustering, time series or mixed
+analysis-and-decision systems.
 
-## Required workspace contract
+## Start with one brief
 
-Before acting, read the applicable `AGENTS.md`, `README.md`, `case_manifest.yaml`, `protocol/workflow.md` and `protocol/gates.md`. If the manifest is missing, create a draft and report missing decisions before making strong claims.
+Read the root/case `AGENTS.md`, `README.md`, `case_brief.md` and the original
+statement/attachments. The only required human input at startup is the case
+brief. Record unknowns rather than filling them from memory. Route the case to
+`optimization`, `data_analysis`, `hybrid` or `insufficient_information` and
+explain the evidence.
 
-Use canonical roles under `roles/`: `solution_lead`, `optimization_modeler`, `data_analyst`, `data_auditor`, `independent_adversary`, `reproducibility_engineer` and paper roles. Platform adapters may map Codex and Claude to these roles but cannot change their boundaries.
+## Core loop
 
-## Operating rules
+1. Extract the problem contract: subproblems, inputs, outputs, objectives,
+   hard constraints, fields, units, time boundaries and metrics.
+2. Propose at least three methodologically different candidate routes for each
+   important subproblem.
+3. Build an interpretable baseline and a small hand-checkable instance.
+4. Queue the cheapest experiment that can distinguish the candidates.
+5. Compare candidates with the same split, instances, constraints and metrics.
+6. Keep a Champion and a methodologically different Challenger until the
+   strategy is clear.
+7. Ask Claude for a focused C1, C2 or C3 challenge when the problem, model or
+   conclusion reaches a decision point.
+8. Expand only after the route survives the cheap tests; update the paper as
+   experiments stabilize.
 
-1. Freeze raw inputs and record source, date, size and hash.
-2. Translate the problem into an explicit data/mathematical contract.
-3. Build a simple, interpretable, executable baseline before complex candidates.
-4. Keep claims, experiments, reviews, failures and decisions as durable artifacts.
-5. Treat Codex and Claude as separate roles; agreement is not truth.
-6. Require deterministic evidence, independent reproduction or explicit human approval for important claims.
-7. Mark uncertainty and missing provenance; never silently fill gaps.
-8. Do not run unknown executables or mutate raw inputs.
-9. For post-Gate changes, declare a semantic change surface; filenames alone do not
-   choose R0–R3. Use `run_trusted_check.py` for fixed checks and keep
-   `manual_required` checks explicitly human-owned.
-10. Bind important claims through the evidence graph and use a single-writer
-    `work_item` under `cases/<case_id>/coordination/` for team handoffs.
+## Operations research lens
 
-## Route-specific emphasis
+Check sets and indices, variable domains, units, objective direction, initial
+and terminal conditions, conservation, capacity, timing, feasibility and the
+boundary of any optimality claim. Select among exact programming, network or
+dynamic programming, decomposition/relaxation, heuristics, metaheuristics,
+robust/stochastic optimization and simulation optimization according to the
+problem. Independently recalculate feasibility and objective values with
+`scripts/model_checks.py` or a small separate checker.
 
-### Operations optimization
+## Data analysis lens
 
-Check sets, indices, variables, domains, units, objectives, hard/soft constraints, feasibility, boundary states, solver status, optimality claims, complexity and multi-objective sensitivity. Use hand-checkable or enumerated micro-instances before scale.
+Check entity grain, keys, label construction, missingness, duplicates, outliers,
+time order, train/validation/test isolation, preprocessing fit scope, leakage,
+baselines, metrics, calibration, uncertainty and association-versus-causation
+language. Use the data checklist and the split helper before comparing models.
 
-### Data analysis
+## Hybrid lens
 
-Check entity grain, keys, labels, missingness, duplicates, outliers, time order, train/validation/test isolation, preprocessing fit scope, leakage, baselines, metrics, calibration, uncertainty and association/causation limits.
+Write the upstream-to-downstream fields, types, units, time semantics, error or
+scenario treatment and allowed range in the case notes. Test how upstream error,
+missing predictions and extreme predictions affect downstream feasibility and
+objective. Compare both a simple end-to-end baseline and separate module baselines.
 
-### Hybrid decisions
+## Evidence and writing
 
-Freeze the upstream-to-downstream interface: field names, types, units, time semantics, uncertainty, allowed range, scenario handling and validation tests. Check how upstream error changes downstream feasibility and objective.
+Keep source, experiment ID, code entry point, parameters, seed, result and
+limitations alongside each important conclusion. A model output is not a fact
+until its assumptions and checks are visible. Start the paper outline after the
+first baseline, keep formulas and code aligned, and calibrate language to the
+strength of the evidence.
 
-## Fixed competition workflow
+## Project references
 
-This Skill does not expose selectable workflows. Always use the single G0–G12
-competition sequence in `protocol/workflow.md`. After a Gate has passed, use the
-R0–R3 revision loop rather than restarting every stage.
-
-Claude is invoked only at C1 (problem/constraints), C2 (model/algorithm), or C3
-(results/strong claims). A review without a methodological difference and a
-disconfirming test or counterexample is invalid.
-
-## Required artifacts
-
-`problem_contract.md`, data dictionary/contract, input hash manifest, routing record,
-experiment records, claim register, review records, failure log, decision log,
-`change_impact_record`, `revision_validation_record`, `human_review_card`, `work_item`
-and final handoff. For papers, add claim/evidence map, citation audit, AI-use record,
-candidate PDF path/hash and final PDF QA.
-
-## Failure conditions
-
-Block delivery when the route or objective is unclear, key input fields/constraints are unknown, baseline cannot run, a core claim lacks evidence, data leakage is present, constraints are violated, results cannot be independently rerun, the official format is unknown, or P0/P1 findings remain unresolved.
-
-## Project-local references
-
-- `references/claims-and-evidence.md`
 - `references/optimization-checklist.md`
 - `references/data-analysis-checklist.md`
 - `references/hybrid-checklist.md`
-- `writing/README.md` for paper delivery
+- `references/claims-and-evidence.md`
+- `skills/model-race/SKILL.md`
+- `writing/README.md`

@@ -23,13 +23,16 @@ jobs:
       - name: Install TeX toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y ripgrep latexmk texlive-xetex texlive-lang-chinese texlive-bibtex-extra biber poppler-utils
+          sudo apt-get install -y latexmk texlive-xetex texlive-lang-chinese texlive-bibtex-extra biber poppler-utils
 
       - name: Validate workspace contracts
         run: python3 scripts/validate_workspace.py
 
       - name: Run synthetic tests
         run: python3 -m unittest discover -s tests -v
+
+      - name: Run generic modeling demonstrations
+        run: make demos
 
       - name: Compile Python contracts
         run: python3 -m py_compile scripts/*.py tests/*.py

@@ -1,24 +1,30 @@
 import unittest
+from pathlib import Path
 
-from scripts.gate_contract import GATES
-from scripts.validate_workspace import extract_gate_rows, validate_gate_mirror, validate_static_contract
+from scripts.validate_workspace import validate_static_contract
 
 
-def gate_table():
-    lines = ["| Gate | 名称 | 进入状态 | 首次通过的退出证据 |", "|---|---|---|---|"]
-    lines.extend(f"| {gate.gate_id} | {gate.name} | `{gate.state}` | {gate.exit_evidence} |" for gate in GATES)
-    return "\n".join(lines)
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorkspaceContractTests(unittest.TestCase):
-    def test_current_workspace_contract_is_clean(self):
+    def test_lightweight_workspace_contract_is_clean(self):
         self.assertEqual(validate_static_contract(), [])
 
-    def test_gate_mirror_rejects_swapped_name_or_state(self):
-        text = gate_table()
-        self.assertEqual(len(extract_gate_rows(text)), 13)
-        broken = text.replace("| G4 | 正式模型和算法 | `model_ready` |", "| G4 | 正确性、可行性与边界 | `model_ready` |")
-        self.assertTrue(validate_gate_mirror(broken))
+    def test_old_heavy_runtime_paths_are_not_current_entries(self):
+        for relative in (
+            "protocol/workflow.md", "protocol/gates.md", "protocol/state-machine.md",
+            "scripts/gate_contract.py", "scripts/check_revision_closure.py",
+            "scripts/run_trusted_check.py", "templates/case_manifest.yaml",
+        ):
+            self.assertFalse((ROOT / relative).exists(), relative)
+
+    def test_readme_and_prompts_expose_core_loop(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        for marker in ("十分钟", "候选模型池", "Champion", "Challenger", "C1/C2/C3"):
+            self.assertIn(marker, readme)
+        for node in ("C1_problem_challenge.md", "C2_model_challenge.md", "C3_results_challenge.md"):
+            self.assertTrue((ROOT / "prompts/claude" / node).is_file())
 
 
 if __name__ == "__main__":

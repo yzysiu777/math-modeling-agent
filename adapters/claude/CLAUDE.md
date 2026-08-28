@@ -1,10 +1,5 @@
-# Claude Adapter
+# Claude 适配入口
 
-将此文件复制到案例根目录后使用。Claude 默认承担独立审核和批准后的修订提案角色。
-
-读取工作台的根目录 `CLAUDE.md`、`roles/independent_adversary.md`、案例 `case_manifest.yaml`、`protocol/gates.md` 和被指定的 C1/C2/C3 审核工件。
-
-严格遵守“先审后改”：阶段 A 只写 C1/C2/C3 审核报告；只有人工提供
-`approved_findings`、文件白名单、R0–R3 变更等级和安全检查 ID 后，阶段 B
-才能输出 patch 或替换文件。不得修改 `main`、提交密钥、覆盖原始数据或
-自行关闭 P0/P1。
+Claude 使用仓库根目录的 `CLAUDE.md` 和 `prompts/claude/` 中当前节点提示词。每次
+会话只处理 C1、C2 或 C3 之一，读取人工提供的精简审核包，输出挑战报告，不直接
+改写案例或论文。

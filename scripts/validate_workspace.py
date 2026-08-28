@@ -1,194 +1,180 @@
-"""Validate canonical role files, YAML templates and JSON Schema contracts."""
+"""Validate the lightweight competition workspace contract."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
-import json
-import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Iterable, List
 
 try:
-    from .gate_contract import GATE_IDS, GATES, SAFE_CHECK_IDS
+    import yaml
+except ImportError:  # pragma: no cover - dependency is installed by the workspace setup
+    yaml = None
+
+try:
+    from .experiment_board import validate_experiment_board
 except ImportError:  # pragma: no cover
-    from gate_contract import GATE_IDS, GATES, SAFE_CHECK_IDS
+    from experiment_board import validate_experiment_board
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_DIR = ROOT / "schemas"
-TEMPLATE_DIR = ROOT / "templates"
-
-EXPECTED_ROLES = {
-    "orchestrator", "task_router", "solution_lead", "optimization_modeler",
-    "data_analyst", "data_auditor", "independent_adversary",
-    "reproducibility_engineer", "paper_architect", "citation_editor",
-    "formatting_qa", "final_gatekeeper", "human_owner",
-}
-FORBIDDEN_ACTIVE_TERMS = (
-    "出血性脑卒中", "智能飞行器航迹", "通用神经网络处理器", "核内调度",
-    "AI_CDM_for_ICH", "FightRoute", "FlashAttention", "2023 E", "2019 F", "2025 A",
-    "competition_" + "fast", "checkpoint_" + "review", "release_" + "full",
+REQUIRED_FILES = (
+    "README.md", "AGENTS.md", "agent.md", "CLAUDE.md",
+    "protocol/competition-workflow.md", "protocol/team-collaboration.md",
+    "templates/case_brief.md", "templates/model_candidate.md",
+    "templates/model_comparison.md", "templates/experiment_board.md",
+    "templates/decision_log.md", "templates/claude_review_packet.md",
+    "templates/final_checklist.md", "scripts/router.py", "scripts/create_case.py",
+    "scripts/model_checks.py", "scripts/experiment_board.py", "scripts/run_demos.py",
+    "paper/main.tex", "paper/official/2025/manifest.yaml", "paper/official/2026/manifest.yaml",
+)
+REQUIRED_SKILLS = (
+    "skills/industrial-mathematical-modeling/SKILL.md",
+    "skills/model-race/SKILL.md",
+    "skills/competition-paper-writing/SKILL.md",
+)
+REQUIRED_PROMPTS = (
+    "prompts/codex-start.md", "prompts/claude/C1_problem_challenge.md",
+    "prompts/claude/C2_model_challenge.md", "prompts/claude/C3_results_challenge.md",
+    "prompts/claude/README.md",
+)
+REQUIRED_EXAMPLES = (
+    "cases/examples/optimization/case_brief.md",
+    "cases/examples/optimization/models/candidates.md",
+    "cases/examples/optimization/models/comparison.md",
+    "cases/examples/optimization/experiments/board.md",
+    "cases/examples/optimization/experiments/code/run_demo.py",
+    "cases/examples/data-analysis/case_brief.md",
+    "cases/examples/data-analysis/models/candidates.md",
+    "cases/examples/data-analysis/models/comparison.md",
+    "cases/examples/data-analysis/experiments/board.md",
+    "cases/examples/data-analysis/experiments/code/run_demo.py",
+    "cases/examples/hybrid/case_brief.md",
+    "cases/examples/hybrid/models/candidates.md",
+    "cases/examples/hybrid/models/comparison.md",
+    "cases/examples/hybrid/experiments/board.md",
+    "cases/examples/hybrid/experiments/code/run_demo.py",
+)
+OBSOLETE_PATHS = (
+    "protocol/workflow.md", "protocol/gates.md", "protocol/state-machine.md",
+    "scripts/gate_contract.py", "scripts/check_transition.py", "scripts/check_work_item.py",
+    "scripts/check_revision_closure.py", "scripts/run_trusted_check.py",
+    "scripts/check_trusted_execution.py", "scripts/check_human_signoff.py",
+    "scripts/check_manual_attestation.py", "scripts/check_approved_revision.py",
+    "schemas/project_manifest.schema.json", "schemas/state_event.schema.json",
+    "templates/case_manifest.yaml", "templates/work_item.yaml",
+)
+ACTIVE_DIRS = ("roles", "adapters", "protocol", "prompts", "skills", "templates", "scripts", "cases")
+FORBIDDEN_RUNTIME_REFERENCES = (
+    "protocol/gates.md", "protocol/state-machine.md", "scripts/gate_contract.py",
+    "scripts/run_trusted_check.py", "scripts/check_revision_closure.py",
+    "scripts/check_transition.py", "scripts/check_work_item.py", "case_manifest.yaml",
 )
 
 
-def load_yaml(path: Path):
-    try:
-        import yaml
-    except ImportError as exc:  # pragma: no cover - environment dependent
-        raise RuntimeError("missing PyYAML; install requirements-dev.txt") from exc
+def _missing(paths: Iterable[str]) -> List[str]:
+    return [relative for relative in paths if not (ROOT / relative).exists()]
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _load_yaml(path: Path):
+    if yaml is None:
+        raise RuntimeError("PyYAML is required for official paper profile validation")
     with path.open(encoding="utf-8") as handle:
         return yaml.safe_load(handle)
 
 
-def validate_templates() -> list[str]:
+def validate_official_profiles() -> List[str]:
+    errors: List[str] = []
     try:
-        from jsonschema import Draft202012Validator
-    except ImportError as exc:  # pragma: no cover - environment dependent
-        raise RuntimeError("missing jsonschema; install requirements-dev.txt") from exc
-
-    errors: list[str] = []
-    for template in sorted(TEMPLATE_DIR.glob("*.yaml")):
-        try:
-            document = load_yaml(template)
-            record_type = document.get("record_type") if isinstance(document, dict) else None
-            schema_path = SCHEMA_DIR / f"{record_type}.schema.json"
-            if not record_type or not schema_path.exists():
-                errors.append(f"{template}: unknown record_type {record_type!r}")
+        profile = _load_yaml(ROOT / "paper/official/2025/manifest.yaml")
+        for source in profile.get("sources", []):
+            reference = source.get("local_reference")
+            if not reference:
+                errors.append("2025 profile source has no local_reference")
                 continue
-            schema = json.loads(schema_path.read_text(encoding="utf-8"))
-            validator = Draft202012Validator(schema)
-            for error in validator.iter_errors(document):
-                location = ".".join(str(item) for item in error.absolute_path)
-                errors.append(f"{template}:{location}: {error.message}")
-            if record_type == "project_manifest":
-                gates = document.get("acceptance", {}).get("required_gates", [])
-                if gates != list(GATE_IDS):
-                    errors.append(f"{template}: required_gates must equal {list(GATE_IDS)}")
-            if record_type in {"change_impact_record", "revision_validation_record"}:
-                checks = document.get("required_checks", []) or document.get("executed_checks", [])
-                unsafe = set(checks).difference(SAFE_CHECK_IDS)
-                if unsafe:
-                    errors.append(f"{template}: unsafe check IDs {sorted(unsafe)}")
-        except Exception as exc:  # noqa: BLE001
-            errors.append(f"{template}: {exc}")
+            path = ROOT / "paper/official/2025" / reference
+            if not path.is_file():
+                errors.append(f"2025 official snapshot missing: {path}")
+            elif _sha256(path) != source.get("sha256"):
+                errors.append(f"2025 official snapshot hash mismatch: {path}")
+        pending = _load_yaml(ROOT / "paper/official/2026/manifest.yaml")
+        if pending.get("active") is not False or pending.get("status") != "pending_official_paper_standard":
+            errors.append("2026 profile must remain inactive and pending")
+        if not any(str(source.get("url", "")).startswith("https://cpipc.acge.org.cn/") for source in pending.get("sources", [])):
+            errors.append("2026 profile must reference the official CPIPC site")
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"official profile validation failed: {exc}")
     return errors
 
 
-def extract_gate_rows(text: str) -> list[tuple[str, str, str, str]]:
-    rows = []
-    for line in text.splitlines():
-        if not re.match(r"^\|\s*G(?:[0-9]|1[0-2])\s*\|", line):
-            continue
-        cells = [cell.strip().replace("`", "") for cell in line.strip().strip("|").split("|")]
-        if len(cells) == 4:
-            rows.append(tuple(cells))
-    return rows
-
-
-def validate_gate_mirror(text: str) -> list[str]:
-    expected_rows = [(gate.gate_id, gate.name, gate.state, gate.exit_evidence) for gate in GATES]
-    return [] if extract_gate_rows(text) == expected_rows else ["full Gate ID/name/state/exit-evidence table is not canonical"]
-
-
-def validate_static_contract() -> list[str]:
-    errors: list[str] = []
-    for role in EXPECTED_ROLES:
-        if not (ROOT / "roles" / f"{role}.md").exists():
-            errors.append(f"missing canonical role: {role}")
-
-    for schema in sorted(SCHEMA_DIR.glob("*.schema.json")):
-        try:
-            json.loads(schema.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            errors.append(f"invalid JSON Schema {schema}: {exc}")
-
-    expected_gates = set(GATE_IDS)
-    for relative in ("protocol/workflow.md", "protocol/gates.md", "protocol/state-machine.md"):
-        path = ROOT / relative
-        text = path.read_text(encoding="utf-8") if path.exists() else ""
-        found = set(re.findall(r"\bG(?:[0-9]|1[0-2])\b", text))
-        if found != expected_gates:
-            errors.append(f"{path}: Gate IDs {sorted(found)} do not equal {list(GATE_IDS)}")
-        if re.search(r"\bG(?:1[3-9]|[2-9][0-9])\b", text):
-            errors.append(f"{path}: contains Gate ID outside canonical G0-G12")
-        errors.extend(f"{path}: {error}" for error in validate_gate_mirror(text))
-    for state in ("gate_passed", "revision_pending", "impact_classified", "targeted_validation", "validation_passed", "validation_failed", "restore_affected_gate"):
-        if state not in (ROOT / "protocol/state-machine.md").read_text(encoding="utf-8"):
-            errors.append(f"protocol/state-machine.md: missing revision state {state}")
-    claude_prompt_text = "\n".join(
-        path.read_text(encoding="utf-8") for path in (ROOT / "prompts/claude").glob("*.md")
-    )
-    for node in ("C1", "C2", "C3"):
-        if node not in claude_prompt_text:
-            errors.append(f"prompts/claude: missing critical node {node}")
-
-    if not (ROOT / "protocol/team-collaboration.md").is_file():
-        errors.append("missing protocol/team-collaboration.md")
-    if not (ROOT / "scripts/run_trusted_check.py").is_file():
-        errors.append("missing trusted check runner")
-    if not (ROOT / "scripts/check_evidence_graph.py").is_file():
-        errors.append("missing evidence graph validator")
-
-    # Official snapshots are integrity-checked; a pending future profile must
-    # remain explicitly inactive and point to the official competition site.
-    try:
-        profile_2025 = load_yaml(ROOT / "paper/official/2025/manifest.yaml")
-        for source in profile_2025.get("sources", []):
-            reference = source.get("local_reference")
-            if not reference:
-                errors.append("2025 official profile has a source without local_reference")
-                continue
-            path = (ROOT / "paper/official/2025" / reference).resolve()
-            if not path.is_file():
-                errors.append(f"2025 official snapshot missing: {path}")
-            elif hashlib.sha256(path.read_bytes()).hexdigest() != source.get("sha256"):
-                errors.append(f"2025 official snapshot hash mismatch: {path}")
-        profile_2026 = load_yaml(ROOT / "paper/official/2026/manifest.yaml")
-        if profile_2026.get("active") is not False or profile_2026.get("status") != "pending_official_paper_standard":
-            errors.append("2026 official profile must remain inactive and pending")
-        urls = [source.get("url", "") for source in profile_2026.get("sources", [])]
-        if not any(url.startswith("https://cpipc.acge.org.cn/") for url in urls):
-            errors.append("2026 official profile must reference the official CPIPC site")
-    except Exception as exc:  # noqa: BLE001
-        errors.append(f"official profile validation failed: {exc}")
-
-    try:
-        tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, text=True, capture_output=True, check=True).stdout.splitlines()
-        control_terms = ("COLLABORATION_PROTOCOL.md", "handoffs/", "agent_协作控制台")
-        if any(any(term in path for term in control_terms) for path in tracked):
-            errors.append("external collaboration control-plane file is tracked in the main repository")
-    except (OSError, subprocess.CalledProcessError) as exc:
-        errors.append(f"unable to verify control-plane isolation: {exc}")
-
-    active_dirs = ["roles", "protocol", "prompts", "schemas", "templates", "skills", "writing", "paper", "scripts"]
-    for dirname in active_dirs:
+def validate_runtime_references() -> List[str]:
+    errors: List[str] = []
+    for relative in OBSOLETE_PATHS:
+        if (ROOT / relative).exists():
+            errors.append(f"obsolete runtime path still exists: {relative}")
+    for dirname in ACTIVE_DIRS:
         base = ROOT / dirname
+        if not base.exists():
+            continue
         for path in base.rglob("*"):
-            if not path.is_file() or "official" in path.parts:
+            if not path.is_file() or path.resolve() == Path(__file__).resolve():
                 continue
-            if path.resolve() == Path(__file__).resolve():
-                continue  # this checker stores forbidden sentinels by design
             try:
                 text = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 continue
-            for term in FORBIDDEN_ACTIVE_TERMS:
-                if term in text:
-                    errors.append(f"historical hardcoding in active file {path}: {term}")
+            for marker in FORBIDDEN_RUNTIME_REFERENCES:
+                if marker in text:
+                    errors.append(f"active file references removed runtime path: {path}: {marker}")
+    return errors
+
+
+def validate_examples() -> List[str]:
+    errors: List[str] = []
+    for relative in REQUIRED_EXAMPLES:
+        if not (ROOT / relative).is_file():
+            errors.append(f"missing demonstration artifact: {relative}")
+    for route in ("optimization", "data-analysis", "hybrid"):
+        errors.extend(f"cases/examples/{route}/experiments/board.md: {error}" for error in validate_experiment_board(ROOT / f"cases/examples/{route}/experiments/board.md"))
+        candidates = ROOT / f"cases/examples/{route}/models/candidates.md"
+        if candidates.is_file():
+            route_count = sum(1 for line in candidates.read_text(encoding="utf-8").splitlines() if line.startswith("## M-"))
+            if route_count < 3:
+                errors.append(f"{candidates}: fewer than three candidate routes")
+    return errors
+
+
+def validate_static_contract() -> List[str]:
+    errors = [f"missing required file: {path}" for path in _missing(REQUIRED_FILES + REQUIRED_SKILLS + REQUIRED_PROMPTS)]
+    errors.extend(validate_runtime_references())
+    errors.extend(validate_official_profiles())
+    errors.extend(validate_examples())
+    readme = ROOT / "README.md"
+    if readme.is_file():
+        text = readme.read_text(encoding="utf-8")
+        for marker in ("十分钟", "Champion", "Challenger", "C1/C2/C3", "case_brief.md"):
+            if marker not in text:
+                errors.append(f"README.md missing core entry marker: {marker}")
+    try:
+        tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, text=True, capture_output=True, check=True).stdout.splitlines()
+        if any("agent_协作控制台" in path or path.startswith("handoffs/") for path in tracked):
+            errors.append("external collaboration control-plane file is tracked in the main repository")
+    except (OSError, subprocess.CalledProcessError) as exc:
+        errors.append(f"unable to inspect tracked files: {exc}")
     return errors
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--templates-only", action="store_true")
-    args = parser.parse_args()
-    try:
-        errors = validate_templates() if args.templates_only else validate_templates() + validate_static_contract()
-    except RuntimeError as exc:
-        print(f"FAIL: {exc}", file=sys.stderr)
-        return 2
+    parser = argparse.ArgumentParser(description="validate the lightweight competition workspace")
+    parser.parse_args()
+    errors = validate_static_contract()
     if errors:
         print("FAIL workspace validation")
         print("\n".join(f"- {error}" for error in errors))

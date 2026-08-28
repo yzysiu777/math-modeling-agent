@@ -1,11 +1,18 @@
-# 交接给下一轮 Agent 的提示词
+# 数学建模案例交接提示词
 
-请先读取当前案例的 `AGENTS.md`、`case_manifest.yaml`、问题契约、claim register、最近运行记录、C1/C2/C3 审核、所有未解决 finding、`failures/`、论文状态和 `protocol/gates.md`。
+请以当前案例文件和最近一次 Git 提交为事实源，先读取 `AGENTS.md`、`README.md`、
+`case_brief.md`、模型比较、实验板、`decisions.md`、C1/C2/C3 报告、失败路线和
+论文状态。
 
-先报告当前状态：路由、G0–G12、已支持结论、证据位置、未验证项、P0/P1 阻塞项、最近一次可信运行、C1/C2/C3 审核、R0–R3 修订回归、论文格式状态、AI 使用记录状态和下一步。不要从聊天记忆补造结论；以工作区工件、哈希和 Git 提交为准。发现结论与工件冲突时，先建立新的审查记录并暂停定稿。
+输出：
 
-若最近有修改，必须同时报告 `change_impact_record`、`revision_validation_record`
-和 `human_review_card` 的路径、前后哈希、受影响 Gate、required check 的可信
-运行记录（执行时间、stdout/stderr 哈希、退出码、实际输出哈希）、未关闭 finding
-以及人工已检查/未检查范围。`manual_required` 不得写成自动通过；候选 PDF 必须
-同时报告路径和 SHA-256。
+- 当前路由和题意中仍不确定的部分；
+- 三条以上候选路线、Champion、Challenger 及淘汰理由；
+- 最近实验、统一比较口径、关键数字和可复算入口；
+- 已完成/未完成的数值、数据、论文和格式检查；
+- Claude 检查了什么、没有检查什么、提出了哪些未决问题；
+- 论文当前章节、图表、引用和 AI 使用记录状态；
+- 下一项信息价值最高的实验；
+- 必须由队员决定的事项。
+
+不要从聊天记忆补造结果，不要把单次输出写成稳定结论，不要删除失败路线。

@@ -2,7 +2,7 @@ PAPER_DIR := paper
 PAPER_BUILD := $(PAPER_DIR)/build
 PYTHON ?= python3
 
-.PHONY: paper paper-ci qa clean test validate
+.PHONY: paper paper-ci qa clean test validate demos
 
 paper:
 	mkdir -p $(PAPER_BUILD)
@@ -20,6 +20,9 @@ validate:
 
 test:
 	$(PYTHON) -m unittest discover -s tests -v
+
+demos:
+	$(PYTHON) scripts/run_demos.py
 
 clean:
 	cd $(PAPER_DIR) && latexmk -r ../latexmkrc -C -outdir=build main.tex || true

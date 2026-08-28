@@ -1,4 +1,4 @@
 interface:
   display_name: "Competition Paper Writing"
   short_description: "Evidence-backed Chinese math-modeling paper workflow"
-  default_prompt: "Use $competition-paper-writing to plan, write, audit, and visually verify a Huawei Cup mathematical-modeling competition paper. Read the current official standard document first; keep Codex as author/coordinator and Claude or a human as independent reviewer."
+  default_prompt: "Use $competition-paper-writing to plan, write, and visually verify a Huawei Cup mathematical-modeling paper from the current case experiments; read the current official standard first."

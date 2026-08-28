@@ -1,20 +1,15 @@
-# Claude 交接提示词目录
+# Claude 关键挑战提示词
 
-这里的提示词对应“先审后改”两阶段流程。Claude 只审核 C1、C2、C3
-三个关键节点；每次使用时复制一份到审核会话，补充案例 ID、审核 ID、
-文件白名单、输入哈希和验收标准。
+工作台只在三个节点使用 Claude：C1 题意、C2 模型架构、C3 结果与论文强结论。每次
+只复制一个提示词到新的 Claude 会话，并附上精简审核包。Claude 不重做整题、不要求
+全量实验、不直接修改案例文件，只输出挑战报告。队员将接受/拒绝及原因写入
+`decisions.md`，再由 Codex 修改。
 
-| 文件 | 用途 | 是否可修改主方案 |
+| 节点 | 文件 | 重点 |
 |---|---|---|
-| `01_blind_problem_review.md` | C1：题意、目标和约束盲审 | 否 |
-| `02_data_model_audit.md` | C2：模型架构和算法挑战 | 否 |
-| `03_results_reproduction_audit.md` | C3：主要结果和论文强结论挑战 | 否 |
-| `05_approved_revision.md` | 人工批准后的受限修订提案 | 只能输出 patch |
+| C1 | `C1_problem_challenge.md` | 语义、目标、约束、单位、遗漏、最小反例 |
+| C2 | `C2_model_challenge.md` | 方法族、公式、算法不变量、实现一致性 |
+| C3 | `C3_results_challenge.md` | 复算、对照、泄漏、稳定性、数字和强结论 |
 
-Claude 的报告进入 `reviews/`；修订提案进入 `reviews/<review-id>/proposed.patch`，
-不得直接写入 `main`。LaTeX 只在 C3 的强结论和证据范围内审核，普通排版
-由确定性检查器和 R0/R1 规则处理。
-
-`../claude-blind-review.md` 仅是重定向入口，不是第四个审核节点。所有审核
-报告必须使用 `schemas/review_record.schema.json` 的结构化字段，尤其是稳定
-`reviewer_id`、规范方法族和带实际结果的可证伪测试。
+每份报告都必须说明主/替代方法族、方法论差异、反例或区分实验、已检查和未检查
+内容，以及需要人工决定的事项。

@@ -1,58 +1,54 @@
 ---
 name: competition-paper-writing
-description: Build evidence-backed Chinese mathematical-modeling competition papers with current official-template checks, problem-centered structure, calibrated claims, citation and AI-use auditing, and rendered-PDF quality gates.
+description: Write and QA Chinese mathematical-modeling competition papers with evidence-calibrated language and a reusable LaTeX workflow.
 metadata:
-  short-description: Huawei Cup competition paper workflow
+  short-description: Evidence-backed Huawei Cup paper writing
 ---
 
 # Competition Paper Writing
 
-Use this Skill after a model/experiment exists or when a modeling case needs a paper plan from the beginning. It controls content architecture, evidence-calibrated language, figures/tables/equations, citations, AI-use records, LaTeX collaboration, and final PDF delivery.
+Use this Skill as soon as a baseline produces a stable observation. The paper
+is a second representation of the model and experiments, not a final-day
+decoration.
 
 ## Required reading
 
-Read the case AGENTS.md first, then:
+Read the case brief and:
 
-- writing/OFFICIAL_RULES.md
-- writing/PAPER_STYLE_GUIDE.md
-- writing/NATIONAL_AWARD_LANGUAGE.md
-- writing/FIGURE_TABLE_FORMULA_RULES.md
-- writing/AI_COMPLIANCE.md
-- writing/QA_CHECKLIST.md
+- `writing/OFFICIAL_RULES.md`
+- `writing/PAPER_STYLE_GUIDE.md`
+- `writing/NATIONAL_AWARD_LANGUAGE.md`
+- `writing/FIGURE_TABLE_FORMULA_RULES.md`
+- `writing/AI_COMPLIANCE.md`
+- `writing/QA_CHECKLIST.md`
 
-At competition time, also read the current official paper standard document and AI rules. They override this Skill.
+At competition time, the current official paper standard, template and AI rules
+override every historical snapshot in the repository.
 
-## Workflow
+## Writing loop
 
-1. Freeze the official template and record its URL, date, size, and hash.
-2. Build a question-to-claim-to-evidence map before drafting.
-3. Draft the abstract skeleton and result-table inventory before long prose.
-4. Write each subproblem as analysis, assumptions, model, solution, results, and checks.
-5. Calibrate wording to evidence; do not turn association into causation or heuristic output into global optimality.
-6. Audit equations, units, figure/table numbering, cross-references, citations, code/source attribution, and AI records.
-7. At C3, run a focused results/strong-claim challenge with Claude or a human reviewer; do not create a separate paper-review track.
-8. Compile the shared `paper/` XeLaTeX project locally and in CI; export PDF, extract text, inspect metadata, render representative pages, and obtain human sign-off.
-9. Compute final hashes and freeze the submitted PDF.
+1. Build a problem–model–experiment–figure–claim–citation map.
+2. Draft the abstract skeleton and result-table inventory early.
+3. For each subproblem write problem interpretation, assumptions, model,
+   solution, results and checks as one coherent chain.
+4. Keep the formula, implementation, experiment and prose synchronized.
+5. State whether a result is feasible, a current best heuristic, optimal under
+   stated assumptions or globally optimal; never blur these categories.
+6. Distinguish association, prediction importance and causation.
+7. Put every important number beside its experiment ID or reproducible source.
+8. Run C3 on the strongest results and wording; use deterministic checks for
+   citations, cross-references and PDF structure.
 
-Every numeric or strong paper claim must pass the evidence-graph binding. If a paper
-or candidate PDF changes after a Gate, declare `paper_claim` or `candidate_pdf` and
-use the trusted runner's fixed checks; visual review remains `manual_required` until
-an independent reviewer or human supplies evidence.
+## LaTeX collaboration
 
-## Required artifacts
+Use `paper/main.tex` as an assembler. Keep sections, figures, tables, appendix,
+references and style tokens separate. Contributors work on section branches;
+the shared `.bib` file is the only citation source. Compile with XeLaTeX and
+biber through `make paper-ci`, then run `make qa` and inspect the rendered PDF.
 
-- draft/paper_plan.md
-- `paper/main.tex` and the section sources, or the current official Word source
-- claim register and experiment cards
-- reviews/C3_results_claim_review.md
-- reviews/citation_review.md (deterministic or human support record)
-- reviews/final_pdf_qa.md (deterministic/人工格式记录)
-- support/AI工具使用详情.pdf or the equivalent required by the current rules
+## Delivery limits
 
-## Failure conditions
-
-Block delivery when the official template is unknown, the abstract exceeds the current limit, non-cover pages expose identity, a core claim lacks evidence, equations disagree with code, citations are unverifiable, AI use is undocumented when required, or the final PDF has visual/metadata defects.
-
-## Available prompt roles
-
-Use writing/prompts/paper_architect.md, mathematical_writer.md, figure_table_editor.md, citation_editor.md, paper_reviewer.md, and formatting_qa.md as role prompts. Keep author, reviewer, and final approver separate.
+Do not invent data, awards, references, results or official requirements. The
+current PDF is a preview until the team verifies the current official cover,
+anonymous information, page limits, fonts and AI-use instructions. Human
+members inspect the final PDF before submission.
