@@ -1,19 +1,19 @@
-# 决策日志写法
+# 决策日志
 
-每次改变数据、模型、算法、参数或论文表述时，记录一条决策：
+决策日志只记录会影响路线、实验投入、论文强表述或最终提交的取舍。普通代码和
+排版修改在提交说明中写清即可。
 
 ```text
 Decision ID:
 Time:
-Owner:
-Change:
+Question or route:
+Decision: accept | reject | pause | defer
 Reason:
-Alternatives considered:
-Evidence:
-Impact:
-Required reruns:
-Reviewer:
-Status:
+Evidence: experiment IDs, formulas, data checks or review IDs
+Trade-off:
+Owner:
+Next action:
 ```
 
-禁止用“模型认为更好”“效果看起来更稳定”作为唯一理由。至少补充指标、反例、约束检查、论文依据或人工决定。
+失败路线不用写长篇解释，但必须留下可复现的最小原因。Claude 的建议先记录“接受/
+拒绝及原因”，不能因为两个模型意见相同就跳过实验或人工判断。

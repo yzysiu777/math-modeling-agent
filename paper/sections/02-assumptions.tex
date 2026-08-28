@@ -1,0 +1,32 @@
+\section{模型假设与符号说明}
+
+假设必须说明题面或数据依据、必要性、可能偏差和验证方式。假设的编号应在模型、敏感性和限制中保持一致。
+
+\begin{table}[H]
+  \centering
+  \caption{模型假设记录示例}
+  \label{tab:assumptions}
+  \begin{tabular}{p{0.10\textwidth}p{0.28\textwidth}p{0.28\textwidth}p{0.22\textwidth}}
+    \toprule
+    编号 & 假设 & 依据 & 验证或敏感性 \\
+    \midrule
+    H1 & 输入在研究窗口内可比 & 题面/数据说明 & 分层或扰动检查 \\
+    H2 & 资源约束按记录执行 & 题面约束 & 独立可行性检查 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{符号说明示例}
+  \label{tab:symbols}
+  \begin{tabular}{@{}p{0.15\textwidth}p{0.32\textwidth}p{0.16\textwidth}p{0.23\textwidth}@{}}
+    \toprule
+    符号 & 含义 & 单位 & 取值范围 \\
+    \midrule
+    $x_i$ & 决策或响应变量 & 题面单位 & 由契约定义 \\
+    $c_i$ & 已知参数 & 题面单位 & 由数据定义 \\
+    $f(x)$ & 目标/损失函数 & 统一量纲 & 待核验 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

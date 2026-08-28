@@ -1,25 +1,26 @@
-# 仅作角色和权限示例，不放 API key、Cookie、账号或真实私密地址。
-lead:
-  platform: "codex"
-  model: "PIN_LOCALLY_FOR_THE_COMPETITION"
-  reasoning_effort: "high_or_max"
+# 只作本地配置示例，不放 API key、Cookie、账号或真实私密地址。
+# 模型名称、预算和访问方式由队员在机器私有配置中决定。
+codex:
+  platform: codex
+  role: solution_lead
+  purpose: "题意、候选路线、实验和论文主线"
   workspace_write: true
-  default_mode: "plan_then_execute"
 
-adversary:
-  platform: "claude"
-  model: "PIN_LOCALLY_FOR_THE_COMPETITION"
-  workspace_write: "reviews_and_failures_only"
-  initial_visibility: "raw_input_and_contract_only"
-  nonblind_visibility: "explicitly_declared"
+claude:
+  platform: claude
+  role: independent_adversary
+  purpose: "人工触发的 C1/C2/C3 关键挑战"
+  workspace_write: false
+  session_mode: manual_copy_of_compact_packet
 
 deterministic:
-  python: "PIN_ENVIRONMENT_VERSION"
-  statistics: "PIN_ENVIRONMENT_VERSION"
-  graph: "PIN_ENVIRONMENT_VERSION"
-  optimizer: "OPTIONAL_SOLVER_AND_LICENSE"
+  python: PIN_ENVIRONMENT_VERSION
+  statistics: PIN_ENVIRONMENT_VERSION
+  optimizer: OPTIONAL_SOLVER_AND_LICENSE
+  latex: XeLaTeX_biber_latexmk
 
 human:
-  approves_goals: true
-  approves_model_tradeoffs: true
-  signs_final_report: true
+  decides_problem_ambiguity: true
+  decides_model_tradeoffs: true
+  decides_claude_suggestions: true
+  confirms_official_rules_and_submission: true

@@ -1,56 +1,58 @@
-# Claude Code 对抗审查适配规则
+# Claude C1/C2/C3 独立挑战协议
 
-在本数学建模工作区，Claude 默认是独立审查者，不是 Codex 的第二个项目经理，也不是最终裁判。
+你是人工触发的独立挑战者，不是第二个主解模型，也不是最终裁判。一次会话只做
+一个关键节点；不完整重做整道题，不要求全量实验，不直接修改 Codex 工作区。
 
-## 默认权限
+## 三个节点
 
-- 只读检查 `input/`、`source/`、`data_dictionary/`、`artifacts/` 和 `runs/`。
-- 只向 `reviews/` 和 `failures/` 写入审查结果；不修改 Codex 的模型代码、结论登记表或最终论文。
-- 不执行 `.exe`、来源不明脚本、破坏性命令或未经用户确认的外部操作。
-- 若没有独立证据，不把“看起来合理”写成“正确”。
+### C1：题意、目标和约束
 
-## 论文审查边界
+只阅读题面摘要、原始输入说明和 `case_brief.md`。独立列出研究对象、输入输出、
+目标、硬约束、单位、时间边界、可能解释、不能擅自补的假设，以及一个能推翻当前
+理解的最小反例。不要读取主模型结论来反推题意。
 
-- 读取 writing/OFFICIAL_RULES.md、writing/PAPER_STYLE_GUIDE.md、writing/NATIONAL_AWARD_LANGUAGE.md 和 writing/QA_CHECKLIST.md。
-- 将官方硬规则、推荐风格和本地优秀论文样本观察分开报告；不要把某篇论文的排版或“国奖语言”包装成组委会规定。
-- 逐句攻击摘要和结论中的“最优、显著、导致、稳定、创新、指导”等强表述，要求对应的证明、对照、统计检验或实验记录。
-- 检查论文、代码、图表和结果表是否一致，检查引用、AI 使用说明、PDF 匿名性、页码和版式。
-- 只向 reviews/ 写审查报告，不直接改写主论文；所有 P0/P1 发现必须阻断定稿。
+### C2：模型架构和算法
 
-## 审查模式
+阅读候选路线、关键公式、伪代码/流程图和小实验。检查变量、目标、约束、单位、
+算法不变量与代码是否一致，并从不同方法族提出挑战。至少给出一个替代方法族和
+一个最便宜的区分实验，不实现第二套完整算法。
 
-1. **盲审模式**：只读原始题面、数据契约和验收标准，独立提出模型结构、风险点和应有的确定性测试；不读取 Codex 解答。
-2. **对抗模式**：读取指定的 Codex 工件，逐条攻击其假设、公式、代码和实验，优先找能让结论失效的最小反例。
-3. **复现模式**：只按照 `runs/` 中的命令和环境说明复核结果；如果无法复跑，记录具体阻塞原因。
+### C3：主要结果和论文强结论
 
-## 必查项目
+阅读关键实验、对照表、claim、论文片段和必要代码。局部复算指标和硬约束，检查
+切分/泄漏、公平对照、稳定性、数字来源以及“可行/较优/最优”“关联/因果”的表述。
+只挑最值得人工抽查的 3–5 个结论，不要求重跑全部实验。
 
-- 题面是否被完整、正确地翻译为数据契约和数学约束；
-- 训练/测试划分、时间切分、患者/节点/路径去重是否正确；
-- 标签构造是否使用了答案信息、未来信息或测试信息；
-- 目标函数、约束、单位、边界条件和变量维度是否一致；
-- 代码是否真的实现了论文所声称的模型；
-- 指标是否足以支持结论，是否存在选择性报告；
-- 结果是否能被随机种子、输入哈希和命令复现；
-- 是否存在反例、极端值、不可行解、局部最优或数值不稳定。
+## 审核包最低内容
 
-## 输出格式
+- `case_id`、当前问题和审核节点；
+- 候选路线、方法族、Champion/Challenger 与淘汰理由；
+- 关键公式、伪代码或流程图；
+- 主要实验结果、当前最担心的问题和希望回答的 3–5 个问题；
+- 文件路径、版本和必要的输入说明；
+- 明确未提供、因此不能判断的内容。
 
-写入 `reviews/<timestamp>_claude_adversary.md`，至少包含：
+## 固定输出
 
 ```text
 Review ID:
-Mode: blind | adversarial | reproduction
-Target artifact:
-Verdict: PASS | PASS_WITH_LIMITATIONS | BLOCKED | REJECTED
-
-Findings:
-- [P0/P1/P2/P3] 问题、证据位置、影响、最小修复或验证建议
-
-Independent reconstruction:
-Counterexamples or tests:
-Claims that remain supported:
+Critical node: C1 | C2 | C3
+Review mode: blind | challenge | results
+Review lens:
+Primary method family:
+Alternative method family:
+Methodological difference:
+Highest-risk findings:
+- [P0/P1/P2/P3] statement; evidence; impact; minimal test
+Disconfirming test or counterexample:
+Routes to retain / modify / pause:
+What was checked:
+What was not checked:
+Human decisions required:
 Uncertainty:
+Verdict: PASS | PASS_WITH_LIMITATIONS | BLOCKED | REJECTED
 ```
 
-审查结束时不要直接修改主方案；只给出可操作的发现和证据位置。
+“方案看起来合理”不是审核结论。没有方法论差异、反例或可证伪测试时，只能报告
+信息不足。报告只提出建议；队员在 `decisions.md` 记录接受或拒绝及原因，Codex 再
+实施和验证。

@@ -1,84 +1,117 @@
-# 华为杯数学建模工业级 Agent 工作台
+# 数学建模 Agent 工作台
 
-这是一个面向中国研究生数学建模竞赛的、可复制的多智能体协作模板。目标不是让两个模型“互相投票”，而是把模型推理、数据验证、复现实验、对抗审查和人工决策分层，形成可追溯的竞赛建模生产线。
+这是一个面向华为杯四天赛程的轻量数学建模工作台，服务于三类题目：
 
-## 先看什么
+- 运筹优化：规划、网络、路径、调度、资源分配、多目标、鲁棒与随机优化；
+- 数据分析：清洗、统计推断、预测、分类、聚类、时序和可解释性；
+- 混合建模：数据分析产生参数、预测或场景，优化模型完成决策。
 
-1. [RESEARCH_REPORT.md](RESEARCH_REPORT.md)：调研结论、架构判断、支持的 Skills 和三道题的落地路线。
-2. [AGENTS.md](AGENTS.md)：Codex 及其他 coding agent 的长期工作规则。
-3. [CLAUDE.md](CLAUDE.md)：Claude Code 作为独立对抗审查者时的适配规则。
-4. [protocol/workflow.md](protocol/workflow.md)：从题面接收到最终论文的阶段流程。
-5. [protocol/gates.md](protocol/gates.md)：每个阶段的准入、验收和阻断条件。
-6. [skills/industrial-mathematical-modeling/SKILL.md](skills/industrial-mathematical-modeling/SKILL.md)：可复制的项目级 Skill。
+核心目标是快速产生真正不同的候选路线，用低成本实验进行赛马，在关键节点让
+Claude 做独立挑战，并同步推进高质量 LaTeX 论文。Codex 负责主线执行，Claude
+由队员手动触发，队员保留模型取舍和最终提交决定。
 
-## 核心判断
+## 十分钟开始
 
-“Codex 主模型 + Claude 对抗模型”是合理的候选架构，但必须加上第三层：**确定性验证器与人工门禁**。Claude 的不同模型先验可以降低单一模型路径依赖，却不能把“模型不一致”当作真值，也不能代替数据检查、公式推导、求解器结果和复现实验。
+1. 阅读 [AGENTS.md](AGENTS.md) 和 [agent.md](agent.md)，了解最少但必须遵守的规则。
+2. 创建案例目录：
 
-建议角色分工：
+   ```bash
+   python3 scripts/create_case.py --case-id demo-01 --route optimization
+   ```
 
-- Codex：项目协调、资料盘点、代码/实验编排、候选模型实现、结果汇总和论文草稿。
-- Claude：独立建模、反例构造、数据泄漏审查、公式/约束攻击、结果复核；默认只读，不改主方案。
-- Python/统计库/图算法/优化求解器：对数据、公式、约束、指标和结果做可重复的确定性检查。
-- 人：批准目标、确认建模取舍、处理无法自动裁决的争议，并签署最终论文。
+3. 只填写 `cases/demo-01/case_brief.md`：子问题、输入输出、目标、硬约束、单位、
+   指标、歧义和当前假设。其余文件先由 Agent 生成草稿。
+4. 让 Codex 读取题面与附件，建立至少三条方法论不同的路线，先写入
+   `models/candidates.md`，再把最便宜的区分实验放入 `experiments/board.md`。
+5. 统一切分、统一指标，先跑可解释 baseline；保留一个 Champion 和一个方法论
+   不同的 Challenger。每次取舍在 `decisions.md` 用一行记录理由。
+6. 在题意、模型架构、主要结果三个关键节点，复制对应的
+   `prompts/claude/C1_problem_challenge.md`、C2 或 C3 到新的 Claude 会话。
+7. 从实验结果同步更新 `paper/` 和案例的 `paper/` 说明，最后运行：
 
-## 目录说明
+   ```bash
+   PYTHON=.venv/bin/python make validate
+   PYTHON=.venv/bin/python make test
+   make paper-ci
+   make qa
+   ```
+
+## 唯一工作流
+
+```text
+题意重构
+  -> 多路线头脑风暴
+  -> 候选模型池
+  -> 快速 baseline
+  -> 小实验赛马
+  -> Champion / Challenger
+  -> Claude C1/C2/C3 关键挑战
+  -> 深化模型与稳健性
+  -> 论文同步写作
+  -> 数值、引用、格式和 PDF 检查
+```
+
+详细规则见 [protocol/competition-workflow.md](protocol/competition-workflow.md)。
+普通实验和论文小修改直接在案例目录及对应 Git 分支中推进，不需要先填一套复杂
+的开发表单。只有会显著改变题意、目标、约束、比赛策略或最终提交的决定才停下来
+请队员确认。
+
+## 目录结构
 
 ```text
 agent/
-├── README.md                         本文件
-├── RESEARCH_REPORT.md                调研报告
-├── AGENTS.md                         Codex/通用 coding agent 规则
-├── CLAUDE.md                         Claude Code 适配规则
-├── roles/                            权威角色提示词
-│   ├── codex_lead.md
-│   ├── claude_adversary.md
-│   ├── data_auditor.md
-│   ├── model_reviewer.md
-│   ├── reproducibility_reviewer.md
-│   └── final_gatekeeper.md
-├── prompts/                          可直接复制的启动提示词
-├── protocol/                         流程、门禁和升级规则
-├── schemas/                          声明、实验、审查和运行记录字段
-├── templates/                        案例清单、实验卡、审查报告模板
-├── config/                           不含密钥的模型配置示例
-├── skills/
-│   └── industrial-mathematical-modeling/  可携带的 Codex Skill 包
-└── adapters/                         平台适配入口
-    ├── codex/AGENTS.md
-    └── claude/CLAUDE.md
+├── README.md                         十分钟入口
+├── AGENTS.md                         少量硬规则
+├── agent.md                          Codex 主 Agent 协议
+├── CLAUDE.md                         Claude C1/C2/C3 协议
+├── protocol/                         唯一竞赛流程与协作约定
+├── roles/                            建模、数据、论文角色卡
+├── prompts/                          启动和关键挑战提示词
+├── skills/                           可携带的工业级方法 Skill
+├── templates/                        案例、模型、实验和论文模板
+├── scripts/                          路由、案例初始化、实验与数值检查
+├── cases/examples/                   三个通用演示
+├── paper/                            XeLaTeX 团队论文工程
+├── writing/                          国奖语言、图表、引用和 AI 记录
+└── audit/                            历史架构资料，仅供回看，不参与运行时
 ```
 
-## 使用方式
-
-把某一道题复制成独立案例工作区，例如：
+案例使用以下简洁结构：
 
 ```text
-case-workspace/
-├── AGENTS.md                 从本目录复制或引用
-├── CLAUDE.md                 需要 Claude Code 时复制
-├── case_manifest.yaml
-├── input/                    原始题面、附件，只读
-├── source/                   论文、官方资料、代码仓库
-├── data_dictionary/         字段、单位、标签和数据契约
-├── artifacts/                模型、图表、表格、推导和中间结论
-├── runs/                     每次实验的命令、环境、日志和结果
-├── reviews/                  Claude/其他审查者的审查记录
-├── failures/                 失败尝试、反例和废弃路线
-└── final/                    经过门禁的论文和答辩材料
+cases/<case_id>/
+├── input/                    题面和附件，只读
+├── case_brief.md             唯一启动表单
+├── models/
+│   ├── candidates.md         候选路线池
+│   └── comparison.md         公平比较与取舍
+├── experiments/
+│   ├── board.md              实验队列
+│   ├── code/                 可运行代码
+│   └── outputs/              关键输出
+├── decisions.md              保留、淘汰和人工决定
+├── reviews/                  C1/C2/C3 报告
+└── paper/                    案例论文入口或说明
 ```
 
-原则上不要把三道题混在同一个运行状态里。每道题要有独立的 `case_manifest.yaml`、原始数据哈希、运行日志和结论登记表。
+外部 Planner/Executor 控制面不属于本仓库，也不会被案例运行时读取。
 
-## 当前版本边界
+## 三类能力
 
-- 这是提示词、流程和目录模板，不是已经接通 Codex API、Claude API 或求解器的自动编排平台。
-- `config/models.example.yaml` 不含任何密钥；真正的模型名、账户、预算和 API 地址应在本地私有配置中填写。
-- 2025 A 可能包含较大 CSV 和较重调度实验，先做小算例和确定性 baseline，再扩大规模。
-- 任何“通过”都必须有证据记录；没有运行记录的模型只能标记为“候选”或“未验证”。
+`skills/industrial-mathematical-modeling/` 给出运筹、数据分析和混合题的检查重点及
+短方法卡；`skills/model-race/` 给出候选路线、实验信息价值和 Champion/Challenger 的操作法。
+`scripts/model_checks.py` 提供可复用的约束可行性、目标复算、数据切分/泄漏和模型
+比较函数；`scripts/model_pool.py` 和 `scripts/experiment_board.py` 只做候选路线与
+实验内容的轻量结构检查。它们是辅助证据，不替代题面理解和队员判断。
 
-## 论文写作与交付
+## 论文工程
 
-论文不作为最后一步的语言润色。请先读 writing/README.md，它包含官方模板快照、论文结构、国奖语言的证据化写法、图表公式规范、AI 合规记录和最终 PDF 门禁。
+论文从 baseline 开始同步维护：问题重述、符号、模型、实验、图表、结论和引用
+保持可追踪。`paper/` 使用 XeLaTeX、ctex、biblatex/biber 和统一 `.bib`；历史
+官方文件只作参考，比赛日必须重新确认当届格式、匿名规则和 AI 使用规定。
 
-论文专项 Skill 位于 skills/competition-paper-writing/，负责官方模板版本冻结、正文结构、语言证据化、引用/AI 审计和最终 PDF 验收。
+## Git 协作
+
+主线使用 `main`，个人修改使用 `model/<任务>`、`analysis/<任务>`、`paper/<章节>`
+或 `review/<编号>`。每次提交说明“方法、数据、实验或论文发生了什么”，保留被
+淘汰路线和失败实验的简短记录。外部开发任务的交接文件只在协作控制面保存。

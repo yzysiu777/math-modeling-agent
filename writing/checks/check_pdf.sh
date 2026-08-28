@@ -18,7 +18,7 @@ if [ ! -f "$pdf" ]; then
   exit 1
 fi
 
-for tool in file pdfinfo pdftotext shasum rg; do
+for tool in file pdfinfo pdftotext shasum grep; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "FAIL required tool not found: $tool" >&2
     exit 1
@@ -56,7 +56,7 @@ echo "SHA-256: $hash"
 status=0
 
 for marker in 摘要 关键词 参考文献; do
-  if rg -q "$marker" "$text"; then
+  if grep -F -q "$marker" "$text"; then
     echo "PASS marker: $marker"
   else
     echo "WARN marker not found: $marker"
@@ -64,7 +64,7 @@ for marker in 摘要 关键词 参考文献; do
   fi
 done
 
-if rg -q '页眉|Header' "$text"; then
+if grep -E -q '页眉|Header' "$text"; then
   echo "WARN header-like text detected; inspect visually and compare with the current official template."
   status=1
 else

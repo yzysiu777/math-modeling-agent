@@ -1,0 +1,66 @@
+# Operating-system and editor files
+.DS_Store
+.AppleDouble
+.LSOverride
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+**/*secret*
+**/*credential*
+**/*token*
+!writing/templates/latex_style_tokens.yaml
+
+# Python and local tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+.venv/
+venv/
+
+# LaTeX intermediates and generated output
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.nav
+*.out
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+paper/build/
+paper/output/
+build/
+dist/
+
+# Competition case data and private review bundles are opt-in
+cases/**/input/
+cases/**/runs/raw/
+cases/**/artifacts/generated/
+cases/**/review_bundles/
+reviews/bundles/
+
+# Temporary exports and local caches
+*.tmp
+*.bak
+*.orig
+*.patch
+tmp/
+.cache/
+.harness/

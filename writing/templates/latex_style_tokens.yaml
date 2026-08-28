@@ -1,30 +1,8 @@
-version: "2026-08-26-internal"
-status: "internal-recommendation-not-official"
 paper:
-  paper_size: "a4"
-  language: "zh-CN"
-  body_font_cn: "SimSun"
-  heading_font_cn: "SimHei"
-  latin_font: "Times New Roman"
-  line_spacing: "single"
-  header: "none"
-  footer_page_number: "center"
-  page_number_start: "abstract-page-as-1"
-  citation_style: "numeric-brackets"
-  figure_caption_position: "below"
-  table_caption_position: "above"
-  equation_numbering: "chapter-sequence"
-sections:
-  title: "official-template"
-  abstract: "official-template"
-  keywords: "official-template"
-  body_heading_level_1: "fourth-size-bold-centered"
-  body_heading_level_2: "small-fourth-size-bold-left"
-  body_text: "small-fourth-size"
-qa:
-  require_pdf_render: true
-  require_metadata_check: true
-  require_identity_check_after_cover: true
-  require_cross_reference_check: true
-  require_claim_evidence_map: true
-  require_human_signoff: true
+  fontset: fandol-for-ci
+  line_spacing: single
+  numbering: sequential
+  bibliography: gb7714-2015
+  anonymous_body: true
+  current_official_profile: "比赛日重新填写"
+  human_pdf_inspection: true

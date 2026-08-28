@@ -1,0 +1,12 @@
+# 案例目录约定
+
+案例目录只保存比赛运行时资料，不保存外部 Planner/Executor 开发控制面。创建案例
+时只需复制 [../templates/case_brief.md](../templates/case_brief.md)，或直接运行：
+
+```bash
+python3 ../scripts/create_case.py --case-id your-case --route insufficient_information
+```
+
+推荐结构见根目录 [README.md](../README.md)。`input/` 中的题面和附件只读；模型候选、
+实验板、决定、C1/C2/C3 报告和论文源文件与案例一起维护。每个案例可以根据题目
+增加本地字段和脚本，但不要把多个题目的数据混在同一目录。

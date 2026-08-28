@@ -1,55 +1,93 @@
 ---
 name: industrial-mathematical-modeling
-description: Run evidence-backed, reviewer-gated mathematical modeling workflows for competition problems, combining reproducible data checks, baseline-first modeling, adversarial review, and final report controls.
+description: Build fast, evidence-backed operations research, data analysis, hybrid models and competition papers.
 metadata:
-  short-description: Industrial-grade math modeling workflow
+  short-description: Industrial-grade modeling and experiment race
 ---
 
 # Industrial Mathematical Modeling
 
-Use this Skill for research-grade or competition-grade mathematical modeling tasks involving messy attachments, statistical learning, graph/path planning, scheduling, optimization, paper comparison, reproducible experiments, or a final technical report.
+Use this Skill for Huawei Cup problems involving planning, networks, paths,
+scheduling, allocation, multi-objective decisions, robust or stochastic models,
+messy data, prediction, classification, clustering, time series or mixed
+analysis-and-decision systems.
 
-## Required workspace contract
+## Start with one brief
 
-Before acting, locate and read the applicable `AGENTS.md`, `case_manifest.yaml`, `protocol/workflow.md`, and `protocol/gates.md`. If the case manifest is missing, create a draft and report the missing decisions before making strong claims.
+Read the root/case `AGENTS.md`, `README.md`, `case_brief.md` and the original
+statement/attachments. The only required human input at startup is the case
+brief. Record unknowns rather than filling them from memory. Route the case to
+`optimization`, `data_analysis`, `hybrid` or `insufficient_information` and
+explain the evidence.
 
-Use the canonical role prompts under `roles/`:
+## Core loop
 
-- `codex_lead.md` for the main coordinator;
-- `claude_adversary.md` for an independent read-only reviewer;
-- `data_auditor.md`, `model_reviewer.md`, and `reproducibility_reviewer.md` for focused gates;
-- `final_gatekeeper.md` for final acceptance.
+1. Extract the problem contract: subproblems, inputs, outputs, objectives,
+   hard constraints, fields, units, time boundaries and metrics.
+2. Read the route-specific method cards in `references/` and propose at least
+   three methodologically different candidate routes for each important
+   subproblem. Cards are prompts for route generation, not approval gates.
+3. Build an interpretable baseline and a small hand-checkable instance.
+4. Queue the cheapest experiment that can distinguish the candidates.
+5. Compare candidates with the same split, instances, constraints and metrics.
+6. Keep a Champion and a methodologically different Challenger until the
+   strategy is clear.
+7. Ask Claude for a focused C1, C2 or C3 challenge when the problem, model or
+   conclusion reaches a decision point.
+8. Expand only after the route survives the cheap tests; update the paper as
+   experiments stabilize.
 
-## Operating rules
+## Operations research lens
 
-1. Freeze raw inputs and record source, version, size, and hash.
-2. Translate the problem into an explicit data and mathematical contract before tuning models.
-3. Build a simple, interpretable, executable baseline before complex candidates.
-4. Keep claims, experiments, reviews, failures, and decisions as durable artifacts.
-5. Treat Codex and Claude as separate roles; do not use agreement as truth.
-6. Require deterministic evidence, independent reproduction, or explicit human approval for important claims.
-7. Mark uncertainty and missing provenance; never silently fill gaps.
-8. Do not run unknown executables or mutate raw inputs.
+Check sets and indices, variable domains, units, objective direction, initial
+and terminal conditions, conservation, capacity, timing, feasibility and the
+boundary of any optimality claim. Select among exact programming, network or
+dynamic programming, decomposition/relaxation, heuristics, metaheuristics,
+robust/stochastic optimization and simulation optimization according to the
+problem. Independently recalculate feasibility and objective values with
+`scripts/model_checks.py` or a small separate checker.
 
-## Modes
+## Data analysis lens
 
-- **Intake:** inventory sources, fields, units, constraints, outputs, and risks.
-- **Baseline:** implement the smallest verifiable model and tests.
-- **Candidate:** compare model/algorithm variants through experiment cards.
-- **Review:** run blind or non-blind adversarial review and focused gates.
-- **Reproduction:** rerun from recorded commands and versions without guessing.
-- **Handoff:** summarize Gate status, claims, evidence, unresolved issues, and next actions.
+Check entity grain, keys, label construction, missingness, duplicates, outliers,
+time order, train/validation/test isolation, preprocessing fit scope, leakage,
+baselines, metrics, calibration, uncertainty and association-versus-causation
+language. Use the data checklist and the split helper before comparing models.
 
-## Domain routing
+## Hybrid lens
 
-- Clinical/tabular tasks: prioritize patient-level splitting, time leakage, label construction, calibration, and association-versus-causation limits.
-- Graph/trajectory tasks: prioritize graph state, edge feasibility, geometry, path constraints, probability semantics, and small-instance optimal checks.
-- DAG/scheduling tasks: prioritize acyclicity, topological feasibility, resources, buffer lifetimes, capacity, SPILL closure, simulator consistency, and scale tests.
+Write the upstream-to-downstream fields, types, units, time semantics, error or
+scenario treatment and allowed range in the case notes. Test how upstream error,
+missing predictions and extreme predictions affect downstream feasibility and
+objective. Compare both a simple end-to-end baseline and separate module baselines.
 
-## References
+## Evidence and writing
 
-- Read [claims-and-evidence.md](references/claims-and-evidence.md) when registering or reviewing claims.
-- Read [task-checklists.md](references/task-checklists.md) when the case is 2023 E, 2019 F, or 2025 A.
-- For paper delivery, prioritize official template/version, anonymous pages, abstract limits, numeric citations, figure/table/equation cross-references, AI disclosure, and rendered-PDF QA.
-- Use writing/README.md as the entry point for paper structure, official-format versioning, language control, citation auditing, AI-use records, and final-PDF QA.
-- Use root templates under `templates/` for case manifests, experiment cards, reviews, and final handoff.
+Keep source, experiment ID, code entry point, parameters, seed, result and
+limitations alongside each important conclusion. A model output is not a fact
+until its assumptions and checks are visible. Start the paper outline after the
+first baseline, keep formulas and code aligned, and calibrate language to the
+strength of the evidence.
+
+## File identity and hashes
+
+Ordinary data files and ordinary experiment outputs do not require a hash. Keep
+their source, acquisition date, size and a useful file list when available; add
+SHA-256 when the team wants to freeze a particular input or output. The first
+official problem package may likewise record a hash optionally. A hash is
+appropriate for a frozen official template or final submission PDF, but is not
+a substitute for data quality, mathematical checks or reproducibility evidence.
+
+## Project references
+
+- `references/optimization-checklist.md`
+- `references/data-analysis-checklist.md`
+- `references/hybrid-checklist.md`
+- `references/optimization-method-cards.md`
+- `references/data-analysis-method-cards.md`
+- `references/hybrid-method-cards.md`
+- `references/claims-and-evidence.md`
+- `scripts/model_pool.py`
+- `scripts/experiment_board.py`
+- `skills/model-race/SKILL.md`
+- `writing/README.md`

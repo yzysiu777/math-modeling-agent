@@ -1,0 +1,25 @@
+record_type: official_paper_profile
+year: 2025
+active: false
+status: historical_snapshot
+sources:
+  - name: "2025论文格式规范"
+    url: "https://www.cmathc.org.cn/mcm/tz/317.html"
+    local_reference: "../../../writing/official/2025/华为杯_2025_论文格式规范.pdf"
+    sha256: "127d0b629d2475f97ed1e206dd7d34ccb6a9e0c56a75e7493bcd969c9dfa03c0"
+  - name: "2025论文模板"
+    url: "https://www.cmathc.org.cn/cpmcm/news/512.html"
+    local_reference: "../../../writing/official/2025/华为杯_2025_论文模板.doc"
+    sha256: "2fe99e580833602e49a714bda1883ab56ebfcebfc48f77aa74053e23a6185fb0"
+observed_rules:
+  abstract_page_before_body: true
+  page_number_from_abstract: true
+  centered_footer_page_number: true
+  no_header: true
+  anonymous_body_pages: true
+  abstract_max_pages: 2
+  numeric_citations: true
+  pdf_submission: true
+notes:
+  - "历史快照仅供训练和格式对照。比赛日必须重新冻结当届文件。"
+  - "社区LaTeX模板仅作工程参考，不是官方来源。"

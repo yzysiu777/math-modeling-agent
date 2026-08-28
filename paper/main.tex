@@ -1,0 +1,42 @@
+\documentclass[UTF8,a4paper,zihao=-4,fontset=fandol]{ctexart}
+
+\input{config/paper-profile.tex}
+\input{style/modeling-paper.sty}
+\usepackage[backend=biber,style=gb7714-2015,sorting=none]{biblatex}
+\addbibresource{bibliography/references.bib}
+
+\begin{document}
+
+\hypersetup{pageanchor=false}
+\PaperCover
+\hypersetup{pageanchor=true}
+
+% The official 2025 rules start page numbering at the abstract page.
+% Reconfirm this with the active competition profile before submission.
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\begin{abstractpage}
+\paperexample{本文模板用于展示团队的论文组织、证据绑定和 LaTeX 协作方式。实际案例应在冻结题面、数据契约、模型、实验和当届官方格式后替换本页内容。}
+
+\paperexample{针对一个由多个子问题组成的数学建模任务，团队先进行题意重构与数据审计，再依据路由选择运筹优化、数据分析或混合建模方法。每个模型均先建立可解释 baseline，并通过小规模测试、独立复算和敏感性分析检查。}
+
+\paperexample{模板中的章节、公式和表格只展示排版结构，不代表任何具体案例的实验结果或结论。}
+\end{abstractpage}
+
+\input{sections/01-problem}
+\input{sections/02-assumptions}
+\input{sections/03-model}
+\input{sections/04-solution}
+\input{sections/05-results}
+\input{sections/06-robustness}
+\input{sections/07-conclusion}
+
+\clearpage
+\printbibliography[heading=bibintoc,title={参考文献}]
+
+\appendix
+\clearpage
+\input{appendix/01-support}
+
+\end{document}
