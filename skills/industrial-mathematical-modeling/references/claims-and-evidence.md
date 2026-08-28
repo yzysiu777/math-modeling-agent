@@ -16,7 +16,7 @@ A claim is any sentence that asserts a fact, model property, numerical result, c
 | Predictive performance | 患者/样本隔离、指标、对照和稳定性 |
 | Causal interpretation | 设计或假设足以支持因果，否则只能写关联 |
 | Generalization | 外部/留出验证或明确局限 |
-| Reproducibility | 输入哈希、代码版本、命令、环境和输出 |
+| Reproducibility | 输入清单、代码版本、命令、环境和输出；普通数据/实验文件哈希可选，冻结版本时再记录 |
 
 ## Evidence quality
 

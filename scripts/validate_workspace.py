@@ -19,6 +19,11 @@ try:
 except ImportError:  # pragma: no cover
     from experiment_board import validate_experiment_board
 
+try:
+    from .model_pool import validate_candidate_pool
+except ImportError:  # pragma: no cover
+    from model_pool import validate_candidate_pool
+
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_FILES = (
@@ -28,7 +33,10 @@ REQUIRED_FILES = (
     "templates/model_comparison.md", "templates/experiment_board.md",
     "templates/decision_log.md", "templates/claude_review_packet.md",
     "templates/final_checklist.md", "scripts/router.py", "scripts/create_case.py",
-    "scripts/model_checks.py", "scripts/experiment_board.py", "scripts/run_demos.py",
+    "scripts/model_checks.py", "scripts/model_pool.py", "scripts/experiment_board.py", "scripts/run_demos.py",
+    "skills/industrial-mathematical-modeling/references/optimization-method-cards.md",
+    "skills/industrial-mathematical-modeling/references/data-analysis-method-cards.md",
+    "skills/industrial-mathematical-modeling/references/hybrid-method-cards.md",
     "paper/main.tex", "paper/official/2025/manifest.yaml", "paper/official/2026/manifest.yaml",
 )
 REQUIRED_SKILLS = (
@@ -144,10 +152,7 @@ def validate_examples() -> List[str]:
     for route in ("optimization", "data-analysis", "hybrid"):
         errors.extend(f"cases/examples/{route}/experiments/board.md: {error}" for error in validate_experiment_board(ROOT / f"cases/examples/{route}/experiments/board.md"))
         candidates = ROOT / f"cases/examples/{route}/models/candidates.md"
-        if candidates.is_file():
-            route_count = sum(1 for line in candidates.read_text(encoding="utf-8").splitlines() if line.startswith("## M-"))
-            if route_count < 3:
-                errors.append(f"{candidates}: fewer than three candidate routes")
+        errors.extend(f"{candidates}: {error}" for error in validate_candidate_pool(candidates))
     return errors
 
 

@@ -98,10 +98,11 @@ cases/<case_id>/
 
 ## 三类能力
 
-`skills/industrial-mathematical-modeling/` 给出运筹、数据分析和混合题的检查重点；
-`skills/model-race/` 给出候选路线、实验信息价值和 Champion/Challenger 的操作法。
+`skills/industrial-mathematical-modeling/` 给出运筹、数据分析和混合题的检查重点及
+短方法卡；`skills/model-race/` 给出候选路线、实验信息价值和 Champion/Challenger 的操作法。
 `scripts/model_checks.py` 提供可复用的约束可行性、目标复算、数据切分/泄漏和模型
-比较函数。它们是辅助证据，不替代题面理解和队员判断。
+比较函数；`scripts/model_pool.py` 和 `scripts/experiment_board.py` 只做候选路线与
+实验内容的轻量结构检查。它们是辅助证据，不替代题面理解和队员判断。
 
 ## 论文工程
 

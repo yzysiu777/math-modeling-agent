@@ -25,6 +25,12 @@ class WorkspaceContractTests(unittest.TestCase):
             self.assertIn(marker, readme)
         for node in ("C1_problem_challenge.md", "C2_model_challenge.md", "C3_results_challenge.md"):
             self.assertTrue((ROOT / "prompts/claude" / node).is_file())
+        for card in (
+            "optimization-method-cards.md",
+            "data-analysis-method-cards.md",
+            "hybrid-method-cards.md",
+        ):
+            self.assertTrue((ROOT / "skills/industrial-mathematical-modeling/references" / card).is_file())
 
 
 if __name__ == "__main__":

@@ -24,8 +24,9 @@ explain the evidence.
 
 1. Extract the problem contract: subproblems, inputs, outputs, objectives,
    hard constraints, fields, units, time boundaries and metrics.
-2. Propose at least three methodologically different candidate routes for each
-   important subproblem.
+2. Read the route-specific method cards in `references/` and propose at least
+   three methodologically different candidate routes for each important
+   subproblem. Cards are prompts for route generation, not approval gates.
 3. Build an interpretable baseline and a small hand-checkable instance.
 4. Queue the cheapest experiment that can distinguish the candidates.
 5. Compare candidates with the same split, instances, constraints and metrics.
@@ -68,11 +69,25 @@ until its assumptions and checks are visible. Start the paper outline after the
 first baseline, keep formulas and code aligned, and calibrate language to the
 strength of the evidence.
 
+## File identity and hashes
+
+Ordinary data files and ordinary experiment outputs do not require a hash. Keep
+their source, acquisition date, size and a useful file list when available; add
+SHA-256 when the team wants to freeze a particular input or output. The first
+official problem package may likewise record a hash optionally. A hash is
+appropriate for a frozen official template or final submission PDF, but is not
+a substitute for data quality, mathematical checks or reproducibility evidence.
+
 ## Project references
 
 - `references/optimization-checklist.md`
 - `references/data-analysis-checklist.md`
 - `references/hybrid-checklist.md`
+- `references/optimization-method-cards.md`
+- `references/data-analysis-method-cards.md`
+- `references/hybrid-method-cards.md`
 - `references/claims-and-evidence.md`
+- `scripts/model_pool.py`
+- `scripts/experiment_board.py`
 - `skills/model-race/SKILL.md`
 - `writing/README.md`

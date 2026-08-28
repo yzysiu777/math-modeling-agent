@@ -31,7 +31,7 @@ make qa
 - 所有引用统一进入 `bibliography/references.bib`，不手工改数字编号；
 - `paper/config/paper-profile.tex` 保存题目、关键词、官方版本和封面开关；
 - `PaperOfficialCoverPages` 记录官方封面 PDF 的页面范围；默认 `-` 表示导入全部页面，正式提交前必须按当届文件核对；
-- `paper/official/<year>/manifest.yaml` 记录当届官方文件来源、日期和哈希；
+- `paper/official/<year>/manifest.yaml` 记录当届官方文件来源、日期、大小和可选哈希；冻结正式模板时再记录哈希；
 - `paper/build/` 只存构建产物，不提交 Git。
 
 ## 封面和摘要页

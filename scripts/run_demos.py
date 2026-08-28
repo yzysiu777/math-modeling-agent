@@ -3,22 +3,46 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.experiment_board import validate_experiment_board  # noqa: E402
+from scripts.model_pool import validate_candidate_pool  # noqa: E402
+
+
 DEMO_SCRIPTS = (
     ROOT / "cases/examples/optimization/experiments/code/run_demo.py",
     ROOT / "cases/examples/data-analysis/experiments/code/run_demo.py",
     ROOT / "cases/examples/hybrid/experiments/code/run_demo.py",
 )
+DEMO_CASES = (
+    ("optimization", DEMO_SCRIPTS[0].parents[2] / "models/candidates.md", DEMO_SCRIPTS[0].parents[2] / "experiments/board.md", DEMO_SCRIPTS[0]),
+    ("data-analysis", DEMO_SCRIPTS[1].parents[2] / "models/candidates.md", DEMO_SCRIPTS[1].parents[2] / "experiments/board.md", DEMO_SCRIPTS[1]),
+    ("hybrid", DEMO_SCRIPTS[2].parents[2] / "models/candidates.md", DEMO_SCRIPTS[2].parents[2] / "experiments/board.md", DEMO_SCRIPTS[2]),
+)
+
+
+def validate_demo_case(candidates: Path, board: Path) -> list[str]:
+    return [
+        *validate_candidate_pool(candidates),
+        *validate_experiment_board(board),
+    ]
 
 
 def run_all() -> list[tuple[Path, int, str, str]]:
     results = []
-    for script in DEMO_SCRIPTS:
+    for _, candidates, board, script in DEMO_CASES:
+        static_errors = validate_demo_case(candidates, board)
+        if static_errors:
+            output = {"passed": False, "static_errors": static_errors}
+            results.append((script, 1, json.dumps(output, ensure_ascii=False), ""))
+            continue
         process = subprocess.run([sys.executable, str(script)], cwd=ROOT, text=True, capture_output=True, check=False)
         results.append((script, process.returncode, process.stdout, process.stderr))
     return results

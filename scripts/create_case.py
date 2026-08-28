@@ -14,7 +14,7 @@ CASE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{1,63}$")
 
 
 def _candidate_seed(route: str) -> str:
-    return f"""# 候选路线池\n\n案例路由：`{route}`\n\n至少先保留三条方法论不同的路线；以下只是启动占位，Codex 应根据题面替换。\n\n## M-01：可解释 baseline\n\n- 方法族：\n- 核心思想：\n- 最便宜的证伪实验：\n- 状态：`candidate`\n\n## M-02：结构不同的候选\n\n- 方法族：\n- 核心思想：\n- 最便宜的证伪实验：\n- 状态：`candidate`\n\n## M-03：风险/假设不同的候选\n\n- 方法族：\n- 核心思想：\n- 最便宜的证伪实验：\n- 状态：`candidate`\n"""
+    return f"""# 候选路线池\n\n案例路由：`{route}`\n\n以下是能通过轻量结构检查的启动草稿；Codex 应根据题面替换，不把占位路线当成正式方案。\n\n## M-01：可解释 baseline\n\n- 方法族：simple interpretable baseline\n- 核心思想：用最小可运行规则或统计量建立可解释比较线\n- 最便宜的证伪实验：在小样本/小实例上与题面已知结果或手算结果对照\n- 状态：`candidate`\n\n## M-02：结构不同的候选\n\n- 方法族：structural mathematical model\n- 核心思想：把题面中的主要关系显式写成公式或约束\n- 最便宜的证伪实验：构造一个能区分结构假设的边界样例\n- 状态：`candidate`\n\n## M-03：风险/假设不同的候选\n\n- 方法族：risk-aware or data-driven alternative\n- 核心思想：改变关键假设、误差处理或数据使用方式，检验结果是否稳健\n- 最便宜的证伪实验：对关键输入或误差做一次小规模扰动并比较指标/可行性\n- 状态：`candidate`\n"""
 
 
 def _comparison_seed() -> str:
