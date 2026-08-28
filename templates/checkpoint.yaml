@@ -1,0 +1,27 @@
+# 案例级轻量控制文件：队员或 Codex 可手工编辑，不是身份认证或审批系统。
+case_id: <case_id>
+routing:
+  suggested: <route>
+  confirmed: false
+  confirmed_route: ""
+  confirmed_by: ""
+  note: ""
+
+# C1 可写 not_needed，但必须在 review_notes.C1 留下简短理由。
+reviews:
+  C1: pending
+  C2: pending
+  C3: pending
+review_notes:
+  C1: ""
+
+# 进入摘要/结论等强主张阶段时由 Codex 或队员明确标记。
+paper_claims_active: false
+performance_concern: false
+
+# 仅在相应确定性检查实际发现问题后写 true；不是自动诊断结果。
+deterministic_risks:
+  infeasible: false
+  objective_mismatch: false
+  leakage: false
+  split_overlap: false

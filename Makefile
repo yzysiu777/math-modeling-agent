@@ -2,7 +2,7 @@ PAPER_DIR := paper
 PAPER_BUILD := $(PAPER_DIR)/build
 PYTHON ?= python3
 
-.PHONY: paper paper-ci qa clean test validate demos
+.PHONY: paper paper-ci qa clean test validate demos case-check final-check
 
 paper:
 	mkdir -p $(PAPER_BUILD)
@@ -23,6 +23,19 @@ test:
 
 demos:
 	$(PYTHON) scripts/run_demos.py
+
+case-check:
+	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
+	@test -n "$(STAGE)" || (echo "STAGE is required"; exit 2)
+	$(PYTHON) scripts/check_case.py --case-dir "$(CASE)" --stage "$(STAGE)"
+
+final-check:
+	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
+	@status=0; \
+	$(PYTHON) scripts/check_case.py --case-dir "$(CASE)" --stage final || status=$$?; \
+	$(MAKE) PYTHON="$(PYTHON)" paper-ci || status=$$?; \
+	if [ -f $(PAPER_BUILD)/main.pdf ]; then sh writing/checks/check_pdf.sh $(PAPER_BUILD)/main.pdf || status=$$?; fi; \
+	exit $$status
 
 clean:
 	cd $(PAPER_DIR) && latexmk -r ../latexmkrc -C -outdir=build main.tex || true

@@ -38,6 +38,14 @@ class RouteResult:
     data_score: int
     evidence: tuple[str, ...]
     uncertainty: tuple[str, ...]
+    requires_human_confirmation: bool = True
+    confirmation_message: str = "这是建议，不是已确认路由；请由队员结合完整题面确认一次。"
+
+    @property
+    def suggested_route(self) -> str:
+        """Expose the advisory name without breaking callers of ``route``."""
+
+        return self.route
 
 
 def _hits(text: str, terms: Iterable[str]) -> list[str]:
@@ -94,7 +102,12 @@ def main() -> int:
     source.add_argument("--file", type=Path)
     args = parser.parse_args()
     text = args.text if args.text is not None else args.file.read_text(encoding="utf-8")
-    print(json.dumps(asdict(route_problem(text)), ensure_ascii=False, indent=2))
+    result = route_problem(text)
+    payload = asdict(result)
+    # Keep ``route`` for callers that already consume the original interface while
+    # making the advisory nature explicit to humans reading the CLI output.
+    payload["suggested_route"] = result.route
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
 

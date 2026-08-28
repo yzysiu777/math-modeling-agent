@@ -65,7 +65,8 @@ cases/huawei-cup-2026-a/input/
 ```
 
 启动时，队员只需要补充 `case_brief.md` 中确实掌握的信息。其余模型池、比较表和
-实验板由 Codex 根据题面更新。
+实验板由 Codex 根据题面更新。`checkpoint.yaml` 会记录 router 建议和一次人工路由确认；
+建议路由不是正式路由，队员需在准备冻结路线前确认或修正并写明原因。
 
 ## 3. 比赛主流程
 
@@ -77,6 +78,7 @@ cases/huawei-cup-2026-a/input/
   -> Champion / Challenger
   -> Claude 关键挑战
   -> 正式模型与稳健性实验
+  -> 阶段提醒与人工决定
   -> 论文同步写作
   -> 数值、引用、格式和 PDF 检查
 ```
@@ -125,6 +127,8 @@ Claude 不接管主解，只审核关键节点：
 
 让 Codex 按 `templates/claude_review_packet.md` 生成精简材料，人工复制到新的 Claude
 会话。队员将采纳或拒绝理由写入 `decisions.md`，再让 Codex 实施修改和针对性复算。
+Codex 应在 C1/C2/C3 到达适用节点时主动提醒，不等待队员记起；单次失败只提醒，重复失败
+或确定性错误则升级到人工和相应审核节点。
 
 ### 第五步：同步论文
 
@@ -136,6 +140,21 @@ make paper-ci   # 编译预览 PDF 并运行 LaTeX QA
 make qa         # 检查已生成 PDF
 ```
 
+### 第六步：按阶段运行案例检查
+
+四个阶段使用同一个轻量检查器，不是四套运行模式：
+
+```bash
+make case-check CASE=cases/huawei-cup-2026-a STAGE=exploration
+make case-check CASE=cases/huawei-cup-2026-a STAGE=model_selection
+make case-check CASE=cases/huawei-cup-2026-a STAGE=paper_claims
+make final-check CASE=cases/huawei-cup-2026-a
+```
+
+探索阶段的 `REMINDER` 返回成功，允许继续建模；准备正式路线时未确认路由会 `BLOCK`；
+论文强主张阶段要求有效 C3；最终检查还要求人工决定并执行根论文 PDF QA。检查器只确认
+可见记录存在，不替代题意、数学或语义审核。
+
 仓库模板是团队内部工程模板，不是当届官方提交模板。比赛开始后必须重新核对官方封面、
 摘要页、匿名要求、字体、页数、文件命名和 AI 使用规定。
 
@@ -145,6 +164,7 @@ make qa         # 检查已生成 PDF
 cases/<case_id>/
 ├── input/                    题面、附件和字段说明
 ├── case_brief.md             题意、目标、约束、单位和疑点
+├── checkpoint.yaml           router 建议、一次人工确认和轻量风险标志
 ├── models/
 │   ├── candidates.md         候选路线池
 │   └── comparison.md         统一口径下的模型比较
@@ -200,8 +220,18 @@ PYTHON=.venv/bin/python make qa
 .venv/bin/python scripts/experiment_board.py cases/<case_id>/experiments/board.md
 ```
 
+案例阶段检查：
+
+```bash
+make case-check CASE=cases/<case_id> STAGE=exploration
+make case-check CASE=cases/<case_id> STAGE=model_selection
+make case-check CASE=cases/<case_id> STAGE=paper_claims
+make final-check CASE=cases/<case_id>
+```
+
 这些脚本检查明显缺失、重复、数据泄漏、约束和目标值，不判断模型在科学意义上是否
-正确。方法论差异和强结论仍需 Codex、Claude 与队员共同判断。
+正确。案例检查还会提醒路由确认、C1/C2/C3、失败模式和人工决定；方法论差异和强结论
+仍需 Codex、Claude 与队员共同判断。
 
 ## 7. 团队 Git 协作
 
