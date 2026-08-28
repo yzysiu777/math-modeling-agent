@@ -19,6 +19,11 @@ versus a constructive heuristic; or linear regression versus a tree model
 versus a time-aware baseline. For each route state assumptions, data need,
 implementation/compute cost, expected advantage, risk and the cheapest falsifier.
 
+The lightweight `scripts/model_pool.py` only checks empty fields, invalid
+status, duplicate route IDs and obvious normalized method-family duplicates.
+It cannot judge semantic independence; distinctions such as MIP arc-flow,
+path-flow and time-indexed formulations require C2 and human review.
+
 ## Experiment selection
 
 Rank queued experiments by information value divided by cost. Prefer hand-sized

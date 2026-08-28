@@ -16,13 +16,6 @@ REQUIRED_CONTENT_COLUMNS = REQUIRED_COLUMNS[:8]
 VALID_STATUS = {"queued", "running", "done", "failed", "skipped"}
 EXPERIMENT_ID = re.compile(r"EXP-[A-Za-z0-9][A-Za-z0-9_-]*$", re.IGNORECASE)
 PLACEHOLDERS = {"", "-", "—", "待填写", "待填", "待补充", "todo", "tbd", "n/a"}
-FAILURE_HINTS = (
-    "失败", "原因", "错误", "异常", "不可行", "超时", "中止", "缺失", "崩溃", "无法", "未能",
-    "failed", "failure", "error", "exception", "infeasible", "timeout", "missing", "crash",
-)
-SKIP_HINTS = (
-    "跳过", "原因", "不相关", "无需", "缺少", "重复", "资源", "暂不", "skip", "because",
-)
 
 
 def parse_markdown_table(text: str) -> List[Dict[str, str]]:
@@ -47,16 +40,6 @@ def parse_markdown_table(text: str) -> List[Dict[str, str]]:
 def _has_value(value: str) -> bool:
     normalized = " ".join(value.casefold().split()).strip(" .。_")
     return bool(normalized) and normalized not in PLACEHOLDERS
-
-
-def _has_failure_reason(value: str) -> bool:
-    lowered = value.casefold()
-    return _has_value(value) and any(hint.casefold() in lowered for hint in FAILURE_HINTS)
-
-
-def _has_skip_reason(value: str) -> bool:
-    lowered = value.casefold()
-    return _has_value(value) and any(hint.casefold() in lowered for hint in SKIP_HINTS)
 
 
 def validate_experiment_board(path: Path) -> List[str]:
@@ -105,14 +88,14 @@ def validate_experiment_board(path: Path) -> List[str]:
             if not _has_value(next_experiment):
                 errors.append(f"done experiment {experiment_id} needs a next experiment or 无/路线已确定")
         elif status == "failed":
-            if not _has_failure_reason(result):
-                errors.append(f"failed experiment {experiment_id} needs a failure reason in 结果摘要")
+            if not _has_value(result):
+                errors.append(f"failed experiment {experiment_id} needs a non-empty failure summary")
             if not _has_value(continuation):
                 errors.append(f"failed experiment {experiment_id} needs 是否继续")
             if not _has_value(next_experiment):
                 errors.append(f"failed experiment {experiment_id} needs a next step")
-        elif status == "skipped" and not _has_skip_reason(result):
-            errors.append(f"skipped experiment {experiment_id} needs a skip reason in 结果摘要")
+        elif status == "skipped" and not _has_value(result):
+            errors.append(f"skipped experiment {experiment_id} needs a non-empty summary")
     return errors
 
 

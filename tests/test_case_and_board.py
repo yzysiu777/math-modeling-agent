@@ -8,6 +8,17 @@ from scripts.model_pool import validate_candidate_pool
 
 
 class CaseAndBoardTests(unittest.TestCase):
+    @staticmethod
+    def board_row(status, result, continuation="yes", next_experiment="继续检查"):
+        base = "M-01 | 问题 | 配置 | 范围 | 指标 | low"
+        return f"| EXP-001 | {base} | {status} | {result} | {continuation} | {next_experiment} |\n"
+
+    @staticmethod
+    def board_text(row):
+        header = "| 实验 ID | 候选路线 | 要回答的问题 | 最小配置 | 数据/实例范围 | 指标 | 预计成本 | status | 结果摘要 | 是否继续 | 下一项信息价值最高的实验 |\n"
+        separator = "|---|---|---|---|---|---|---|---|---|---|---|\n"
+        return header + separator + row
+
     def test_case_creation_needs_only_one_brief_and_creates_board(self):
         with tempfile.TemporaryDirectory() as directory:
             case = create_case("case-quickstart", "data_analysis", Path(directory))
@@ -70,6 +81,48 @@ class CaseAndBoardTests(unittest.TestCase):
         self.assertTrue(any("done experiment EXP-001 needs a result summary" in error for error in done_errors))
         self.assertEqual(failed_errors, [])
         self.assertEqual(skipped_errors, [])
+
+    def test_failed_summary_accepts_content_without_failure_keywords(self):
+        for summary in ("gap 未收敛", "数值震荡"):
+            with self.subTest(summary=summary), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "failed.md"
+                path.write_text(self.board_text(self.board_row("failed", summary)), encoding="utf-8")
+                errors = validate_experiment_board(path)
+            self.assertEqual(errors, [])
+
+    def test_failed_summary_rejects_empty_and_placeholders(self):
+        for summary in ("", "待填写", "TODO"):
+            with self.subTest(summary=summary), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "failed.md"
+                path.write_text(self.board_text(self.board_row("failed", summary)), encoding="utf-8")
+                errors = validate_experiment_board(path)
+            self.assertTrue(any("non-empty failure summary" in error for error in errors))
+
+    def test_failed_requires_continuation_and_next_step(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "failed.md"
+            path.write_text(self.board_text(self.board_row("failed", "gap 未收敛", "", "")), encoding="utf-8")
+            errors = validate_experiment_board(path)
+        self.assertTrue(any("needs 是否继续" in error for error in errors))
+        self.assertTrue(any("needs a next step" in error for error in errors))
+
+    def test_skipped_summary_uses_content_not_keyword_list(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "skipped.md"
+            path.write_text(
+                self.board_text(self.board_row("skipped", "与当前指标定义不匹配，但保留记录")),
+                encoding="utf-8",
+            )
+            errors = validate_experiment_board(path)
+        self.assertEqual(errors, [])
+
+    def test_skipped_summary_rejects_empty_and_placeholders(self):
+        for summary in ("", "待填写", "TODO"):
+            with self.subTest(summary=summary), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "skipped.md"
+                path.write_text(self.board_text(self.board_row("skipped", summary)), encoding="utf-8")
+                errors = validate_experiment_board(path)
+            self.assertTrue(any("non-empty summary" in error for error in errors))
 
 
 if __name__ == "__main__":

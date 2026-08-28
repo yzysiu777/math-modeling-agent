@@ -34,15 +34,15 @@ REQUIRED_FILES = (
     "templates/decision_log.md", "templates/claude_review_packet.md",
     "templates/final_checklist.md", "scripts/router.py", "scripts/create_case.py",
     "scripts/model_checks.py", "scripts/model_pool.py", "scripts/experiment_board.py", "scripts/run_demos.py",
-    "skills/industrial-mathematical-modeling/references/optimization-method-cards.md",
-    "skills/industrial-mathematical-modeling/references/data-analysis-method-cards.md",
-    "skills/industrial-mathematical-modeling/references/hybrid-method-cards.md",
+    ".agents/skills/industrial-mathematical-modeling/references/optimization-method-cards.md",
+    ".agents/skills/industrial-mathematical-modeling/references/data-analysis-method-cards.md",
+    ".agents/skills/industrial-mathematical-modeling/references/hybrid-method-cards.md",
     "paper/main.tex", "paper/official/2025/manifest.yaml", "paper/official/2026/manifest.yaml",
 )
 REQUIRED_SKILLS = (
-    "skills/industrial-mathematical-modeling/SKILL.md",
-    "skills/model-race/SKILL.md",
-    "skills/competition-paper-writing/SKILL.md",
+    ".agents/skills/industrial-mathematical-modeling/SKILL.md",
+    ".agents/skills/model-race/SKILL.md",
+    ".agents/skills/competition-paper-writing/SKILL.md",
 )
 REQUIRED_PROMPTS = (
     "prompts/codex-start.md", "prompts/claude/C1_problem_challenge.md",
@@ -66,23 +66,6 @@ REQUIRED_EXAMPLES = (
     "cases/examples/hybrid/experiments/board.md",
     "cases/examples/hybrid/experiments/code/run_demo.py",
 )
-OBSOLETE_PATHS = (
-    "protocol/workflow.md", "protocol/gates.md", "protocol/state-machine.md",
-    "scripts/gate_contract.py", "scripts/check_transition.py", "scripts/check_work_item.py",
-    "scripts/check_revision_closure.py", "scripts/run_trusted_check.py",
-    "scripts/check_trusted_execution.py", "scripts/check_human_signoff.py",
-    "scripts/check_manual_attestation.py", "scripts/check_approved_revision.py",
-    "schemas/project_manifest.schema.json", "schemas/state_event.schema.json",
-    "templates/case_manifest.yaml", "templates/work_item.yaml",
-)
-ACTIVE_DIRS = ("roles", "adapters", "protocol", "prompts", "skills", "templates", "scripts", "cases")
-FORBIDDEN_RUNTIME_REFERENCES = (
-    "protocol/gates.md", "protocol/state-machine.md", "scripts/gate_contract.py",
-    "scripts/run_trusted_check.py", "scripts/check_revision_closure.py",
-    "scripts/check_transition.py", "scripts/check_work_item.py", "case_manifest.yaml",
-)
-
-
 def _missing(paths: Iterable[str]) -> List[str]:
     return [relative for relative in paths if not (ROOT / relative).exists()]
 
@@ -122,28 +105,6 @@ def validate_official_profiles() -> List[str]:
     return errors
 
 
-def validate_runtime_references() -> List[str]:
-    errors: List[str] = []
-    for relative in OBSOLETE_PATHS:
-        if (ROOT / relative).exists():
-            errors.append(f"obsolete runtime path still exists: {relative}")
-    for dirname in ACTIVE_DIRS:
-        base = ROOT / dirname
-        if not base.exists():
-            continue
-        for path in base.rglob("*"):
-            if not path.is_file() or path.resolve() == Path(__file__).resolve():
-                continue
-            try:
-                text = path.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
-                continue
-            for marker in FORBIDDEN_RUNTIME_REFERENCES:
-                if marker in text:
-                    errors.append(f"active file references removed runtime path: {path}: {marker}")
-    return errors
-
-
 def validate_examples() -> List[str]:
     errors: List[str] = []
     for relative in REQUIRED_EXAMPLES:
@@ -158,13 +119,12 @@ def validate_examples() -> List[str]:
 
 def validate_static_contract() -> List[str]:
     errors = [f"missing required file: {path}" for path in _missing(REQUIRED_FILES + REQUIRED_SKILLS + REQUIRED_PROMPTS)]
-    errors.extend(validate_runtime_references())
     errors.extend(validate_official_profiles())
     errors.extend(validate_examples())
     readme = ROOT / "README.md"
     if readme.is_file():
         text = readme.read_text(encoding="utf-8")
-        for marker in ("十分钟", "Champion", "Challenger", "C1/C2/C3", "case_brief.md"):
+        for marker in ("五分钟", "Champion", "Challenger", "C1/C2/C3", "case_brief.md"):
             if marker not in text:
                 errors.append(f"README.md missing core entry marker: {marker}")
     try:

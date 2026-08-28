@@ -19,7 +19,11 @@ VALID_ROUTE_STATUS = {
     "candidate", "testing", "champion", "challenger", "paused", "rejected",
 }
 _HEADING = re.compile(
-    r"^\s*##\s+(M-[A-Za-z0-9][A-Za-z0-9_-]*)(?:\s*.*)?\s*$",
+    r"^\s*#{2,4}\s+(M-[A-Za-z0-9][A-Za-z0-9_-]*)(?:\s*.*)?\s*$",
+    re.IGNORECASE,
+)
+_ROUTE_HEADING = re.compile(
+    r"^\s*(?P<hashes>#+)\s+(?P<route>M-[A-Za-z0-9][A-Za-z0-9_-]*)(?:\s*.*)?\s*$",
     re.IGNORECASE,
 )
 _FIELD = re.compile(r"^\s*-\s*([^:：]+?)\s*[：:]\s*(.*?)\s*$")
@@ -70,7 +74,7 @@ def normalize_method_family(value: str) -> str:
 
 
 def parse_candidate_pool(text: str) -> List[CandidateRoute]:
-    """Parse ``## M-...`` sections and their known bullet fields."""
+    """Parse level-2 to level-4 ``M-...`` sections and known bullet fields."""
 
     routes: List[Dict[str, str]] = []
     current: Dict[str, str] | None = None
@@ -100,13 +104,33 @@ def parse_candidate_pool(text: str) -> List[CandidateRoute]:
     return [CandidateRoute(**route) for route in routes]
 
 
+def _unsupported_heading_levels(text: str) -> List[int]:
+    """Return route-heading levels outside the supported Markdown range."""
+
+    levels = {
+        len(match.group("hashes"))
+        for line in text.splitlines()
+        if (match := _ROUTE_HEADING.match(line))
+        and len(match.group("hashes")) not in {2, 3, 4}
+    }
+    return sorted(levels)
+
+
 def validate_candidate_pool(path: Path) -> List[str]:
     """Return lightweight validation errors for a candidate pool file."""
 
     if not path.is_file():
         return [f"missing candidate pool: {path}"]
-    routes = parse_candidate_pool(path.read_text(encoding="utf-8"))
+    text = path.read_text(encoding="utf-8")
+    routes = parse_candidate_pool(text)
     errors: List[str] = []
+    unsupported_levels = _unsupported_heading_levels(text)
+    if unsupported_levels:
+        levels = ", ".join(f"h{level}" for level in unsupported_levels)
+        errors.append(
+            f"unsupported candidate heading level(s): {levels}; "
+            "use h2, h3 or h4 headings for routes"
+        )
     if len(routes) < 3:
         errors.append("candidate pool needs at least three routes")
 
