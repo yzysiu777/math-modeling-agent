@@ -26,7 +26,7 @@ explain the evidence.
    hard constraints, fields, units, time boundaries and metrics.
 2. Read the route-specific method cards in `references/` and propose at least
    three methodologically different candidate routes for each important
-   subproblem. Cards are prompts for route generation, not approval gates.
+   subproblem. Cards guide route generation; evidence from the case decides selection.
 3. Build an interpretable baseline and a small hand-checkable instance.
 4. Queue the cheapest experiment that can distinguish the candidates.
 5. Compare candidates with the same split, instances, constraints and metrics.
@@ -89,5 +89,5 @@ a substitute for data quality, mathematical checks or reproducibility evidence.
 - `references/claims-and-evidence.md`
 - `scripts/model_pool.py`
 - `scripts/experiment_board.py`
-- `skills/model-race/SKILL.md`
+- `../model-race/SKILL.md`
 - `writing/README.md`
