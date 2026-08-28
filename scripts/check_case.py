@@ -36,6 +36,53 @@ RISK_LABELS = {
     "split_overlap": ("确定性检查发现数据切分重叠", "C3"),
 }
 
+_REVIEW_FIELDS = (
+    (
+        "conclusion",
+        "结论/verdict",
+        r"(?:结论|判定|审核结论|verdict|conclusion|decision)",
+    ),
+    (
+        "checked",
+        "已检查范围",
+        r"(?:已检查(?:的)?(?:范围|内容|项)?|检查(?:的)?范围|审核范围|checked(?:\s+scope)?|reviewed(?:\s+scope)?|scope)",
+    ),
+    (
+        "unchecked",
+        "未检查范围",
+        r"(?:未检查(?:的)?(?:范围|内容|项)?|未覆盖(?:的)?范围|未验证|未审|unchecked(?:\s+scope)?|unreviewed(?:\s+scope)?|not\s+checked|not\s+reviewed|out\s+of\s+scope|limitation)",
+    ),
+)
+_REVIEW_FIELD_LABELS = re.compile(
+    r"^(?:" + "|".join(
+        rf"(?P<{key}>{pattern})(?:\s*/\s*(?:verdict|conclusion|decision|checked\s+scope|reviewed\s+scope|unchecked\s+scope))?"
+        for key, _label, pattern in _REVIEW_FIELDS
+    ) + r")\s*(?:[:：]\s*(?P<inline>.*))?$",
+    re.IGNORECASE,
+)
+_REVIEW_PLACEHOLDER = re.compile(
+    r"^(?:todo|tbd|n/?a|placeholder|待填写|待填|待补充)"
+    r"(?:\s*[/\\,:：;；\-—–]\s*(?:todo|tbd|n/?a|placeholder|待填写|待填|待补充))*$",
+    re.IGNORECASE,
+)
+_DECISION_TOKEN = re.compile(
+    r"(?:不接受|不采纳|接受|采纳|拒绝|延期|暂缓|推迟|保留|"
+    r"accept(?:ed)?|reject(?:ed)?|defer(?:red)?)",
+    re.IGNORECASE,
+)
+_REASON_LABEL = re.compile(
+    r"^(?:原因|理由|说明|备注|reason|rationale|justification|because|due\s+to|因为|由于|依据|基于)\s*[:：]?\s*",
+    re.IGNORECASE,
+)
+_DECISION_HEADER = re.compile(
+    r"^(?:决定|决策|选择|decision|choice)(?:\s*/\s*(?:decision|choice))?$",
+    re.IGNORECASE,
+)
+_REASON_HEADER = re.compile(
+    r"(?:原因|理由|说明|备注|reason|rationale|justification|evidence|note)",
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -114,9 +161,48 @@ def _review_files(case_dir: Path, node: str) -> list[Path]:
     )
 
 
-def _placeholder_only(line: str) -> bool:
-    compact = re.sub(r"^[#>*\-\s]+", "", line).strip().casefold()
-    return compact in PLACEHOLDERS or compact in {"todo", "placeholder", "..."}
+def _review_text(value: Any) -> str:
+    """Remove presentation-only Markdown characters before checking substance."""
+
+    text = str(value or "").strip()
+    text = re.sub(r"^\s*(?:#{1,6}\s*|>\s*|[-*+]\s+|\d+[.)]\s*)", "", text)
+    text = re.sub(r"`+", "", text)
+    return text.strip(" \t\r\n.,。；;:：!?！？、，,`*_~[]()（）【】<>|+-—–")
+
+
+def _has_substantive_value(value: Any) -> bool:
+    """Return whether a review field contains content rather than a template marker."""
+
+    normalized = " ".join(_review_text(value).casefold().split())
+    if not normalized or _REVIEW_PLACEHOLDER.fullmatch(normalized):
+        return False
+    # A field made only of punctuation/Markdown is not an actual review value.
+    return re.search(r"[a-z0-9_\u3400-\u9fff]", normalized, re.IGNORECASE) is not None
+
+
+def _has_reason_value(value: Any) -> bool:
+    text = _REASON_LABEL.sub("", _review_text(value)).strip()
+    normalized = " ".join(text.casefold().split())
+    if normalized in {"", "空", "为空", "空白", "无", "none", "null"}:
+        return False
+    return _has_substantive_value(text)
+
+
+def _review_field(line: str) -> tuple[str, str] | None:
+    """Parse a required review field from a labelled line or Markdown heading."""
+
+    candidate = re.sub(r"^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+)", "", line).strip()
+    match = _REVIEW_FIELD_LABELS.fullmatch(candidate)
+    if not match:
+        return None
+    field = next(
+        key for key, _label, _pattern in _REVIEW_FIELDS if match.group(key) is not None
+    )
+    return field, match.group("inline") or ""
+
+
+def _is_markdown_heading(line: str) -> bool:
+    return re.match(r"^\s*#{1,6}(?:\s|$)", line) is not None
 
 
 def _review_errors(path: Path, node: str) -> list[str]:
@@ -124,23 +210,29 @@ def _review_errors(path: Path, node: str) -> list[str]:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
         return [f"文件无法读取：{exc}"]
-    if not text.strip() or all(_placeholder_only(line) for line in text.splitlines() if line.strip()):
+    if not text.strip():
         return ["报告为空或只有占位内容"]
-    checks = (
-        ("节点", rf"(?<![A-Za-z0-9]){re.escape(node)}(?![A-Za-z0-9])"),
-        ("结论/verdict", r"(?:结论|判定|审核结论|verdict|conclusion|decision)"),
-        ("已检查范围", r"(?:已检查|检查范围|审核范围|checked|reviewed|scope)"),
-        ("未检查范围", r"(?:未检查|未覆盖|未验证|未审|unchecked|unreviewed|not\s+checked|not\s+reviewed|out of scope|limitation)"),
-    )
-    errors = [label + "缺失" for label, pattern in checks if not re.search(pattern, text, re.IGNORECASE)]
-    field_patterns = (
-        ("结论", r"(?:结论|判定|审核结论|verdict|conclusion|decision)\s*[:：]\s*(.*?)\s*$"),
-        ("已检查范围", r"(?:已检查(?:的)?(?:范围|内容|项)?|检查(?:的)?范围|审核范围|checked|reviewed|scope)\s*[:：]\s*(.*?)\s*$"),
-        ("未检查范围", r"(?:未检查(?:的)?(?:范围|内容|项)?|未覆盖(?:的)?范围|未验证|未审|unchecked|unreviewed|not\s+checked|not\s+reviewed|out of scope|limitation)\s*[:：]\s*(.*?)\s*$"),
-    )
-    for label, pattern in field_patterns:
-        match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
-        if match and not _has_value(match.group(1)):
+    node_pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(node)}(?![A-Za-z0-9])", re.IGNORECASE)
+    errors = [] if node_pattern.search(text) else ["节点缺失"]
+    sections: dict[str, list[str]] = {key: [] for key, _label, _pattern in _REVIEW_FIELDS}
+    current: str | None = None
+    for line in text.splitlines():
+        field = _review_field(line)
+        if field is not None:
+            current, inline = field
+            if inline:
+                sections[current].append(inline)
+            continue
+        # A new Markdown heading closes the previous field.  This prevents an
+        # empty heading from borrowing text from a later unrelated section.
+        if _is_markdown_heading(line):
+            current = None
+            continue
+        if current is not None and line.strip():
+            sections[current].append(line)
+
+    for _key, label, _pattern in _REVIEW_FIELDS:
+        if not any(_has_substantive_value(value) for value in sections[_key]):
             errors.append(label + "为空或只有占位内容")
     return errors
 
@@ -302,23 +394,121 @@ def _risk_findings(checkpoint: Mapping[str, Any], stage: str) -> list[Finding]:
     return findings
 
 
+def _decision_tokens(value: Any) -> list[re.Match[str]]:
+    return list(_DECISION_TOKEN.finditer(str(value or "")))
+
+
+def _split_pipe_row(line: str) -> list[str] | None:
+    stripped = line.strip()
+    if "|" not in stripped:
+        return None
+    return [cell.strip() for cell in stripped.strip("|").split("|")]
+
+
+def _is_table_separator(cells: list[str]) -> bool:
+    return bool(cells) and all(re.fullmatch(r":?-+:?", cell) for cell in cells)
+
+
+def _markdown_decision_tables(text: str) -> list[tuple[list[str], list[str]]]:
+    """Return rows from Markdown tables without changing the case workflow."""
+
+    lines = [line.strip() for line in text.splitlines() if "|" in line]
+    tables: list[tuple[list[str], list[str]]] = []
+    for index in range(len(lines) - 1):
+        headers = _split_pipe_row(lines[index])
+        separator = _split_pipe_row(lines[index + 1])
+        if headers is None or separator is None or len(headers) != len(separator) or not _is_table_separator(separator):
+            continue
+        for line in lines[index + 2:]:
+            cells = _split_pipe_row(line)
+            if cells is None or len(cells) != len(headers) or _is_table_separator(cells):
+                break
+            tables.append((headers, cells))
+        break
+    return tables
+
+
+def _decision_from_cells(cells: list[str], headers: list[str] | None, node: str) -> bool:
+    node_pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(node)}(?![A-Za-z0-9])", re.IGNORECASE)
+    node_indices = {index for index, cell in enumerate(cells) if node_pattern.search(cell)}
+    if not node_indices:
+        return False
+
+    decision_indices = (
+        {index for index, header in enumerate(headers or ()) if _DECISION_HEADER.search(header)}
+        if headers
+        else set()
+    )
+    reason_indices = (
+        {index for index, header in enumerate(headers or ()) if _REASON_HEADER.search(header)}
+        if headers
+        else set()
+    )
+    if decision_indices:
+        if len(decision_indices) != 1:
+            return False
+        choice_index = next(iter(decision_indices))
+        choice_tokens = _decision_tokens(cells[choice_index])
+        if len(choice_tokens) != 1:
+            return False
+    else:
+        candidates = [
+            index for index, cell in enumerate(cells)
+            if index not in node_indices and len(_decision_tokens(cell)) == 1
+        ]
+        if len(candidates) != 1:
+            return False
+        choice_index = candidates[0]
+
+    # A second decision token in a node/reason cell means the row is not a
+    # single, unambiguous human choice (for example 接受/拒绝).
+    for index, cell in enumerate(cells):
+        if index != choice_index and _decision_tokens(cell):
+            return False
+
+    if reason_indices:
+        return any(
+            index not in node_indices and index != choice_index and _has_reason_value(cells[index])
+            for index in reason_indices
+        )
+    return any(
+        index not in node_indices and index != choice_index and _has_reason_value(cell)
+        for index, cell in enumerate(cells)
+    )
+
+
+def _decision_from_non_table_line(line: str, node: str) -> bool:
+    if line.lstrip().startswith("|"):
+        cells = _split_pipe_row(line)
+        return cells is not None and _decision_from_cells(cells, None, node)
+    node_pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(node)}(?![A-Za-z0-9])", re.IGNORECASE)
+    if not node_pattern.search(line):
+        return False
+    tokens = _decision_tokens(line)
+    if len(tokens) != 1:
+        return False
+    # Non-table compatibility requires a reason after the explicit decision;
+    # a bare sentence such as “C3 报告需要决定接受或拒绝” therefore fails.
+    tail = line[tokens[0].end():]
+    return _has_reason_value(tail)
+
+
 def _decision_covers_node(case_dir: Path, node: str) -> bool:
     path = case_dir / "decisions.md"
     if not path.is_file():
         return False
     text = path.read_text(encoding="utf-8")
+    tables = _markdown_decision_tables(text)
+    node_in_table = False
     node_pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(node)}(?![A-Za-z0-9])", re.IGNORECASE)
-    choice_pattern = re.compile(
-        r"(?:接受|采纳|拒绝|不采纳|延期|暂缓|保留|accept(?:ed)?|reject(?:ed)?|defer(?:red)?)",
-        re.IGNORECASE,
-    )
-    placeholder_choice = re.compile(r"accept\s*/\s*reject|pause\s*/\s*defer", re.IGNORECASE)
-    return any(
-        node_pattern.search(line)
-        and choice_pattern.search(line)
-        and not placeholder_choice.search(line)
-        for line in text.splitlines()
-    )
+    for headers, cells in tables:
+        if any(node_pattern.search(cell) for cell in cells):
+            node_in_table = True
+            if _decision_from_cells(cells, headers, node):
+                return True
+    if node_in_table:
+        return False
+    return any(_decision_from_non_table_line(line, node) for line in text.splitlines())
 
 
 def check_case(case_dir: Path, stage: str) -> CaseReport:
@@ -335,17 +525,27 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
     findings, effective_route = _routing_findings(checkpoint, checkpoint_error, stage)
     if checkpoint is None:
         return CaseReport(tuple(findings))
-    if not _has_value(checkpoint.get("case_id")):
+    checkpoint_case_id = str(checkpoint.get("case_id", "") or "").strip()
+    if not _has_value(checkpoint_case_id):
         findings.insert(
             0,
             _finding("BLOCK", "ROUTE_CONFIRMATION_REQUIRED", "checkpoint.yaml 缺少 case_id，无法确认它属于当前案例", "HUMAN", "HUMAN"),
+        )
+    elif checkpoint_case_id != case_dir.name:
+        findings.insert(
+            0,
+            _finding(
+                "BLOCK", "CASE_ID_MISMATCH",
+                f"checkpoint.yaml 的 case_id={checkpoint_case_id!r} 与当前案例目录 {case_dir.name!r} 不一致",
+                "HUMAN", "HUMAN",
+            ),
         )
 
     route_unclear = effective_route == "insufficient_information"
     c1_needed = route_unclear or _brief_has_route_changing_ambiguity(case_dir)
     c1_valid, c1_detail = _valid_review(case_dir, "C1")
     c1_status = _review_status(checkpoint, "C1")
-    if c1_status == "not_needed" and _has_value(_review_note(checkpoint, "C1")) and not route_unclear:
+    if c1_status == "not_needed" and _has_value(_review_note(checkpoint, "C1")) and not c1_needed:
         pass
     elif c1_status == "complete" and not c1_valid:
         level = "REMINDER" if stage == "exploration" else "BLOCK"

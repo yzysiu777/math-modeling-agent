@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from scripts.check_case import check_case
+from scripts.check_case import _decision_covers_node, _valid_review, check_case
 from scripts.create_case import create_case
 
 
@@ -111,6 +111,52 @@ class CaseCheckTests(unittest.TestCase):
         self.assertIsNotNone(placeholder)
         self.assertTrue(any(f.code == "C3_REQUIRED" and f.blocks for f in placeholder.findings))
 
+    def test_review_headings_need_substantive_body(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.add_review(
+                case,
+                "C3",
+                "# C3\n\n## 结论\n## 已检查范围\n## 未检查范围\n",
+            )
+            valid, detail = _valid_review(case, "C3")
+        self.assertFalse(valid, detail)
+
+    def test_review_headings_with_only_placeholders_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.add_review(
+                case,
+                "C3",
+                "# C3\n\n## 结论\nTODO\n## 已检查范围\n待填写\n## 未检查范围\n待补充\n",
+            )
+            valid, detail = _valid_review(case, "C3")
+        self.assertFalse(valid, detail)
+
+    def test_review_punctuation_only_fields_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.add_review(
+                case,
+                "C3",
+                "# C3\n结论：……\n已检查范围：!!!\n未检查范围：——\n",
+            )
+            valid, detail = _valid_review(case, "C3")
+        self.assertFalse(valid, detail)
+
+    def test_review_field_values_and_natural_markdown_sections_are_valid(self):
+        cases = (
+            "# C3\n结论：可以继续。\n已检查范围：题面和模型。\n未检查范围：最终规模实验。\n",
+            "# C3\n\n## 结论\n当前范围内可以继续。\n\n## 已检查范围\n题面、模型和关键结果。\n\n## 未检查范围\n完整规模实验和最终提交。\n",
+        )
+        for content in cases:
+            with self.subTest(content=content):
+                with tempfile.TemporaryDirectory() as directory:
+                    case = self.make_case(directory)
+                    self.add_review(case, "C3", content)
+                    valid, detail = _valid_review(case, "C3")
+                self.assertTrue(valid, detail)
+
     def test_valid_c1_c2_c3_and_decisions_allow_final_case_check(self):
         with tempfile.TemporaryDirectory() as directory:
             case = self.make_case(directory)
@@ -143,6 +189,51 @@ class CaseCheckTests(unittest.TestCase):
             self.update_checkpoint(case, reviews={"C1": "not_needed"})
             report = check_case(case, "model_selection")
         self.assertTrue(any(f.code == "C1_RECOMMENDED" and f.blocks for f in report.findings))
+
+    def test_c1_not_needed_is_reminder_when_route_is_insufficient(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case, "insufficient_information")
+            self.update_checkpoint(
+                case,
+                reviews={"C1": "not_needed"},
+                review_notes={"C1": "暂不需要"},
+            )
+            report = check_case(case, "model_selection")
+        self.assertTrue(any(f.code == "C1_RECOMMENDED" and not f.blocks for f in report.findings))
+
+    def test_c1_not_needed_is_reminder_when_brief_has_route_changing_ambiguity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.update_checkpoint(
+                case,
+                reviews={"C1": "not_needed"},
+                review_notes={"C1": "暂不需要"},
+            )
+            (case / "case_brief.md").write_text(
+                "# 案例简报\n\n- 会改变路线的歧义：目标函数可能应改为多目标\n",
+                encoding="utf-8",
+            )
+            report = check_case(case, "model_selection")
+        self.assertTrue(any(f.code == "C1_RECOMMENDED" and not f.blocks for f in report.findings))
+
+    def test_valid_c1_report_resolves_route_changing_ambiguity_reminder(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.update_checkpoint(
+                case,
+                reviews={"C1": "not_needed"},
+                review_notes={"C1": "已完成独立题意挑战"},
+            )
+            (case / "case_brief.md").write_text(
+                "# 案例简报\n\n- 会改变路线的歧义：目标函数可能应改为多目标\n",
+                encoding="utf-8",
+            )
+            self.add_review(case, "C1")
+            report = check_case(case, "model_selection")
+        self.assertNotIn("C1_RECOMMENDED", self.codes(report))
 
     def test_failure_pattern_escalates_without_blocking_exploration(self):
         board = (
@@ -224,6 +315,57 @@ class CaseCheckTests(unittest.TestCase):
             )
             report = check_case(case, "final")
         self.assertTrue(any(f.code == "HUMAN_DECISION_REQUIRED" and f.blocks for f in report.findings))
+
+    def test_chinese_decision_options_do_not_count_as_one_choice(self):
+        for choice in ("接受/拒绝", "采纳/不采纳", "延期/暂缓"):
+            with self.subTest(choice=choice):
+                with tempfile.TemporaryDirectory() as directory:
+                    case = self.make_case(directory)
+                    (case / "decisions.md").write_text(
+                        "| 节点 | 决定 | 原因 |\n|---|---|---|\n"
+                        f"| C3 | {choice} | 已有依据 |\n",
+                        encoding="utf-8",
+                    )
+                    self.assertFalse(_decision_covers_node(case, "C3"))
+
+    def test_decision_explanation_sentence_is_not_a_human_decision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            (case / "decisions.md").write_text(
+                "C3 报告需要决定接受或拒绝\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(_decision_covers_node(case, "C3"))
+
+    def test_explicit_decision_with_reason_is_valid(self):
+        decisions = (
+            "| C3 | 接受 | 因为反例已补测并通过 |\n",
+            "| 节点 | 决策 | 原因 |\n|---|---|---|\n| C3 | 接受 | 因为反例已补测并通过 |\n",
+        )
+        for content in decisions:
+            with self.subTest(content=content):
+                with tempfile.TemporaryDirectory() as directory:
+                    case = self.make_case(directory)
+                    (case / "decisions.md").write_text(content, encoding="utf-8")
+                    self.assertTrue(_decision_covers_node(case, "C3"))
+
+    def test_explicit_decision_without_reason_or_with_placeholder_is_invalid(self):
+        for reason in ("", "TODO", "待填写"):
+            with self.subTest(reason=reason):
+                with tempfile.TemporaryDirectory() as directory:
+                    case = self.make_case(directory)
+                    (case / "decisions.md").write_text(
+                        f"| C3 | 接受 | {reason} |\n",
+                        encoding="utf-8",
+                    )
+                    self.assertFalse(_decision_covers_node(case, "C3"))
+
+    def test_checkpoint_case_id_must_match_case_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.update_checkpoint(case, case_id="another-case")
+            report = check_case(case, "exploration")
+        self.assertTrue(any(f.code == "CASE_ID_MISMATCH" and f.blocks for f in report.findings))
 
 
 if __name__ == "__main__":
