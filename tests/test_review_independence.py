@@ -9,6 +9,7 @@ def valid_review(**overrides):
         "review_id": "REV-TEST-001",
         "case_id": "CASE-TEST-001",
         "target_revision": "REVISION-TEST-001",
+        "target_git_revision": "a" * 40,
         "reviewer_role": "independent_adversary",
         "reviewer_id": "claude-reviewer-1",
         "critical_node": "C2",
@@ -38,7 +39,7 @@ def valid_review(**overrides):
         "uncertainty": ["large-scale solver performance was not independently rerun"],
         "human_decisions_required": ["choose the risk preference"],
         "target_artifacts": ["model.md"],
-        "input_hashes": ["0" * 64],
+        "input_bindings": [{"path": "inputs/data.csv", "sha256": "1" * 64, "artifact_kind": "source_data"}],
         "verdict": "PASS_WITH_LIMITATIONS",
         "findings": [],
         "unresolved_questions": [],
@@ -87,10 +88,17 @@ class ReviewIndependenceTests(unittest.TestCase):
         review = valid_review()
         review.pop("case_id")
         review.pop("target_revision")
-        review["input_hashes"] = []
+        review["input_bindings"] = []
         ok, errors = validate_review_record(review)
         self.assertFalse(ok)
-        self.assertTrue(any("case_id" in error or "target_revision" in error or "input_hashes" in error for error in errors))
+        self.assertTrue(any("case_id" in error or "target_revision" in error or "input_bindings" in error for error in errors))
+
+    def test_all_zero_input_binding_hash_fails(self):
+        ok, errors = validate_review_record(
+            valid_review(input_bindings=[{"path": "inputs/data.csv", "sha256": "0" * 64, "artifact_kind": "source_data"}])
+        )
+        self.assertFalse(ok)
+        self.assertTrue(any("all-zero" in error for error in errors))
 
 
 if __name__ == "__main__":

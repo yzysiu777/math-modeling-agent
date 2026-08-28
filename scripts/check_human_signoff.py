@@ -111,9 +111,14 @@ def validate_human_signoff(
         errors.append("signed_at is still a placeholder")
     else:
         try:
-            datetime.fromisoformat(signed_at.replace("Z", "+00:00"))
+            parsed_signed_at = datetime.fromisoformat(signed_at.replace("Z", "+00:00"))
         except ValueError:
             errors.append("signed_at must be an ISO-8601 timestamp")
+        else:
+            if parsed_signed_at.tzinfo is None:
+                errors.append("signed_at must include a timezone")
+            elif parsed_signed_at.astimezone(timezone.utc) > datetime.now(timezone.utc):
+                errors.append("signed_at cannot be in the future")
     resolved_revision = current_revision
     if workspace is not None:
         head_revision = resolve_head_revision(workspace)

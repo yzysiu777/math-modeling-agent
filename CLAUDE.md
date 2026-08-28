@@ -69,7 +69,7 @@ Review lens:
 Primary method family:
 Alternative method family:
 Methodological difference:
-Target artifacts and input hashes:
+Target artifacts, target Git revision and structured input bindings:
 Verdict: PASS | PASS_WITH_LIMITATIONS | BLOCKED | REJECTED
 
 Findings:

@@ -144,6 +144,27 @@ class StateMachineTests(unittest.TestCase):
         )
         self.assertFalse(ok)
 
+    def test_nonexistent_closure_revision_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp)
+            (workspace / "scripts").mkdir(parents=True)
+            (workspace / "scripts/run_trusted_check.py").write_text("trusted runner fixture\n", encoding="utf-8")
+            impact, closure = build_records(workspace)
+            forged_revision = "b" * 40
+            impact["new_git_revision"] = forged_revision
+            closure["new_git_revision"] = forged_revision
+            closure_path = workspace / "closure.yaml"
+            closure_path.write_text(yaml.safe_dump(closure, sort_keys=False), encoding="utf-8")
+            ok, message = validate_transition(
+                "targeted_validation", "validation_passed", actor="validator",
+                evidence=["passed.json"], validation_status="passed",
+                closure_report=closure, closure_impact=impact, closure_id=closure["closure_id"],
+                closure_path="closure.yaml", closure_sha256=hashlib.sha256(closure_path.read_bytes()).hexdigest(),
+                workspace=workspace,
+            )
+            self.assertFalse(ok)
+            self.assertIn("Git", message)
+
     def test_restore_regression_free_text_without_closure_fails(self):
         ok, _ = validate_transition(
             "validation_passed", "restore_affected_gate", actor="orchestrator",

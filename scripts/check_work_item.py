@@ -11,8 +11,10 @@ from pathlib import Path, PurePosixPath
 
 try:
     from .check_evidence_graph import load_record
-    from .check_manual_attestation import validate_manual_attestation
+    from .check_revision_closure import validate_revision_closure
+    from .check_review_bindings import validate_review_input_bindings
     from .check_review_independence import validate_review_record
+    from .git_contract import validate_revision_pair
     from .identity_contract import validate_independent_reviewer, validate_manifest_registry
     from .gate_contract import (
         CHANGE_LEVELS,
@@ -25,8 +27,10 @@ try:
     )
 except ImportError:  # pragma: no cover
     from check_evidence_graph import load_record
-    from check_manual_attestation import validate_manual_attestation
+    from check_revision_closure import validate_revision_closure
+    from check_review_bindings import validate_review_input_bindings
     from check_review_independence import validate_review_record
+    from git_contract import validate_revision_pair
     from identity_contract import validate_independent_reviewer, validate_manifest_registry
     from gate_contract import CHANGE_LEVELS, CHANGE_SURFACES, SAFE_CHECK_IDS, affected_gates_for_surfaces, change_level_for_surfaces, required_checks_for, required_review_nodes_for
 
@@ -100,6 +104,53 @@ def _verify_hashed_file(workspace: Path | None, raw_path: object, expected_hash:
         errors.append(f"{label} hash mismatch: {path}")
         return None
     return candidate
+
+
+def _load_hashed_record(
+    workspace: Path,
+    raw_path: object,
+    expected_hash: object,
+    label: str,
+    errors: list[str],
+) -> dict | None:
+    """Load a record only after verifying its confined path and SHA-256."""
+
+    path = _verify_hashed_file(workspace, raw_path, expected_hash, label, errors)
+    if path is None:
+        return None
+    try:
+        record = load_record(path)
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"{label} cannot be parsed: {exc}")
+        return None
+    if not isinstance(record, dict):
+        errors.append(f"{label} must contain a mapping")
+        return None
+    return record
+
+
+def _load_manifest_from_validation(record: dict, workspace: Path, errors: list[str]) -> dict | None:
+    path = safe_relative(record.get("project_manifest_path"))
+    expected = record.get("project_manifest_sha256")
+    if path is None or not isinstance(expected, str) or not HEX64.fullmatch(expected):
+        return None
+    candidate = (workspace / path).resolve()
+    try:
+        candidate.relative_to(workspace.resolve())
+    except ValueError:
+        return None
+    if not candidate.is_file() or sha256_file(candidate).lower() != expected.lower():
+        return None
+    try:
+        manifest = load_record(candidate)
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"trusted validation record manifest cannot be parsed: {exc}")
+        return None
+    if not isinstance(manifest, dict):
+        errors.append("trusted validation record manifest must contain a mapping")
+        return None
+    validate_manifest_registry(manifest, errors)
+    return manifest
 
 
 def _validate_trusted_validation_record(item: dict, workspace: Path, errors: list[str]) -> dict | None:
@@ -206,7 +257,12 @@ def _validate_trusted_validation_record(item: dict, workspace: Path, errors: lis
     return manifest
 
 
-def _validate_independent_verdict(item: dict, workspace: Path, errors: list[str], manifest: dict | None) -> None:
+def _validate_independent_verdict(
+    item: dict,
+    workspace: Path,
+    errors: list[str],
+    manifest: dict | None,
+) -> None:
     path = _verify_hashed_file(
         workspace,
         item.get("review_verdict_path"),
@@ -227,6 +283,8 @@ def _validate_independent_verdict(item: dict, workspace: Path, errors: list[str]
         errors.append("review verdict case_id does not match the work item")
     if record.get("target_revision") != item.get("revision_id"):
         errors.append("review verdict target_revision does not match the work item revision")
+    if record.get("target_git_revision") != item.get("result_git_revision"):
+        errors.append("review verdict target_git_revision does not match the work item result revision")
     if record.get("reviewer_id") != item.get("reviewer_id"):
         errors.append("review verdict reviewer_id does not match the work item")
     if record.get("reviewer_role") != item.get("reviewer_role") or record.get("reviewer_role") not in {"independent_adversary", "independent_reviewer"}:
@@ -237,6 +295,17 @@ def _validate_independent_verdict(item: dict, workspace: Path, errors: list[str]
         validate_independent_reviewer(manifest, record.get("reviewer_id"), record.get("reviewer_role"), errors)
     if record.get("verdict") not in {"PASS", "PASS_WITH_LIMITATIONS"}:
         errors.append("independent reviewer verdict is not passing")
+    errors.extend(validate_review_input_bindings(record, workspace, label="independent reviewer verdict"))
+    git_errors: list[str] = []
+    validate_revision_pair(
+        workspace,
+        record.get("target_git_revision"),
+        record.get("target_git_revision"),
+        git_errors,
+        require_result_at_head=False,
+        label="independent reviewer target Git revision",
+    )
+    errors.extend(git_errors)
     ok, review_errors = validate_review_record(record)
     if not ok:
         errors.extend(f"invalid independent reviewer verdict: {error}" for error in review_errors)
@@ -356,7 +425,63 @@ def validate_work_item(
         if workspace is None:
             errors.append("accepted work item requires a workspace for trusted evidence verification")
         else:
-            manifest = _validate_trusted_validation_record(item, workspace, errors)
+            impact = _load_hashed_record(
+                workspace,
+                item.get("trusted_change_impact_path"),
+                item.get("trusted_change_impact_sha256"),
+                "trusted change impact record",
+                errors,
+            )
+            validation = _load_hashed_record(
+                workspace,
+                item.get("trusted_validation_record_path"),
+                item.get("trusted_validation_record_sha256"),
+                "trusted validation record",
+                errors,
+            )
+            manifest = None
+            if impact is not None and validation is not None:
+                if impact.get("record_type") != "change_impact_record":
+                    errors.append("trusted change impact record has the wrong record_type")
+                if validation.get("record_type") != "revision_validation_record":
+                    errors.append("trusted validation record has the wrong record_type")
+                for item_field, record_field in (
+                    ("case_id", "case_id"),
+                    ("revision_id", "revision_id"),
+                    ("source_git_revision", "base_git_revision"),
+                    ("result_git_revision", "new_git_revision"),
+                    ("change_level", "change_level"),
+                    ("change_surfaces", "change_surfaces"),
+                    ("affected_gates", "affected_gates"),
+                    ("affected_claims", "affected_claims"),
+                    ("affected_experiments", "affected_experiments"),
+                    ("required_checks", "required_checks"),
+                    ("required_review_nodes", "required_review_nodes"),
+                ):
+                    if impact.get(record_field) != item.get(item_field):
+                        errors.append(f"trusted change impact {record_field} does not match the work item")
+                if validation.get("closure_id") != item.get("trusted_validation_record_id"):
+                    errors.append("trusted validation record closure_id does not match the work item")
+                git_errors: list[str] = []
+                validate_revision_pair(
+                    workspace,
+                    item.get("source_git_revision"),
+                    item.get("result_git_revision"),
+                    git_errors,
+                    require_result_at_head=True,
+                    label="accepted work item",
+                )
+                errors.extend(git_errors)
+                closure_errors = validate_revision_closure(
+                    impact,
+                    validation,
+                    workspace=workspace,
+                    base_ref=item.get("source_git_revision"),
+                    head_ref="HEAD",
+                    verify_git=True,
+                )
+                errors.extend(f"trusted revision closure: {error}" for error in closure_errors)
+                manifest = _load_manifest_from_validation(validation, workspace, errors)
             _validate_independent_verdict(item, workspace, errors, manifest)
     unresolved = item.get("unresolved_items") or []
     for index, entry in enumerate(unresolved):

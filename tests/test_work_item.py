@@ -7,6 +7,7 @@ import yaml
 
 from scripts.check_work_item import validate_work_item, validate_work_item_set
 from scripts.gate_contract import required_checks_for
+from test_revision_contract import build_records
 
 
 def valid_item(workspace: Path, **overrides):
@@ -85,12 +86,67 @@ def valid_item(workspace: Path, **overrides):
     return item
 
 
+def trusted_item(workspace: Path):
+    impact, validation = build_records(workspace)
+    impact_path = workspace / "impact.yaml"
+    validation_path = workspace / "validation-closure.yaml"
+    impact_path.write_text(yaml.safe_dump(impact, sort_keys=False), encoding="utf-8")
+    validation_path.write_text(yaml.safe_dump(validation, sort_keys=False), encoding="utf-8")
+    input_path = workspace / "inputs/source-data.csv"
+    review = {
+        "record_type": "review_record", "review_id": "REV-C3-TRUSTED", "case_id": impact["case_id"],
+        "target_revision": impact["revision_id"], "target_git_revision": impact["new_git_revision"],
+        "reviewer_role": "independent_adversary", "reviewer_id": "reviewer-1", "critical_node": "C3", "review_mode": "results",
+        "review_lens": ["evidence_claim_audit", "implementation_consistency", "invariant_counterexample"],
+        "primary_method_family": "mixed_integer_programming", "alternative_method_family": "constraint_programming",
+        "methodological_difference": {"axis": "feasibility", "primary_assumption": "primary", "alternative_assumption": "alternative", "discriminating_test": "small case"},
+        "critical_decisions_reviewed": ["decision"],
+        "disconfirming_tests": [{"test_id": "T-1", "target": "result", "input_or_case": "small", "expected_falsifier": "wrong", "actual_result": "none", "evidence": ["validation-closure.yaml"], "status": "passed"}],
+        "counterexamples": [], "what_was_checked": ["result"], "what_was_not_checked": ["scale"],
+        "human_decisions_required": [], "target_artifacts": ["validation-closure.yaml"],
+        "input_bindings": [{"path": str(input_path.relative_to(workspace)), "sha256": hashlib.sha256(input_path.read_bytes()).hexdigest(), "artifact_kind": "source_data"}],
+        "verdict": "PASS_WITH_LIMITATIONS", "findings": [], "unresolved_questions": [], "uncertainty": ["scale"],
+        "reviewer_signature": "reviewer-1", "created_at": "2026-08-27T00:00:00+00:00",
+    }
+    review_path = workspace / "review-verdict.yaml"
+    review_path.write_text(yaml.safe_dump(review, sort_keys=False), encoding="utf-8")
+    return {
+        "record_type": "work_item", "work_item_id": "WI-TRUSTED", "case_id": impact["case_id"],
+        "source_git_revision": impact["base_git_revision"], "objective": "update a note", "scope": ["update report"],
+        "non_goals": ["do not change data"], "allowed_files": ["notes.md"], "affected_claims": [],
+        "affected_experiments": [], "affected_gates": impact["affected_gates"], "required_checks": impact["required_checks"],
+        "change_level": impact["change_level"], "change_surfaces": impact["change_surfaces"],
+        "required_review_nodes": impact["required_review_nodes"], "executor_id": "executor-1", "reviewer_id": "reviewer-1",
+        "write_owner_id": "executor-1", "result_git_revision": impact["new_git_revision"], "test_evidence": [
+            {"check_id": entry["check_id"], "status": "passed", "evidence_path": entry["stdout_path"], "sha256": entry["stdout_sha256"]}
+            for entry in validation["check_results"]
+        ],
+        "status": "accepted", "previous_status": "review_ready", "unresolved_items": [], "revision_id": impact["revision_id"],
+        "report_path": "report.md", "human_decisions_required": [],
+        "trusted_validation_record_path": str(validation_path.relative_to(workspace)),
+        "trusted_validation_record_sha256": hashlib.sha256(validation_path.read_bytes()).hexdigest(),
+        "trusted_validation_record_id": validation["closure_id"],
+        "trusted_change_impact_path": str(impact_path.relative_to(workspace)),
+        "trusted_change_impact_sha256": hashlib.sha256(impact_path.read_bytes()).hexdigest(),
+        "review_verdict_path": str(review_path.relative_to(workspace)),
+        "review_verdict_sha256": hashlib.sha256(review_path.read_bytes()).hexdigest(),
+        "review_id": review["review_id"], "reviewer_role": review["reviewer_role"],
+    }
+
+
 class WorkItemTests(unittest.TestCase):
-    def test_accepted_item_does_not_imply_human_frozen(self):
+    def test_structured_trusted_closure_can_accept(self):
+        with tempfile.TemporaryDirectory() as temp:
+            item = trusted_item(Path(temp))
+            self.assertEqual(validate_work_item(item, workspace=Path(temp)), [])
+            self.assertNotIn("human_frozen", item)
+
+    def test_hand_assembled_validation_record_cannot_accept(self):
         with tempfile.TemporaryDirectory() as temp:
             item = valid_item(Path(temp), status="accepted")
             item["previous_status"] = "review_ready"
-            self.assertEqual(validate_work_item(item, workspace=Path(temp), source_ref="a" * 40, result_ref="b" * 40), [])
+            errors = validate_work_item(item, workspace=Path(temp), source_ref="a" * 40, result_ref="b" * 40)
+            self.assertTrue(any("trusted change impact record" in error or "revision closure" in error for error in errors))
             self.assertNotIn("human_frozen", item)
 
     def test_self_review_is_rejected(self):

@@ -3,6 +3,16 @@
   "$id": "https://math-modeling-agent.local/schema/revision_validation_record.json",
   "type": "object",
   "$defs": {
+    "input_binding": {
+      "type": "object",
+      "required": ["path", "sha256", "artifact_kind"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+        "artifact_kind": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
     "check_result": {
       "type": "object",
       "required": [
@@ -52,7 +62,7 @@
     },
     "review_binding": {
       "type": "object",
-      "required": ["node", "review_id", "path", "sha256", "case_id", "target_revision", "input_hashes", "reviewer_id", "reviewer_role"],
+      "required": ["node", "review_id", "path", "sha256", "case_id", "target_revision", "target_git_revision", "input_bindings", "reviewer_id", "reviewer_role"],
       "properties": {
         "node": {"type": "string", "enum": ["C1", "C2", "C3"]},
         "review_id": {"type": "string", "minLength": 1},
@@ -60,7 +70,8 @@
         "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
         "case_id": {"type": "string", "minLength": 1},
         "target_revision": {"type": "string", "minLength": 1},
-        "input_hashes": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}},
+        "target_git_revision": {"type": "string", "pattern": "^[0-9a-fA-F]{40}$"},
+        "input_bindings": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/input_binding"}},
         "reviewer_id": {"type": "string", "minLength": 1},
         "reviewer_role": {"type": "string", "enum": ["independent_adversary", "independent_reviewer", "human"]}
       },

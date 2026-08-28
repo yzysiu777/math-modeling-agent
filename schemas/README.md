@@ -19,6 +19,10 @@
 - `approved_findings` 的案例、审核、修订、基线和结果 revision 必须严格关联；
   已批准/已应用记录的文件白名单和验证清单不能为空。
 - `work_item` 固定单一写入者，执行者不能自审；`accepted` 只关闭工作项，不产生 G12。
+- C1/C2/C3 审核必须使用 `input_bindings` 逐项绑定真实工作区文件、SHA-256 和
+  `artifact_kind`；裸 `input_hashes`、全零占位哈希、缺失文件或错误哈希均不能通过。
+- `target_revision` 标识案例修订，`target_git_revision` 必须是可达且与结果提交一致的
+  完整 Git commit SHA。
 
 新增修订闭环记录：`change_impact_record`、`revision_validation_record`、
 `human_review_card`、`work_item`。它们分别说明变更影响、定向验证、人工决策和

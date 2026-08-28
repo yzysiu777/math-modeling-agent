@@ -46,6 +46,22 @@ class HumanSignoffTests(unittest.TestCase):
                 "identity_allowlist": [{"id": "owner-1", "role": "human_owner"}],
             }), [])
 
+    def test_future_signed_at_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp)
+            signoff = self.make_signoff(workspace)
+            signoff["signed_at"] = "2999-01-01T00:00:00+00:00"
+            errors = validate_human_signoff(signoff, actor="owner-1", workspace=workspace)
+            self.assertTrue(any("future" in error for error in errors))
+
+    def test_timezone_less_signed_at_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = Path(temp)
+            signoff = self.make_signoff(workspace)
+            signoff["signed_at"] = "2026-08-28T12:00:00"
+            errors = validate_human_signoff(signoff, actor="owner-1", workspace=workspace)
+            self.assertTrue(any("timezone" in error for error in errors))
+
     def test_hash_or_open_p1_blocks_freeze(self):
         with tempfile.TemporaryDirectory() as temp:
             workspace = Path(temp)

@@ -7,11 +7,13 @@ import re
 from pathlib import Path, PurePosixPath
 
 try:
-    from .check_review_independence import validate_review_record
+    from .check_review_independence import validate_input_bindings, validate_review_record
+    from .git_contract import validate_revision_pair, resolve_commit
     from .identity_contract import validate_independent_reviewer, validate_manifest_registry
     from .check_evidence_graph import load_record
 except ImportError:  # pragma: no cover
-    from check_review_independence import validate_review_record
+    from check_review_independence import validate_input_bindings, validate_review_record
+    from git_contract import validate_revision_pair, resolve_commit
     from identity_contract import validate_independent_reviewer, validate_manifest_registry
     from check_evidence_graph import load_record
 
@@ -42,6 +44,45 @@ def safe_relative(raw: object) -> str | None:
     return str(path)
 
 
+def validate_review_input_bindings(
+    review: dict,
+    workspace: Path,
+    *,
+    label: str,
+) -> list[str]:
+    """Validate structured review inputs against files in the active workspace."""
+
+    errors: list[str] = []
+    if "input_hashes" in review:
+        errors.append(f"{label} uses legacy input_hashes; structured input_bindings are required")
+    bindings = review.get("input_bindings")
+    validate_input_bindings(bindings, errors, label=f"{label}.input_bindings")
+    if not isinstance(bindings, list):
+        return errors
+    root = workspace.resolve()
+    for index, binding in enumerate(bindings):
+        if not isinstance(binding, dict):
+            continue
+        item_label = f"{label}.input_bindings[{index}]"
+        relative = safe_relative(binding.get("path"))
+        expected = binding.get("sha256")
+        if relative is None or not isinstance(expected, str) or not HEX64.fullmatch(expected):
+            continue
+        path = (workspace / relative).resolve()
+        try:
+            path.relative_to(root)
+        except ValueError:
+            errors.append(f"{item_label}.path escapes workspace")
+            continue
+        if not path.is_file():
+            errors.append(f"{item_label}.path does not exist: {relative}")
+            continue
+        actual = sha256_file(path)
+        if actual.lower() != expected.lower():
+            errors.append(f"{item_label}.sha256 does not match: {relative}")
+    return errors
+
+
 def validate_review_bindings(
     bindings: object,
     required_nodes: list[str] | tuple[str, ...],
@@ -50,6 +91,7 @@ def validate_review_bindings(
     revision_id: str,
     workspace: Path,
     manifest: dict | None = None,
+    target_git_revision: str | None = None,
 ) -> list[str]:
     """Return errors for a one-to-one node -> review-record join."""
 
@@ -63,6 +105,21 @@ def validate_review_bindings(
         return ["review_bindings must be a list"]
     if workspace is None:
         return [*errors, "workspace is required to read and hash review records"]
+    if required and not target_git_revision:
+        errors.append("required review nodes need the result Git revision")
+    if target_git_revision:
+        resolved_target = resolve_commit(workspace, target_git_revision)
+        if resolved_target is None:
+            errors.append(f"result Git revision is not a real full commit: {target_git_revision}")
+        else:
+            _, _ = validate_revision_pair(
+                workspace,
+                resolved_target,
+                resolved_target,
+                errors,
+                require_result_at_head=False,
+                label="review target Git revision",
+            )
     if len(bindings) != len(set(required)):
         errors.append("review_bindings count must equal the number of required review nodes")
     seen_nodes: set[str] = set()
@@ -73,7 +130,7 @@ def validate_review_bindings(
         if not isinstance(binding, dict):
             errors.append(f"{label} must be an object")
             continue
-        required_fields = {"node", "review_id", "path", "sha256", "case_id", "target_revision", "input_hashes", "reviewer_id", "reviewer_role"}
+        required_fields = {"node", "review_id", "path", "sha256", "case_id", "target_revision", "target_git_revision", "input_bindings", "reviewer_id", "reviewer_role"}
         missing = required_fields.difference(binding)
         if missing:
             errors.append(f"{label} missing fields: {sorted(missing)}")
@@ -94,6 +151,9 @@ def validate_review_bindings(
             errors.append(f"{label} case_id does not match the active case")
         if target_revision != revision_id:
             errors.append(f"{label} target_revision does not match the active revision")
+        binding_target_git = binding.get("target_git_revision")
+        if target_git_revision and binding_target_git != target_git_revision:
+            errors.append(f"{label} target_git_revision does not match the result Git revision")
         identity_key = (str(review_id), str(binding_case), str(target_revision))
         if identity_key in seen_cases:
             errors.append(f"review record is reused for multiple bindings: {identity_key}")
@@ -128,11 +188,11 @@ def validate_review_bindings(
             errors.append(f"{label} review record case_id does not match the active case")
         if review.get("target_revision") != revision_id:
             errors.append(f"{label} review record target_revision does not match the active revision")
-        input_hashes = binding.get("input_hashes")
-        if not isinstance(input_hashes, list) or not input_hashes or any(not isinstance(value, str) or not HEX64.fullmatch(value) for value in input_hashes):
-            errors.append(f"{label} input_hashes must contain valid SHA-256 values")
-        if input_hashes != review.get("input_hashes"):
-            errors.append(f"{label} input_hashes do not match the review record")
+        if review.get("target_git_revision") != binding_target_git:
+            errors.append(f"{label} target_git_revision does not match the review record")
+        if binding.get("input_bindings") != review.get("input_bindings"):
+            errors.append(f"{label} input_bindings do not match the review record")
+        errors.extend(validate_review_input_bindings(review, workspace, label=label))
         if binding.get("reviewer_id") != review.get("reviewer_id") or binding.get("reviewer_role") != review.get("reviewer_role"):
             errors.append(f"{label} reviewer identity does not match the review record")
         if review.get("critical_node") != node:

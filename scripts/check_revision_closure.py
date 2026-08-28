@@ -342,6 +342,7 @@ def validate_revision_closure(
         revision_id=str(impact.get("revision_id", "")),
         workspace=workspace,
         manifest=manifest,
+        target_git_revision=impact.get("new_git_revision"),
     ) if workspace is not None else ["workspace is required to validate review bindings"]
     if needs_identity_registry and manifest is None:
         review_errors.append("manual or critical review evidence requires a frozen project manifest")

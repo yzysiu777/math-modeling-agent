@@ -1,4 +1,5 @@
 import hashlib
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,6 +27,11 @@ def make_workspace() -> tuple[tempfile.TemporaryDirectory, Path]:
     runner = workspace / "scripts/run_trusted_check.py"
     runner.parent.mkdir(parents=True)
     runner.write_text("trusted runner fixture\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=workspace, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=workspace, check=True)
+    subprocess.run(["git", "config", "user.name", "MMAG Test"], cwd=workspace, check=True)
+    subprocess.run(["git", "add", "scripts/run_trusted_check.py"], cwd=workspace, check=True)
+    subprocess.run(["git", "commit", "-qm", "test fixture"], cwd=workspace, check=True)
     return holder, workspace
 
 
@@ -34,6 +40,15 @@ def build_records(workspace: Path, *, level="R0", surfaces=None, changed_files=N
     changed_files = changed_files or ["notes.md"]
     affected_experiments = affected_experiments or []
     affected_claims = affected_claims or []
+    if not (workspace / ".git").exists():
+        runner = workspace / "scripts/run_trusted_check.py"
+        runner.parent.mkdir(parents=True, exist_ok=True)
+        runner.write_text("trusted runner fixture\n", encoding="utf-8")
+        subprocess.run(["git", "init", "-q"], cwd=workspace, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=workspace, check=True)
+        subprocess.run(["git", "config", "user.name", "MMAG Test"], cwd=workspace, check=True)
+        subprocess.run(["git", "add", "scripts/run_trusted_check.py"], cwd=workspace, check=True)
+        subprocess.run(["git", "commit", "-qm", "test fixture"], cwd=workspace, check=True)
     revision_id = "REV-TEST-001"
     case_id = "CASE-TEST-001"
     manifest_path = workspace / "manifest.yaml"
@@ -46,6 +61,11 @@ def build_records(workspace: Path, *, level="R0", surfaces=None, changed_files=N
         "  - id: reviewer-1\n    role: independent_adversary\n",
         encoding="utf-8",
     )
+    target_git_revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=workspace, text=True).strip()
+    input_path = workspace / "inputs/source-data.csv"
+    input_path.parent.mkdir(parents=True, exist_ok=True)
+    input_path.write_text("id,value\n1,2\n", encoding="utf-8")
+    input_bindings = [{"path": str(input_path.relative_to(workspace)), "sha256": digest(input_path), "artifact_kind": "source_data"}]
     checks = required_checks_for(level, changed_files, change_surfaces=surfaces)
     review_nodes = required_review_nodes_for(surfaces)
     review_bindings = []
@@ -54,7 +74,8 @@ def build_records(workspace: Path, *, level="R0", surfaces=None, changed_files=N
         review_path.parent.mkdir(parents=True, exist_ok=True)
         review = {
             "record_type": "review_record", "review_id": f"REV-{node}-TEST", "case_id": case_id,
-            "target_revision": revision_id, "reviewer_role": "independent_adversary", "reviewer_id": "reviewer-1",
+            "target_revision": revision_id, "target_git_revision": target_git_revision,
+            "reviewer_role": "independent_adversary", "reviewer_id": "reviewer-1",
             "critical_node": node, "review_mode": {"C1": "blind", "C2": "challenge", "C3": "results"}[node],
             "review_lens": {
                 "C1": ["semantic_constraint_audit", "invariant_counterexample"],
@@ -66,7 +87,7 @@ def build_records(workspace: Path, *, level="R0", surfaces=None, changed_files=N
             "critical_decisions_reviewed": ["decision"],
             "disconfirming_tests": [{"test_id": "T-1", "target": "constraint", "input_or_case": "small case", "expected_falsifier": "violation", "actual_result": "none", "evidence": ["evidence/review.log"], "status": "passed"}],
             "counterexamples": [], "what_was_checked": ["contract"], "what_was_not_checked": ["scale"],
-            "human_decisions_required": [], "target_artifacts": ["model.md"], "input_hashes": ["0" * 64],
+            "human_decisions_required": [], "target_artifacts": ["model.md"], "input_bindings": input_bindings,
             "verdict": "PASS_WITH_LIMITATIONS", "findings": [], "unresolved_questions": [],
             "uncertainty": ["scale"], "reviewer_signature": "reviewer-1", "created_at": "2026-08-27T00:00:00+00:00",
         }
@@ -74,7 +95,8 @@ def build_records(workspace: Path, *, level="R0", surfaces=None, changed_files=N
         review_bindings.append({
             "node": node, "review_id": review["review_id"], "path": str(review_path.relative_to(workspace)),
             "sha256": digest(review_path), "case_id": case_id, "target_revision": revision_id,
-            "input_hashes": ["0" * 64], "reviewer_id": "reviewer-1", "reviewer_role": "independent_adversary",
+            "target_git_revision": target_git_revision, "input_bindings": input_bindings,
+            "reviewer_id": "reviewer-1", "reviewer_role": "independent_adversary",
         })
     source_review_id = (review_bindings[0]["review_id"] if review_nodes else "REV-MANUAL-TEST") if any(CHECK_IMPLEMENTATION_STATUS[check] == "manual_required" for check in checks) or review_nodes else None
     evidence_root = workspace / "evidence" / revision_id
@@ -130,8 +152,8 @@ def build_records(workspace: Path, *, level="R0", surfaces=None, changed_files=N
         "record_type": "change_impact_record",
         "revision_id": revision_id,
         "case_id": case_id,
-        "base_git_revision": "a" * 40,
-        "new_git_revision": "b" * 40,
+        "base_git_revision": target_git_revision,
+        "new_git_revision": target_git_revision,
         "executor_id": "executor-1",
         "approval_id": None,
         "source_review_id": source_review_id,

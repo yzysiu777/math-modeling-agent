@@ -2,6 +2,7 @@ record_type: review_record
 review_id: REV-YYYYMMDD-0001
 case_id: CASE-YYYYMMDD-0001
 target_revision: REVISION-YYYYMMDD-0001
+target_git_revision: "0000000000000000000000000000000000000001"
 reviewer_role: independent_adversary
 reviewer_id: claude-reviewer-001
 critical_node: C1
@@ -28,7 +29,10 @@ what_was_checked: ["待填写"]
 what_was_not_checked: ["待填写"]
 human_decisions_required: ["待填写"]
 target_artifacts: ["待填写审核工件"]
-input_hashes: ["0000000000000000000000000000000000000000000000000000000000000000"]
+input_bindings:
+  - path: "待填写输入文件"
+    sha256: "0000000000000000000000000000000000000000000000000000000000000001"
+    artifact_kind: "待填写输入工件类型"
 verdict: BLOCKED
 findings: []
 unresolved_questions: []

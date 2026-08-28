@@ -12,6 +12,7 @@ try:  # import works as a package and as ``python scripts/check_transition.py``
     from .check_evidence_graph import load_record
     from .check_human_signoff import validate_human_signoff
     from .check_revision_closure import load_yaml, validate_revision_closure
+    from .git_contract import validate_revision_pair
     from .gate_contract import (
         CHANGE_LEVELS,
         CHANGE_SURFACES,
@@ -26,6 +27,7 @@ except ImportError:  # pragma: no cover
     from check_evidence_graph import load_record
     from check_human_signoff import validate_human_signoff
     from check_revision_closure import load_yaml, validate_revision_closure
+    from git_contract import validate_revision_pair
     from gate_contract import CHANGE_LEVELS, CHANGE_SURFACES, MAIN_TRANSITIONS, REVISION_TRANSITIONS, SAFE_CHECK_IDS, STATES, required_checks_for, validate_revision_scope
 
 
@@ -89,7 +91,26 @@ def _validated_closure(
     closure_report = file_report
     if closure_report.get("validation_status") != "passed":
         return False, "closure report is not successful"
-    errors = validate_revision_closure(closure_impact, closure_report, approval, workspace=workspace)
+    git_errors: list[str] = []
+    validate_revision_pair(
+        workspace,
+        closure_report.get("base_git_revision"),
+        closure_report.get("new_git_revision"),
+        git_errors,
+        require_result_at_head=True,
+        label="transition closure",
+    )
+    if git_errors:
+        return False, "invalid closure Git revisions: " + "; ".join(git_errors)
+    errors = validate_revision_closure(
+        closure_impact,
+        closure_report,
+        approval,
+        workspace=workspace,
+        base_ref=closure_report.get("base_git_revision"),
+        head_ref="HEAD",
+        verify_git=True,
+    )
     if errors:
         return False, "invalid revision closure: " + "; ".join(errors)
     return True, "ok"

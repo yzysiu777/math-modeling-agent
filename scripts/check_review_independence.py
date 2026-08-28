@@ -4,8 +4,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+
+try:
+    from .git_contract import FULL_GIT_SHA
+except ImportError:  # pragma: no cover
+    from git_contract import FULL_GIT_SHA
 
 
 CRITICAL_NODES = {"C1", "C2", "C3"}
@@ -36,6 +42,7 @@ DIFFERENCE_AXES = {
 TEST_STATUSES = {"planned", "passed", "failed", "blocked"}
 PASS_VERDICTS = {"PASS", "PASS_WITH_LIMITATIONS"}
 TEST_FIELDS = {"test_id", "target", "input_or_case", "expected_falsifier", "actual_result", "evidence", "status"}
+HEX64 = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
 def load_record(path: Path) -> dict:
@@ -84,13 +91,54 @@ def _validate_disconfirming_tests(value: object, field: str, errors: list[str]) 
     return [test for test in value if isinstance(test, dict)]
 
 
+def validate_input_bindings(value: object, errors: list[str], *, label: str = "input_bindings") -> list[dict]:
+    """Validate the structural part of concrete input-file bindings."""
+
+    if not isinstance(value, list) or not value:
+        errors.append(f"{label} must contain at least one structured input binding")
+        return []
+    seen_paths: set[str] = set()
+    bindings: list[dict] = []
+    for index, binding in enumerate(value):
+        item_label = f"{label}[{index}]"
+        if not isinstance(binding, dict):
+            errors.append(f"{item_label} must be an object")
+            continue
+        missing = {"path", "sha256", "artifact_kind"}.difference(binding)
+        if missing:
+            errors.append(f"{item_label} missing fields: {sorted(missing)}")
+            continue
+        path = binding.get("path")
+        if not isinstance(path, str) or not path.strip():
+            errors.append(f"{item_label}.path is required")
+        else:
+            normalized = PurePosixPath(path.replace("\\", "/"))
+            if normalized.is_absolute() or ".." in normalized.parts or str(normalized) in {"", "."}:
+                errors.append(f"{item_label}.path must be a safe relative path")
+            elif str(normalized) in seen_paths:
+                errors.append(f"{item_label}.path is duplicated")
+            else:
+                seen_paths.add(str(normalized))
+        sha256 = binding.get("sha256")
+        if not isinstance(sha256, str) or not HEX64.fullmatch(sha256):
+            errors.append(f"{item_label}.sha256 must be a valid SHA-256")
+        elif sha256.lower() == "0" * 64:
+            errors.append(f"{item_label}.sha256 cannot be the all-zero placeholder")
+        if not isinstance(binding.get("artifact_kind"), str) or not binding.get("artifact_kind", "").strip():
+            errors.append(f"{item_label}.artifact_kind is required")
+        bindings.append(binding)
+    return bindings
+
+
 def validate_review_record(record: dict) -> tuple[bool, list[str]]:
     errors: list[str] = []
     if record.get("record_type") != "review_record":
         errors.append("record_type must be review_record")
-    for field in ("review_id", "case_id", "target_revision"):
+    for field in ("review_id", "case_id", "target_revision", "target_git_revision"):
         if not _nonempty(record.get(field)):
             errors.append(f"{field} is required and cannot be generic")
+    if not isinstance(record.get("target_git_revision"), str) or not FULL_GIT_SHA.fullmatch(record.get("target_git_revision", "")):
+        errors.append("target_git_revision must be a full 40-character Git commit SHA")
     node = record.get("critical_node")
     if node not in CRITICAL_NODES:
         errors.append("critical_node must be C1, C2, or C3")
@@ -137,11 +185,9 @@ def validate_review_record(record: dict) -> tuple[bool, list[str]]:
         value = record.get(field)
         if not isinstance(value, list) or not value:
             errors.append(f"{field} must list at least one item")
-    input_hashes = record.get("input_hashes")
-    if not isinstance(input_hashes, list) or not input_hashes:
-        errors.append("input_hashes must contain at least one input hash")
-    elif any(not isinstance(value, str) or len(value) != 64 or any(char not in "0123456789abcdefABCDEF" for char in value) for value in input_hashes):
-        errors.append("input_hashes must contain only valid SHA-256 values")
+    if "input_hashes" in record:
+        errors.append("input_hashes is legacy; use structured input_bindings")
+    validate_input_bindings(record.get("input_bindings"), errors)
     if not isinstance(record.get("target_artifacts"), list) or not record.get("target_artifacts"):
         errors.append("target_artifacts must contain at least one artifact")
     disconfirming = _validate_disconfirming_tests(record.get("disconfirming_tests"), "disconfirming_tests", errors)

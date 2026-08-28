@@ -1,6 +1,7 @@
 import hashlib
 import tempfile
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 import yaml
@@ -15,6 +16,32 @@ from test_revision_contract import build_records
 
 
 class AcceptanceHardeningTests(unittest.TestCase):
+    def _review_binding_case(self, mutate_review):
+        holder = tempfile.TemporaryDirectory()
+        workspace = Path(holder.name)
+        (workspace / "scripts").mkdir()
+        (workspace / "scripts/run_trusted_check.py").write_text("trusted runner\n", encoding="utf-8")
+        impact, validation = build_records(workspace, level="R3", surfaces=["data_contract"], changed_files=["data/labels.csv"])
+        bindings = deepcopy(validation["review_bindings"])
+        binding = bindings[0]
+        review_path = workspace / binding["path"]
+        review = yaml.safe_load(review_path.read_text(encoding="utf-8"))
+        mutate_review(review)
+        review_path.write_text(yaml.safe_dump(review, sort_keys=False), encoding="utf-8")
+        binding["sha256"] = hashlib.sha256(review_path.read_bytes()).hexdigest()
+        binding["input_bindings"] = review["input_bindings"]
+        binding["target_git_revision"] = review["target_git_revision"]
+        errors = validate_review_bindings(
+            bindings,
+            impact["required_review_nodes"],
+            case_id=impact["case_id"],
+            revision_id=impact["revision_id"],
+            workspace=workspace,
+            manifest=yaml.safe_load((workspace / "manifest.yaml").read_text(encoding="utf-8")),
+            target_git_revision=impact["new_git_revision"],
+        )
+        return holder, errors
+
     def test_ten_plain_manual_attestation_files_fail_closed(self):
         with tempfile.TemporaryDirectory() as temp:
             workspace = Path(temp)
@@ -81,8 +108,45 @@ class AcceptanceHardeningTests(unittest.TestCase):
             bindings[1] = dict(bindings[1], review_id=bindings[0]["review_id"], path=bindings[0]["path"], sha256=bindings[0]["sha256"])
             errors = validate_review_bindings(
                 bindings, impact["required_review_nodes"], case_id=impact["case_id"], revision_id=impact["revision_id"], workspace=workspace,
+                target_git_revision=impact["new_git_revision"],
             )
             self.assertTrue(any("reused" in error or "more than once" in error for error in errors))
+
+    def test_review_all_zero_input_hash_fails_closed(self):
+        holder, errors = self._review_binding_case(
+            lambda review: review["input_bindings"][0].update({"sha256": "0" * 64})
+        )
+        try:
+            self.assertTrue(any("all-zero" in error for error in errors))
+        finally:
+            holder.cleanup()
+
+    def test_review_missing_input_file_fails_closed(self):
+        holder, errors = self._review_binding_case(
+            lambda review: review["input_bindings"][0].update({"path": "inputs/missing.csv"})
+        )
+        try:
+            self.assertTrue(any("does not exist" in error for error in errors))
+        finally:
+            holder.cleanup()
+
+    def test_review_wrong_input_hash_fails_closed(self):
+        holder, errors = self._review_binding_case(
+            lambda review: review["input_bindings"][0].update({"sha256": "f" * 64})
+        )
+        try:
+            self.assertTrue(any("does not match" in error for error in errors))
+        finally:
+            holder.cleanup()
+
+    def test_review_forged_target_git_revision_fails_closed(self):
+        holder, errors = self._review_binding_case(
+            lambda review: review.update({"target_git_revision": "b" * 40})
+        )
+        try:
+            self.assertTrue(any("result Git revision" in error or "real full commit" in error for error in errors))
+        finally:
+            holder.cleanup()
 
     def test_transition_reads_the_hashed_closure_file(self):
         with tempfile.TemporaryDirectory() as temp:
