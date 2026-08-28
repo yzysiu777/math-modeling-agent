@@ -81,6 +81,12 @@ Gate 编号和状态以 `protocol/gates.md`、`protocol/workflow.md`、
 
 P0/P1 问题未解决时停止向论文定稿推进。修改模型、数据、标签、目标、约束、求解器、随机种子或论文强结论后，必须创建新版本和新实验记录。G8 的闭环只接受可信运行器生成的结构化 `check_results`；缺失日志、日志哈希、输出哈希或运行器身份时 fail closed。证据图校验必须贯穿 G9、R1、R2、R3。
 
+每个通过的 G8 修订闭环还必须核对 base/result Git commit 的真实 diff 与
+`changed_files`，并核对每个文件的 before/after SHA-256（新增或删除侧使用
+`null`）。实现型检查必须从 base commit 提取受保护 runner 重跑并比较确定性结果；
+不能仅凭自报 runner ID、runner 自哈希或 passed 日志认定已运行。`manual_required`
+继续只能由结构化人工或独立 reviewer attestation 关闭。
+
 案例协作只在 `cases/<case_id>/coordination/` 记录工作项、审核和证据；一个工作项只有一个写入者，执行者不能担任该项 reviewer。`accepted` 不等于 `human_frozen`，G12 必须验证人类签字人、时间、当前 Git revision、最终 PDF 路径/哈希、完整 G0–G12 和无 P0/P1。
 
 ## 论文规则

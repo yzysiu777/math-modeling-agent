@@ -254,11 +254,12 @@ class RevisionContractTests(unittest.TestCase):
         self.assertIn("affected_experiment_rerun", result["required_checks"])
         self.assertIn("new_experiment_record", result["required_checks"])
 
-    def test_r0_full_closure_accepts_empty_gate_impact(self):
+    def test_hand_assembled_r0_closure_fails_without_a_real_git_change(self):
         holder, workspace = make_workspace()
         try:
             impact, validation = build_records(workspace)
-            self.assertEqual(validate_revision_closure(impact, validation, workspace=workspace), [])
+            errors = validate_revision_closure(impact, validation, workspace=workspace)
+            self.assertTrue(any("actual Git diff" in error or "trusted runner" in error for error in errors))
         finally:
             holder.cleanup()
 
@@ -345,7 +346,8 @@ class RevisionContractTests(unittest.TestCase):
                 "project_manifest_path": impact["project_manifest_path"], "project_manifest_sha256": impact["project_manifest_sha256"],
                 "status": "approved",
             }
-            self.assertEqual(validate_revision_closure(impact, validation, approval, workspace=workspace), [])
+            errors = validate_revision_closure(impact, validation, approval, workspace=workspace)
+            self.assertTrue(any("actual Git diff" in error or "trusted runner" in error for error in errors))
             approval["modified_by"] = "another-modifier"
             self.assertTrue(any("modified_by" in error for error in validate_revision_closure(impact, validation, approval, workspace=workspace)))
             approval["modified_by"] = impact["modified_by"]
@@ -366,7 +368,7 @@ class RevisionContractTests(unittest.TestCase):
         finally:
             holder.cleanup()
 
-    def test_valid_r2_closure_requires_new_experiment_and_hash(self):
+    def test_hand_assembled_r2_closure_fails_without_a_real_git_change(self):
         holder, workspace = make_workspace()
         try:
             impact, validation = build_records(
@@ -377,7 +379,8 @@ class RevisionContractTests(unittest.TestCase):
                 affected_experiments=["EXP-OLD"],
                 affected_claims=["CLM-1"],
             )
-            self.assertEqual(validate_revision_closure(impact, validation, workspace=workspace), [])
+            errors = validate_revision_closure(impact, validation, workspace=workspace)
+            self.assertTrue(any("actual Git diff" in error or "trusted runner" in error for error in errors))
         finally:
             holder.cleanup()
 
@@ -395,7 +398,8 @@ class RevisionContractTests(unittest.TestCase):
             impact["candidate_submission_pdf"] = True
             impact["candidate_pdf_path"] = "candidate.pdf"
             impact["candidate_pdf_sha256"] = digest(pdf)
-            self.assertEqual(validate_revision_closure(impact, validation, workspace=workspace), [])
+            errors = validate_revision_closure(impact, validation, workspace=workspace)
+            self.assertTrue(any("actual Git diff" in error or "trusted runner" in error for error in errors))
             impact["candidate_pdf_sha256"] = "0" * 64
             self.assertTrue(any("candidate PDF hash mismatch" in error for error in validate_revision_closure(impact, validation, workspace=workspace)))
         finally:

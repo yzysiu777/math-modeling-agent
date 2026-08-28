@@ -39,8 +39,11 @@
 `change_impact_record` 和 `revision_validation_record` 保存前后哈希、受影响
 工件、可信运行器日志、退出码和输出哈希；只使用 `scripts/run_trusted_check.py`
 中的固定命令映射，禁止从 YAML 自动执行任意命令。每个修订声明语义变更表面，
-不能只根据文件名猜测 R0–R3；证据图必须把输入、代码、实验、输出、图表、claim
-和论文位置连起来。
+不能只根据文件名猜测 R0–R3；closure 还必须由公共 Git 事实验证器核对真实
+diff、逐文件 before/after SHA-256 及新增/删除文件的 `null` 侧。实现型检查由
+base commit 的受保护 runner 重跑并比较 `result_digest`；仅有 runner 自报字段和
+passed 日志不能关闭 G8。证据图必须把输入、代码、实验、输出、图表、claim 和
+论文位置连起来。
 
 案例级团队协作使用 `protocol/team-collaboration.md` 和 `work_item`，只允许
 单一写入者，执行者与 reviewer 身份必须不同。工作项 `accepted` 不得自动推进

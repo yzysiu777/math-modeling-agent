@@ -18,7 +18,7 @@
       "required": [
         "check_id", "status", "execution_kind", "executor", "started_at", "finished_at",
         "exit_code", "stdout_path", "stdout_sha256", "stderr_path", "stderr_sha256", "artifact_hashes",
-        "attestation_path", "attestation_sha256", "attestation_id"
+        "attestation_path", "attestation_sha256", "attestation_id", "result_digest"
       ],
       "properties": {
         "check_id": {"type": "string", "minLength": 1},
@@ -36,6 +36,7 @@
         "attestation_path": {"type": ["string", "null"]},
         "attestation_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$"},
         "attestation_id": {"type": ["string", "null"]},
+        "result_digest": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
         "notes": {"type": "string"}
       },
       "additionalProperties": false
@@ -76,13 +77,33 @@
         "reviewer_role": {"type": "string", "enum": ["independent_adversary", "independent_reviewer", "human"]}
       },
       "additionalProperties": false
+    },
+    "runner_context": {
+      "type": "object",
+      "required": ["check_ids", "changed_files", "change_surfaces", "approval_path", "change_record_path", "review_record_path", "manifest_path", "artifact_paths", "claim_paths", "experiment_paths", "candidate_pdf_path", "expected_pdf_sha256", "output_file_paths"],
+      "properties": {
+        "check_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "changed_files": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "change_surfaces": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "approval_path": {"type": ["string", "null"]},
+        "change_record_path": {"type": ["string", "null"]},
+        "review_record_path": {"type": ["string", "null"]},
+        "manifest_path": {"type": ["string", "null"]},
+        "artifact_paths": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "claim_paths": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "experiment_paths": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "candidate_pdf_path": {"type": ["string", "null"]},
+        "expected_pdf_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-fA-F]{64}$"},
+        "output_file_paths": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      },
+      "additionalProperties": false
     }
   },
   "required": [
     "record_type", "closure_id", "revision_id", "case_id", "approval_id", "source_review_id", "finding_ids",
     "base_git_revision", "new_git_revision", "change_level", "change_surfaces", "changed_files",
     "evidence_root", "runner_id", "runner_version", "runner_script", "runner_script_sha256",
-    "execution_started_at", "execution_finished_at", "check_results", "output_hashes", "new_experiment_ids",
+    "runner_context", "execution_started_at", "execution_finished_at", "check_results", "output_hashes", "new_experiment_ids",
     "claim_status_updates", "closed_findings", "unresolved_findings", "validator", "validation_status",
     "executor_id", "modifier_id", "project_manifest_path", "project_manifest_sha256",
     "required_review_nodes", "review_bindings"
@@ -109,6 +130,7 @@
     "runner_version": {"type": "string", "minLength": 1},
     "runner_script": {"type": "string", "minLength": 1},
     "runner_script_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+    "runner_context": {"$ref": "#/$defs/runner_context"},
     "execution_started_at": {"type": "string", "minLength": 1},
     "execution_finished_at": {"type": "string", "minLength": 1},
     "check_results": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/check_result"}},

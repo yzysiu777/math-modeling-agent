@@ -57,6 +57,8 @@ class TrustedRunnerTests(unittest.TestCase):
             record = run_checks(args)
             self.assertEqual(record["validation_status"], "passed")
             self.assertEqual(record["check_results"][0]["status"], "passed")
+            self.assertRegex(record["check_results"][0]["result_digest"], r"^[0-9a-f]{64}$")
+            self.assertEqual(record["runner_context"]["check_ids"], ["pdf_hash"])
             self.assertIn("candidate.pdf", record["output_hashes"])
 
     def test_automatic_pdf_hash_failure_is_recorded(self):

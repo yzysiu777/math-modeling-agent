@@ -8,7 +8,6 @@ not authorize files outside the allowlist.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -16,9 +15,15 @@ from pathlib import Path, PurePosixPath
 
 try:
     from .check_revision_closure import _load_manifest_for_record, load_yaml, validate_revision_closure
+    from .git_contract import (
+        changed_files as _git_changed_files,
+        file_sha256 as _git_file_sha256,
+        validate_git_change_facts,
+    )
     from .identity_contract import validate_human_owner
 except ImportError:  # pragma: no cover
     from check_revision_closure import _load_manifest_for_record, load_yaml, validate_revision_closure
+    from git_contract import changed_files as _git_changed_files, file_sha256 as _git_file_sha256, validate_git_change_facts
     from identity_contract import validate_human_owner
 
 
@@ -30,28 +35,15 @@ def _normalize_relative(raw: str) -> str:
 
 
 def changed_files(base_ref: str, head_ref: str = "HEAD", *, workspace: Path | None = None) -> list[str]:
-    result = subprocess.run(
-        ["git", "diff", "--name-only", f"{base_ref}...{head_ref}"],
-        text=True,
-        capture_output=True,
-        check=False,
-        cwd=str(workspace) if workspace else None,
-    )
-    if result.returncode:
-        raise RuntimeError(result.stderr.strip() or "git diff failed")
-    return [_normalize_relative(line) for line in result.stdout.splitlines() if line]
+    if workspace is None:
+        raise RuntimeError("workspace is required to read Git diff")
+    return _git_changed_files(workspace, base_ref, head_ref)
 
 
 def git_file_sha256(ref: str, relative: str, *, workspace: Path | None = None) -> str | None:
-    result = subprocess.run(
-        ["git", "show", f"{ref}:{relative}"],
-        capture_output=True,
-        check=False,
-        cwd=str(workspace) if workspace else None,
-    )
-    if result.returncode:
-        return None
-    return hashlib.sha256(result.stdout).hexdigest()
+    if workspace is None:
+        raise RuntimeError("workspace is required to read committed file content")
+    return _git_file_sha256(workspace, ref, relative)
 
 
 def git_revision(ref: str, *, workspace: Path | None = None) -> str | None:
@@ -131,35 +123,37 @@ def validate_revision_boundary(
     if recorded_head and actual_head and recorded_head != actual_head:
         errors.append("new_git_revision does not match head_ref")
 
+    facts_workspace = workspace if actual_base and actual_head else None
+
+    def _changed_provider(workspace_arg, base_arg, result_arg):
+        return changed_files(base_arg, result_arg, workspace=workspace_arg)
+
+    def _hash_provider(workspace_arg, revision_arg, path_arg):
+        return git_file_sha256(revision_arg, path_arg, workspace=workspace_arg)
+
+    errors.extend(
+        validate_git_change_facts(
+            facts_workspace,
+            actual_base or base_ref,
+            actual_head or head_ref,
+            impact.get("changed_files"),
+            impact.get("before_hashes"),
+            impact.get("after_hashes"),
+            require_result_at_head=False,
+            label="approved revision Git change facts",
+            changed_files_provider=_changed_provider,
+            file_sha256_provider=_hash_provider,
+        )
+    )
     try:
         actual = changed_files(base_ref, head_ref, workspace=workspace)
     except Exception as exc:  # noqa: BLE001
-        return errors + [str(exc)]
-    recorded = [_normalize_relative(item) for item in (impact.get("changed_files") or [])]
-    if not recorded:
-        errors.append("change impact record has no changed_files")
-    if set(actual) != set(recorded):
-        errors.append(f"actual and recorded changed files differ: actual={actual}, recorded={recorded}")
+        return sorted(set(errors + [str(exc)]))
     for path in actual:
         if path in forbidden or any(path.startswith(item.rstrip("/") + "/") for item in forbidden):
             errors.append(f"forbidden file changed: {path}")
         if path not in allowed and not any(path.startswith(item.rstrip("/") + "/") for item in allowed):
             errors.append(f"file outside non-empty allowlist changed: {path}")
-
-        before = git_file_sha256(base_ref, path, workspace=workspace)
-        after = git_file_sha256(head_ref, path, workspace=workspace)
-        before_hashes = impact.get("before_hashes") or {}
-        after_hashes = impact.get("after_hashes") or {}
-        if path not in before_hashes:
-            errors.append(f"missing before hash: {path}")
-        if path not in after_hashes:
-            errors.append(f"missing after hash: {path}")
-        recorded_before = before_hashes.get(path)
-        recorded_after = after_hashes.get(path)
-        if recorded_before != before:
-            errors.append(f"before hash mismatch: {path}")
-        if recorded_after != after:
-            errors.append(f"after hash mismatch: {path}")
     return sorted(set(errors))
 
 

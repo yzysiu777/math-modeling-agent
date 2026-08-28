@@ -68,7 +68,9 @@ gate_passed
 - `revision_pending`：提出修改但尚未判断影响；
 - `impact_classified`：已有 R0/R1/R2/R3 和受影响工件；
 - `targeted_validation`：安全检查 ID 已生成并执行；
-- `validation_passed`：所有 required checks 有可信运行器记录、退出码 0、日志哈希和输出证据；
+- `validation_passed`：所有 required checks 有可信运行器记录、退出码 0、日志哈希和输出证据，
+  且 Git diff/逐文件 before-after 哈希通过公共事实校验；实现型检查已由 base commit
+  的受保护 runner 重跑并与记录摘要一致；
 - `validation_failed`：至少一项检查失败，不能关闭相关 finding；
 - `restore_affected_gate`：只恢复受影响 Gate，并保留回退历史。R0 可在
   `affected_gates: []` 下恢复，但必须有 `gate_impact: no_gate_impact` 的显式证据。

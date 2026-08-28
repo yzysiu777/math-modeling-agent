@@ -7,6 +7,10 @@ import yaml
 
 from scripts.check_work_item import validate_work_item, validate_work_item_set
 from scripts.gate_contract import required_checks_for
+try:
+    from support_rev06c import build_real_r0_case
+except ImportError:  # pragma: no cover - direct module invocation
+    from tests.support_rev06c import build_real_r0_case
 from test_revision_contract import build_records
 
 
@@ -135,9 +139,24 @@ def trusted_item(workspace: Path):
 
 
 class WorkItemTests(unittest.TestCase):
-    def test_structured_trusted_closure_can_accept(self):
+    def test_hand_assembled_trusted_item_fails_on_empty_diff(self):
         with tempfile.TemporaryDirectory() as temp:
             item = trusted_item(Path(temp))
+            errors = validate_work_item(item, workspace=Path(temp))
+            self.assertTrue(any("actual Git diff" in error or "protected" in error for error in errors))
+            self.assertNotIn("human_frozen", item)
+
+    def test_base_equals_result_work_item_cannot_be_accepted(self):
+        with tempfile.TemporaryDirectory() as temp:
+            item = trusted_item(Path(temp))
+            item["source_git_revision"] = item["result_git_revision"]
+            errors = validate_work_item(item, workspace=Path(temp))
+            self.assertTrue(any("actual Git diff" in error or "changed files" in error for error in errors))
+
+    def test_real_runner_closure_can_reach_accepted(self):
+        with tempfile.TemporaryDirectory() as temp:
+            _, validation, item = build_real_r0_case(Path(temp))
+            self.assertEqual(validation["validation_status"], "passed")
             self.assertEqual(validate_work_item(item, workspace=Path(temp)), [])
             self.assertNotIn("human_frozen", item)
 

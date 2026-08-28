@@ -106,6 +106,11 @@ gate_passed
 Gate、claim、实验、图表、可信运行器日志哈希和输出哈希。R0 的空 Gate 影响
 必须同时有 `no_gate_impact` 证据；验证失败时不能关闭 finding。
 
+修订闭环的 `changed_files`、`before_hashes`、`after_hashes` 必须由公共 Git 事实
+验证器与 base/result commit 的真实 diff 逐项核对。实现型检查由 base commit 中的
+受保护 trusted runner 重新执行并比较确定性结果摘要；runner 自报 ID、自哈希或
+手工 passed 日志不构成执行证明。人工检查继续使用结构化 attestation。
+
 ### G9–G12：论文和交付
 
 论文先建立“子问题—模型—实验—图表—结论—引用”映射，再进入 LaTeX。

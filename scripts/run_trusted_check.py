@@ -22,6 +22,8 @@ try:
     from .check_approved_revision import validate_revision_boundary
     from .check_evidence_graph import load_record, validate_evidence_graph
     from .check_review_independence import load_record as load_review_yaml, validate_review_record
+    from .check_trusted_execution import result_digest
+    from .git_contract import validate_git_change_facts
     from .gate_contract import (
         CHANGE_LEVELS,
         CHANGE_SURFACES,
@@ -34,6 +36,8 @@ except ImportError:  # pragma: no cover
     from check_approved_revision import validate_revision_boundary
     from check_evidence_graph import load_record, validate_evidence_graph
     from check_review_independence import load_record as load_review_yaml, validate_review_record
+    from check_trusted_execution import result_digest
+    from git_contract import validate_git_change_facts
     from gate_contract import CHANGE_LEVELS, CHANGE_SURFACES, CHECK_IMPLEMENTATION_STATUS, SAFE_CHECK_IDS, required_checks_for, required_review_nodes_for
 
 
@@ -117,17 +121,29 @@ def _internal_basic_syntax(workspace: Path, changed_files: list[str]) -> tuple[i
 
 
 def _internal_file_allowlist(args: argparse.Namespace, workspace: Path) -> tuple[int, str, str]:
-    if not args.approval or not args.change_record:
-        return 2, "", "file_allowlist requires --approval and --change-record\n"
-    approval = load_record(workspace / relative_path(args.approval))
+    if not args.change_record:
+        return 2, "", "file_allowlist requires --change-record\n"
     impact = load_record(workspace / relative_path(args.change_record))
-    errors = validate_revision_boundary(
-        approval,
-        impact,
-        base_ref=args.base_ref,
-        head_ref=args.head_ref,
-        workspace=workspace,
-    )
+    if args.approval:
+        approval = load_record(workspace / relative_path(args.approval))
+        errors = validate_revision_boundary(
+            approval,
+            impact,
+            base_ref=args.base_ref,
+            head_ref=args.head_ref,
+            workspace=workspace,
+        )
+    else:
+        errors = validate_git_change_facts(
+            workspace,
+            args.base_git_revision,
+            args.new_git_revision,
+            impact.get("changed_files"),
+            impact.get("before_hashes"),
+            impact.get("after_hashes"),
+            require_result_at_head=False,
+            label="trusted file-allowlist Git change facts",
+        )
     return (1, "\n".join(errors) + "\n", "") if errors else (0, "modification boundary passed\n", "")
 
 
@@ -290,6 +306,7 @@ def run_checks(args: argparse.Namespace) -> dict:
             status = "passed"
         else:
             status = "failed"
+        digest = result_digest(check_id, status, code, stdout, stderr, artifact_hashes)
         result = {
             "check_id": check_id,
             "status": status,
@@ -306,6 +323,7 @@ def run_checks(args: argparse.Namespace) -> dict:
             "attestation_path": None,
             "attestation_sha256": None,
             "attestation_id": None,
+            "result_digest": digest,
             "notes": "fixed command or internal validator" if implementation == "implemented" else "human evidence must be attached",
         }
         check_results.append(result)
@@ -337,6 +355,21 @@ def run_checks(args: argparse.Namespace) -> dict:
         "runner_version": RUNNER_VERSION,
         "runner_script": SCRIPT_RELATIVE,
         "runner_script_sha256": sha256_file(runner_path),
+        "runner_context": {
+            "check_ids": list(check_ids),
+            "changed_files": [relative_path(path) for path in args.changed_file],
+            "change_surfaces": surfaces,
+            "approval_path": getattr(args, "approval", None),
+            "change_record_path": getattr(args, "change_record", None),
+            "review_record_path": getattr(args, "review_record", None),
+            "manifest_path": manifest_path,
+            "artifact_paths": list(getattr(args, "artifact", []) or []),
+            "claim_paths": list(getattr(args, "claim", []) or []),
+            "experiment_paths": list(getattr(args, "experiment", []) or []),
+            "candidate_pdf_path": getattr(args, "candidate_pdf", None),
+            "expected_pdf_sha256": getattr(args, "expected_pdf_sha256", None),
+            "output_file_paths": list(getattr(args, "output_file", []) or []),
+        },
         "execution_started_at": started_at,
         "execution_finished_at": finished_at,
         "check_results": check_results,

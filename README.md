@@ -47,11 +47,13 @@ Planner/Executor 控制面、交接单或开发审核记录都不复制进本仓
 修订闭环的三个入口是：`scripts/classify_change.py`（R0–R3）、
 `scripts/plan_targeted_validation.py`（安全检查 ID）和
 `scripts/check_revision_closure.py`（验证记录关闭）。
-`scripts/check_approved_revision.py` 先检查非空文件白名单与前后哈希，
+`scripts/check_approved_revision.py` 先调用公共 Git 事实验证器检查真实 diff、
+逐文件 before/after 哈希与非空文件白名单，
 再单独检查回归验证，二者不会互相替代。
 
 `scripts/run_trusted_check.py` 只接受固定 check ID，并为实际执行写入时间戳、
-stdout/stderr 路径与哈希；尚未自动化的检查会明确记录为 `manual_required`，
+stdout/stderr 路径与哈希；closure 会从 base commit 提取受保护 runner 重跑实现型
+检查并比较 `result_digest`。尚未自动化的检查会明确记录为 `manual_required`，
 不能伪装成通过。`scripts/check_evidence_graph.py` 校验“输入/附件哈希 → 代码
 版本 → 实验 → 输出哈希 → 图表/表格 → claim → 论文定位”的证据链。
 `scripts/check_work_item.py` 校验案例级单写入者、非自审、源/结果 revision 和

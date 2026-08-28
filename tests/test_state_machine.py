@@ -10,6 +10,10 @@ import yaml
 
 from scripts.check_transition import validate_transition
 from scripts.gate_contract import required_checks_for
+try:
+    from support_rev06c import build_real_r0_case
+except ImportError:  # pragma: no cover - direct module invocation
+    from tests.support_rev06c import build_real_r0_case
 from test_revision_contract import build_records
 
 
@@ -109,9 +113,7 @@ class StateMachineTests(unittest.TestCase):
     def test_r0_revision_loop_restores_without_model_gate(self):
         with tempfile.TemporaryDirectory() as temp:
             workspace = Path(temp)
-            (workspace / "scripts").mkdir()
-            (workspace / "scripts/run_trusted_check.py").write_text("trusted runner fixture\n", encoding="utf-8")
-            impact, closure = build_records(workspace)
+            impact, closure, _ = build_real_r0_case(workspace)
             closure_path = workspace / "closure.yaml"
             closure_path.write_text(yaml.safe_dump(closure, sort_keys=False), encoding="utf-8")
             closure_hash = hashlib.sha256(closure_path.read_bytes()).hexdigest()

@@ -19,6 +19,20 @@ runner_id: trusted_check_runner
 runner_version: 1.0.0
 runner_script: scripts/run_trusted_check.py
 runner_script_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+runner_context:
+  check_ids: [file_allowlist]
+  changed_files: ["待填写文件"]
+  change_surfaces: [text_only]
+  approval_path: null
+  change_record_path: cases/CASE-YYYYMMDD-0001/coordination/change-impact.yaml
+  review_record_path: null
+  manifest_path: cases/CASE-YYYYMMDD-0001/manifest.yaml
+  artifact_paths: []
+  claim_paths: []
+  experiment_paths: []
+  candidate_pdf_path: null
+  expected_pdf_sha256: null
+  output_file_paths: []
 execution_started_at: "YYYY-MM-DDThh:mm:ss+08:00"
 execution_finished_at: "YYYY-MM-DDThh:mm:ss+08:00"
 check_results:
@@ -37,6 +51,7 @@ check_results:
     attestation_path: null
     attestation_sha256: null
     attestation_id: null
+    result_digest: "0000000000000000000000000000000000000000000000000000000000000000"
     notes: "示例模板：实际记录必须由可信运行器生成"
 output_hashes: {}
 new_experiment_ids: []

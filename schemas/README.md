@@ -16,6 +16,13 @@
 - `revision_validation_record.check_results` 必须来自固定可信运行器，包含执行时间、
   stdout/stderr 路径与哈希、退出码和实际输出哈希；旧的 `check_exit_codes`/
   `check_outputs` 不能作为证据。
+- 每个通过的修订闭环还必须把 `changed_files`、`before_hashes` 和 `after_hashes` 与
+  base/result Git commit 的真实 diff 和内容逐项核对；新增/删除文件的缺失侧必须为
+  `null`，不能用手工列表代替 Git 事实。
+- 实现型检查必须带 `result_digest` 和 `runner_context`。验收时从 base commit 提取
+  受保护 runner，重新运行固定检查并比较结果摘要；runner 自报 ID、文件自哈希和
+  `passed` 日志不能单独构成可信证明。`manual_required` 仍只能由结构化人工或独立
+  reviewer attestation 关闭。
 - `approved_findings` 的案例、审核、修订、基线和结果 revision 必须严格关联；
   已批准/已应用记录的文件白名单和验证清单不能为空。
 - `work_item` 固定单一写入者，执行者不能自审；`accepted` 只关闭工作项，不产生 G12。

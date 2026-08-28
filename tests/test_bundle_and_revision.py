@@ -63,11 +63,11 @@ class RevisionBoundaryTests(unittest.TestCase):
                 "project_manifest_path": "manifest.yaml", "project_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
             }
             impact = {
-                "case_id": "CASE-1", "changed_files": ["paper/main.tex"], "before_hashes": {"paper/main.tex": "before"},
-                "after_hashes": {"paper/main.tex": "after"}, "executor_id": "executor-1", "modified_by": "modifier-1",
+                "case_id": "CASE-1", "changed_files": ["paper/main.tex"], "before_hashes": {"paper/main.tex": "a" * 64},
+                "after_hashes": {"paper/main.tex": "b" * 64}, "executor_id": "executor-1", "modified_by": "modifier-1",
             }
             with patch("scripts.check_approved_revision.changed_files", return_value=["paper/main.tex"]), patch(
-                "scripts.check_approved_revision.git_file_sha256", side_effect=["before", "after"]
+                "scripts.check_approved_revision.git_file_sha256", side_effect=["a" * 64, "b" * 64]
             ):
                 errors = validate_revision_boundary(approval, impact, workspace=workspace)
             self.assertEqual(errors, [])

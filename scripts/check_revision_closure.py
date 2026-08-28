@@ -29,6 +29,8 @@ try:
     )
     from .check_manual_attestation import validate_manual_attestation
     from .check_review_bindings import validate_review_bindings
+    from .check_trusted_execution import validate_trusted_execution
+    from .git_contract import validate_git_change_facts
     from .identity_contract import validate_human_owner, validate_manifest_registry
 except ImportError:  # pragma: no cover
     from gate_contract import (
@@ -44,6 +46,8 @@ except ImportError:  # pragma: no cover
     )
     from check_manual_attestation import validate_manual_attestation
     from check_review_bindings import validate_review_bindings
+    from check_trusted_execution import validate_trusted_execution
+    from git_contract import validate_git_change_facts
     from identity_contract import validate_human_owner, validate_manifest_registry
 
 
@@ -380,6 +384,20 @@ def validate_revision_closure(
     if not validation.get("execution_started_at") or not validation.get("execution_finished_at"):
         errors.append("execution timestamps are required")
 
+    if workspace is not None:
+        errors.extend(
+            validate_git_change_facts(
+                workspace,
+                impact.get("base_git_revision"),
+                impact.get("new_git_revision"),
+                impact.get("changed_files"),
+                impact.get("before_hashes"),
+                impact.get("after_hashes"),
+                require_result_at_head=True,
+                label="revision closure Git change facts",
+            )
+        )
+
     implementation_errors: list[str] = []
     if workspace is not None:
         for item in check_results:
@@ -438,6 +456,17 @@ def validate_revision_closure(
             else:
                 implementation_errors.append(f"check has unknown execution_kind: {check_id}")
     errors.extend(implementation_errors)
+
+    if workspace is not None:
+        errors.extend(
+            validate_trusted_execution(
+                validation,
+                impact,
+                workspace,
+                base_revision=impact.get("base_git_revision"),
+                approval=approval,
+            )
+        )
 
     if workspace is not None:
         for path, expected in (validation.get("output_hashes") or {}).items():
