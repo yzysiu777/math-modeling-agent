@@ -103,7 +103,7 @@ class CaseCheckTests(unittest.TestCase):
             placeholder = None
             for content in (
                 "# C3\n\nTODO\n",
-                "# C3\n\n结论：TODO\n已检查：待填写\n未检查：TODO\n",
+                "# C3\n\n结论：TODO\n已检查范围：待填写\n未检查范围：TODO\n",
             ):
                 self.add_review(case, "C3", content)
                 placeholder = check_case(case, "paper_claims")

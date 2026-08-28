@@ -130,13 +130,13 @@ def _review_errors(path: Path, node: str) -> list[str]:
         ("节点", rf"(?<![A-Za-z0-9]){re.escape(node)}(?![A-Za-z0-9])"),
         ("结论/verdict", r"(?:结论|判定|审核结论|verdict|conclusion|decision)"),
         ("已检查范围", r"(?:已检查|检查范围|审核范围|checked|reviewed|scope)"),
-        ("未检查范围", r"(?:未检查|未覆盖|未验证|未审|unchecked|unreviewed|out of scope|limitation)"),
+        ("未检查范围", r"(?:未检查|未覆盖|未验证|未审|unchecked|unreviewed|not\s+checked|not\s+reviewed|out of scope|limitation)"),
     )
     errors = [label + "缺失" for label, pattern in checks if not re.search(pattern, text, re.IGNORECASE)]
     field_patterns = (
         ("结论", r"(?:结论|判定|审核结论|verdict|conclusion|decision)\s*[:：]\s*(.*?)\s*$"),
-        ("已检查范围", r"(?:已检查|检查范围|审核范围|checked|reviewed|scope)\s*[:：]\s*(.*?)\s*$"),
-        ("未检查范围", r"(?:未检查|未覆盖|未验证|未审|unchecked|unreviewed|out of scope|limitation)\s*[:：]\s*(.*?)\s*$"),
+        ("已检查范围", r"(?:已检查(?:的)?(?:范围|内容|项)?|检查(?:的)?范围|审核范围|checked|reviewed|scope)\s*[:：]\s*(.*?)\s*$"),
+        ("未检查范围", r"(?:未检查(?:的)?(?:范围|内容|项)?|未覆盖(?:的)?范围|未验证|未审|unchecked|unreviewed|not\s+checked|not\s+reviewed|out of scope|limitation)\s*[:：]\s*(.*?)\s*$"),
     )
     for label, pattern in field_patterns:
         match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
