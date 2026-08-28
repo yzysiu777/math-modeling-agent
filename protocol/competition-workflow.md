@@ -28,8 +28,9 @@
 每个关键子问题默认提出至少三条方法论不同的路线。路线卡必须有核心思想、数学
 表达、关键假设、数据需求、实现/运行成本、预期优势、风险和最便宜的证伪实验。
 可先读取 `.agents/skills/industrial-mathematical-modeling/references/` 下对应的实战方法卡。
-`scripts/model_pool.py` 检查空字段、明显重复的方法族和状态；真正的方法论差异仍由
-Codex、Claude C2 与队员判断。
+`scripts/model_pool.py` 只检查空字段、非法状态、重复路线 ID 和明显重复的方法族；真正
+的方法论差异仍由 Codex、Claude C2 与队员判断。例如 MIP 的 arc-flow、path-flow、
+time-indexed 表述是否足够独立，不能由这个语法检查器自动决定。
 
 运筹题按适用性覆盖精确规划、网络/动态规划、分解或松弛、启发式/元启发式、鲁棒
 或随机优化、仿真优化。数据题按适用性覆盖描述统计、线性/广义线性、树模型、时序、

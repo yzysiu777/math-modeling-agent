@@ -97,6 +97,10 @@ Codex 从题面提取子问题、输入、输出、目标、硬约束、字段�
 - `.agents/skills/industrial-mathematical-modeling/references/data-analysis-method-cards.md`
 - `.agents/skills/industrial-mathematical-modeling/references/hybrid-method-cards.md`
 
+`scripts/model_pool.py` 只是轻量语法检查器：它检查空字段、非法状态、重复路线 ID 和
+明显重复的方法族；它不能判断路线在数学意义上是否真正独立。例如 MIP 的 arc-flow、
+path-flow 与 time-indexed 表述仍需 C2 和队员进行语义审查。
+
 ### 第三步：实验赛马
 
 先跑手算、小实例、小样本、短迭代和简单 baseline。所有路线使用统一数据切分、实例、
