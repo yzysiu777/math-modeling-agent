@@ -161,7 +161,9 @@ class CaseCheckTests(unittest.TestCase):
             ("Critical node: C3", "Critical node: C1"),
             ("Case ID: case-check", "Case ID: another-case"),
             ("Review ID: review-c3-001", "Review ID: TODO"),
+            ("Review ID: review-c3-001", "Review ID: "),
             ("Reviewer provider: human_specialist\n", ""),
+            ("Reviewer model: review-model\n", ""),
         )
         for current, replacement in replacements:
             with self.subTest(replacement=replacement):
