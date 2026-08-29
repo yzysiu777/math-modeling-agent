@@ -64,3 +64,6 @@ reviews/bundles/
 tmp/
 .cache/
 .harness/
+
+# 生成的审核包草稿：每次由 make review-packet 重新生成，不入库
+cases/**/reviews/packets/

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Modeling"
+  short_description: "Diverge, evaluate, probe and specify modeling routes"
+  default_prompt: "Use $competition-modeling to reconstruct the problem, brainstorm a wide route space, evaluate routes on fixed dimensions, falsify them with one-minute probes and write implementation specs."
+
+policy:
+  allow_implicit_invocation: true

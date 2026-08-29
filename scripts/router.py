@@ -1,8 +1,15 @@
-"""Deterministic first-pass router for competition problem statements.
+"""Optional keyword prescreen for competition problem statements.
 
-The router narrows the search space; it never replaces reading the statement.
-It intentionally exposes evidence and uncertainty so a teammate can correct
-the route before serious modeling begins.
+The router counts how many distinct terms from three overlapping word lists
+appear in the text.  That is a weak signal and the limits are worth stating:
+"分配" and "资源" sit in both the optimization and decision lists, a long
+statement saturates every list, and a realistic Huawei Cup problem therefore
+tends to land on ``hybrid``.
+
+It is a cross-check, not a decision.  The Modeler reads the statement and
+routes the case; ``checkpoint.yaml`` records one human confirmation before a
+route is frozen.  Evidence and uncertainty are exposed here so a teammate can
+see exactly how thin the basis is.
 """
 
 from __future__ import annotations

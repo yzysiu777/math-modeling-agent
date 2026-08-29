@@ -13,7 +13,10 @@ class WorkspaceContractTests(unittest.TestCase):
 
     def test_readme_and_prompts_expose_core_loop(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        for marker in ("五分钟", "候选模型池", "Champion", "Challenger", "C1/C2/C3"):
+        for marker in (
+            "五分钟", "候选路线池", "Champion", "Challenger", "C1 / C2 / C3",
+            "建模手", "编程手", "写作手", "probe", "claim_map.md",
+        ):
             self.assertIn(marker, readme)
         for node in ("C1_problem_challenge.md", "C2_model_challenge.md", "C3_results_challenge.md"):
             self.assertTrue((ROOT / "prompts/reviewer" / node).is_file())
@@ -22,7 +25,32 @@ class WorkspaceContractTests(unittest.TestCase):
             "data-analysis-method-cards.md",
             "hybrid-method-cards.md",
         ):
-            self.assertTrue((ROOT / ".agents/skills/industrial-mathematical-modeling/references" / card).is_file())
+            self.assertTrue((ROOT / ".agents/skills/competition-modeling/references" / card).is_file())
+
+    def test_three_roles_have_prompt_skill_and_contract(self):
+        for role in ("modeler", "engineer", "writer"):
+            self.assertTrue((ROOT / f"prompts/{role}.md").is_file(), role)
+        for skill in ("competition-modeling", "competition-engineering", "competition-paper-writing"):
+            self.assertTrue((ROOT / ".agents/skills" / skill / "SKILL.md").is_file(), skill)
+        for contract in ("README.md", "spec.md", "results.md", "questions.md"):
+            self.assertTrue((ROOT / "prompts/contracts" / contract).is_file(), contract)
+        for retired in (
+            "prompts/codex-start.md", "roles",
+            ".agents/skills/industrial-mathematical-modeling", ".agents/skills/model-race",
+        ):
+            self.assertFalse((ROOT / retired).exists(), retired)
+
+    def test_role_prompts_state_their_handoff_boundary(self):
+        engineer = (ROOT / "prompts/engineer.md").read_text(encoding="utf-8")
+        self.assertIn("不得修改模型", engineer)
+        self.assertIn("questions.md", engineer)
+        self.assertIn("MATLAB", engineer)
+        writer = (ROOT / "prompts/writer.md").read_text(encoding="utf-8")
+        self.assertIn("claim_map.md", writer)
+        self.assertIn("不得就地", writer)
+        modeler = (ROOT / "prompts/modeler.md").read_text(encoding="utf-8")
+        self.assertIn("probe", modeler)
+        self.assertIn("未决问题", modeler)
 
     def test_reviewer_paths_are_vendor_neutral_and_old_paths_are_absent(self):
         self.assertTrue((ROOT / "REVIEWER.md").is_file())
@@ -58,11 +86,13 @@ class WorkspaceContractTests(unittest.TestCase):
             ROOT / "README.md", ROOT / "AGENTS.md", ROOT / "agent.md", ROOT / "REVIEWER.md",
             ROOT / "docs/README.md", ROOT / "docs/architecture.md",
             ROOT / "protocol/competition-workflow.md", ROOT / "protocol/team-collaboration.md",
-            ROOT / "protocol/decision-log.md", ROOT / "prompts/codex-start.md", ROOT / "prompts/final-handoff.md",
+            ROOT / "protocol/decision-log.md", ROOT / "prompts/README.md", ROOT / "prompts/final-handoff.md",
+            ROOT / "prompts/modeler.md", ROOT / "prompts/engineer.md", ROOT / "prompts/writer.md",
             ROOT / "templates/independent_review_packet.md", ROOT / "templates/final_checklist.md",
-            ROOT / ".agents/skills/industrial-mathematical-modeling/SKILL.md",
-            ROOT / ".agents/skills/model-race/SKILL.md",
+            ROOT / ".agents/skills/competition-modeling/SKILL.md",
+            ROOT / ".agents/skills/competition-engineering/SKILL.md",
         ]
+        active_files.extend(sorted((ROOT / "prompts/contracts").glob("*.md")))
         active_files.extend(sorted((ROOT / "prompts/reviewer").glob("*.md")))
         active_files.extend(sorted((ROOT / "cases/examples").glob("*/reviews/README.md")))
         for path in active_files:

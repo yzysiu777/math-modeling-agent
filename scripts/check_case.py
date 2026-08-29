@@ -9,6 +9,7 @@ the corresponding stage.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -99,6 +100,17 @@ _REVIEW_METADATA_LINE = re.compile(
     + r")\s*[:：]\s*(?P<value>.*?)\s*$",
     re.IGNORECASE,
 )
+
+
+_SPEC_FM_LINE = re.compile(r"^(?P<key>[A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?P<value>.*?)\s*$")
+_SPEC_ROUTE_HEADING = re.compile(
+    r"^\s*#{2,4}\s+(?P<route>M-[A-Za-z0-9][A-Za-z0-9_-]*)(?:\s*.*)?\s*$", re.IGNORECASE
+)
+_SPEC_SELECTED_STATUS = re.compile(r"`?(?:champion|challenger)`?", re.IGNORECASE)
+_SPEC_CLAIM_ID = re.compile(r"^`?CLM-[A-Za-z0-9_-]+`?$", re.IGNORECASE)
+_SPEC_EXP_ID = re.compile(r"EXP-[A-Za-z0-9][A-Za-z0-9_-]*", re.IGNORECASE)
+_TEMPLATE_TOKEN = re.compile(r"<[^<>]{1,80}>")
+_MARKDOWN_HEADING = re.compile(r"^\s*#{1,6}\s+\S")
 
 
 @dataclass(frozen=True)
@@ -449,7 +461,48 @@ def _failure_findings(case_dir: Path) -> list[Finding]:
     ]
 
 
-def _risk_findings(checkpoint: Mapping[str, Any], stage: str) -> list[Finding]:
+def _recomputed_risks(case_dir: Path) -> dict[str, list[str]]:
+    """Collect failed recomputation checks written by the engineer.
+
+    ``scripts/model_checks.py:write_check_report`` lands one JSON file per
+    experiment.  Reading them here means a real deterministic failure raises its
+    flag on its own, instead of waiting for somebody to remember to edit
+    ``checkpoint.yaml`` during a competition.
+    """
+
+    checks_dir = case_dir / "experiments/outputs/checks"
+    if not checks_dir.is_dir():
+        return {}
+    detected: dict[str, list[str]] = {}
+    for path in sorted(checks_dir.glob("*.json")):
+        try:
+            report = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            # An unreadable report is reported separately; it must not be read
+            # as "no risk found".
+            detected.setdefault("unreadable", []).append(path.name)
+            continue
+        if not isinstance(report, Mapping):
+            detected.setdefault("unreadable", []).append(path.name)
+            continue
+        exp_id = str(report.get("exp_id", "") or path.stem).strip()
+        checks = report.get("checks")
+        if not isinstance(checks, list):
+            detected.setdefault("unreadable", []).append(path.name)
+            continue
+        for check in checks:
+            if not isinstance(check, Mapping) or check.get("passed", True):
+                continue
+            kind = str(check.get("kind", "")).strip()
+            key = kind if kind in RISK_LABELS else "infeasible" if kind == "constraint" else ""
+            if not key:
+                continue
+            name = str(check.get("name", "")).strip() or "unnamed"
+            detected.setdefault(key, []).append(f"{exp_id}:{name}")
+    return detected
+
+
+def _risk_findings(checkpoint: Mapping[str, Any], stage: str, case_dir: Path) -> list[Finding]:
     findings: list[Finding] = []
     if _is_true(checkpoint.get("performance_concern")):
         findings.append(
@@ -460,8 +513,28 @@ def _risk_findings(checkpoint: Mapping[str, Any], stage: str) -> list[Finding]:
             )
         )
     risks = _mapping(checkpoint.get("deterministic_risks"))
+    recomputed = _recomputed_risks(case_dir)
+    if "unreadable" in recomputed:
+        findings.append(
+            _finding(
+                "REMINDER", "CHECK_REPORT_UNREADABLE",
+                "复算报告无法解析：" + "、".join(recomputed.pop("unreadable"))
+                + "；不能把无法读取当成检查通过",
+                "ENGINEER", "HUMAN",
+            )
+        )
     for key, (label, node) in RISK_LABELS.items():
-        if _is_true(risks.get(key)):
+        if key in recomputed:
+            level = "BLOCK" if stage in {"paper_claims", "final"} else "REMINDER"
+            findings.append(
+                _finding(
+                    level, "DETERMINISTIC_ERROR_BLOCK",
+                    f"{label}（复算报告：" + "、".join(recomputed[key]) + "）"
+                    "；在写入强结论或最终提交前必须修复、复算或由队员明确处理",
+                    "ENGINEER", node,
+                )
+            )
+        elif _is_true(risks.get(key)):
             level = "BLOCK" if stage in {"paper_claims", "final"} else "REMINDER"
             findings.append(
                 _finding(
@@ -470,6 +543,180 @@ def _risk_findings(checkpoint: Mapping[str, Any], stage: str) -> list[Finding]:
                     "HUMAN", node,
                 )
             )
+    return findings
+
+
+def _spec_front_matter(path: Path) -> dict[str, str]:
+    """Read the small YAML header of one spec without requiring a YAML parser."""
+
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return {}
+    if not lines or lines[0].strip() != "---":
+        return {}
+    fields: dict[str, str] = {}
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        match = _SPEC_FM_LINE.match(line)
+        if match is not None:
+            fields[match.group("key").casefold()] = match.group("value").strip().strip("`'\"")
+    return fields
+
+
+def _specs_by_status(case_dir: Path) -> dict[str, set[str]]:
+    """Map route IDs to the spec statuses they already have."""
+
+    specs_dir = case_dir / "specs"
+    if not specs_dir.is_dir():
+        return {}
+    routes: dict[str, set[str]] = {}
+    for path in sorted(specs_dir.glob("SPEC-*.md")):
+        if path.name.endswith(".questions.md"):
+            continue
+        fields = _spec_front_matter(path)
+        route = fields.get("route_id", "").strip().casefold()
+        status = fields.get("status", "").strip().casefold()
+        if route and status:
+            routes.setdefault(route, set()).add(status)
+    return routes
+
+
+def _selected_routes(case_dir: Path) -> set[str]:
+    """Find routes already marked champion or challenger in the candidate pool."""
+
+    path = case_dir / "models/candidates.md"
+    if not path.is_file():
+        return set()
+    text = path.read_text(encoding="utf-8")
+    selected: set[str] = set()
+    current = ""
+    for line in text.splitlines():
+        # Any heading ends the previous route section.  Without this, prose after
+        # the last route card (for example a section explaining why M-01 is the
+        # Challenger) would be attributed to whichever route came before it.
+        if _MARKDOWN_HEADING.match(line):
+            heading = _SPEC_ROUTE_HEADING.match(line)
+            current = heading.group("route").strip().casefold() if heading else ""
+            continue
+        if current and _SPEC_SELECTED_STATUS.search(line):
+            selected.add(current)
+    return selected
+
+
+def _spec_findings(case_dir: Path, stage: str) -> list[Finding]:
+    """Remind about missing specs and about full specs that skipped their probe.
+
+    These are reminders at every stage.  A spec is a handoff aid, not a gate:
+    blocking on it would turn the lightweight contract into the heavyweight
+    pipeline this workspace deliberately moved away from.
+    """
+
+    if stage == "exploration":
+        return []
+    findings: list[Finding] = []
+    specs = _specs_by_status(case_dir)
+    for route in sorted(_selected_routes(case_dir)):
+        statuses = specs.get(route, set())
+        if "full" not in statuses:
+            findings.append(
+                _finding(
+                    "REMINDER", "SPEC_MISSING",
+                    f"路线 {route.upper()} 已选为 champion/challenger，但 specs/ 中没有 status: full 的实现规格；"
+                    "编程手需要规格才能忠实实现",
+                    "MODELER", "HUMAN",
+                )
+            )
+    for route, statuses in sorted(specs.items()):
+        if "full" in statuses and "probe" not in statuses:
+            findings.append(
+                _finding(
+                    "REMINDER", "PROBE_MISSING",
+                    f"路线 {route.upper()} 直接进入 full 规格，没有对应的 probe 规格；"
+                    "请确认这是题面指定方法，否则先用轻测试证伪",
+                    "MODELER", "HUMAN",
+                )
+            )
+    return findings
+
+
+def _claim_map_findings(case_dir: Path, stage: str) -> list[Finding]:
+    """Check that paper numbers resolve to experiments that actually exist."""
+
+    if stage not in {"paper_claims", "final"}:
+        return []
+    level = "BLOCK" if stage == "final" else "REMINDER"
+    path = case_dir / "paper/claim_map.md"
+    if not path.is_file():
+        return [
+            _finding(
+                level, "HUMAN_DECISION_REQUIRED",
+                "paper/claim_map.md 不存在；论文强主张必须能追溯到实验和数据文件",
+                "WRITER", "HUMAN",
+            )
+        ]
+
+    text = path.read_text(encoding="utf-8")
+    rows = [
+        cells for cells in (_split_pipe_row(line) for line in text.splitlines())
+        if cells and not _is_table_separator(cells)
+    ]
+    # The seeded template ships one all-placeholder row; it means "nobody has
+    # filled this in yet", which is a different message from "a claim exists but
+    # does not resolve".
+    claims = [
+        cells for cells in rows
+        if _SPEC_CLAIM_ID.match(cells[0].strip())
+        and any(_has_value(_TEMPLATE_TOKEN.sub("", cell)) for cell in cells[1:])
+    ]
+    if not claims:
+        return [
+            _finding(
+                level, "HUMAN_DECISION_REQUIRED",
+                "paper/claim_map.md 没有任何已填写的 CLM- 记录；论文里的数字尚未建立溯源",
+                "WRITER", "HUMAN",
+            )
+        ]
+
+    board = case_dir / "experiments/board.md"
+    known = set()
+    if board.is_file():
+        for row in parse_markdown_table(board.read_text(encoding="utf-8")):
+            exp_id = str(row.get("实验 ID", "")).strip().casefold()
+            if exp_id:
+                known.add(exp_id)
+
+    findings: list[Finding] = []
+    dangling: list[str] = []
+    stale: list[str] = []
+    for cells in claims:
+        claim_id = cells[0].strip()
+        joined = _TEMPLATE_TOKEN.sub("", " ".join(cells))
+        referenced = {match.group(0).casefold() for match in _SPEC_EXP_ID.finditer(joined)}
+        if not referenced:
+            dangling.append(f"{claim_id}(无 EXP-ID)")
+        elif known and not (referenced & known):
+            dangling.append(f"{claim_id}->{'、'.join(sorted(referenced))}")
+        if "stale" in joined.casefold():
+            stale.append(claim_id)
+
+    if dangling:
+        findings.append(
+            _finding(
+                level, "HUMAN_DECISION_REQUIRED",
+                "claim_map 中以下主张无法追溯到实验板里的实验：" + "、".join(dangling),
+                "WRITER", "C3",
+            )
+        )
+    if stale:
+        findings.append(
+            _finding(
+                level, "HUMAN_DECISION_REQUIRED",
+                "claim_map 中以下主张仍标记为 stale，对应数字或图已过期：" + "、".join(stale),
+                "WRITER", "HUMAN",
+            )
+        )
     return findings
 
 
@@ -672,7 +919,9 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
         )
 
     findings.extend(_failure_findings(case_dir))
-    findings.extend(_risk_findings(checkpoint, stage))
+    findings.extend(_risk_findings(checkpoint, stage, case_dir))
+    findings.extend(_spec_findings(case_dir, stage))
+    findings.extend(_claim_map_findings(case_dir, stage))
 
     missing_comparison = _comparison_missing(case_dir)
     if missing_comparison:

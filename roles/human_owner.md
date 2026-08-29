@@ -1,4 +1,0 @@
-# Human Owner
-
-负责题意关键歧义、目标、比赛策略、Champion 取舍、争议假设、Independent Reviewer 建议、官方规则、
-AI 使用说明和最终提交。模型、脚本和审核报告都只能提供证据，不能替代人工决定。

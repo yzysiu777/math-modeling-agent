@@ -1,0 +1,7 @@
+instance,demand_id,facility_id,cost_yuan
+base,d1,A,1
+base,d2,B,1
+base,d3,B,2
+capacity_edge,d1,A,1
+capacity_edge,d2,B,1
+capacity_edge,d3,B,2

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Competition Engineering"
+  short_description: "Faithful spec implementation, recomputation and figures"
+  default_prompt: "Use $competition-engineering to implement a modeling spec in Python or MATLAB, recompute the results independently and produce the required figures."
+
+policy:
+  allow_implicit_invocation: true

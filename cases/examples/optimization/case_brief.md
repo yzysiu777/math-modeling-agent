@@ -1,6 +1,6 @@
 # 案例简报：容量受限的服务点分配
 
-- 案例 ID：demo-optimization
+- 案例 ID：optimization
 - 当前路由：`optimization`
 - 子问题：将三个需求点分配给两个服务点
 - 输入：需求点—服务点成本、服务点容量

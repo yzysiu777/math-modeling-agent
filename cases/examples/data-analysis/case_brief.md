@@ -1,6 +1,6 @@
 # 案例简报：按时间预测需求
 
-- 案例 ID：demo-data-analysis
+- 案例 ID：data-analysis
 - 当前路由：`data_analysis`
 - 子问题：用历史观测预测后续需求
 - 输入：按时间排序的实体观测、特征和标签

@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -32,6 +33,39 @@ class CaseCheckTests(unittest.TestCase):
                 "confirmed_by": "队长",
                 "note": note,
             },
+        )
+
+    @staticmethod
+    def set_claim_map(case, exp_id="EXP-001", status="verified"):
+        (case / "paper/claim_map.md").write_text(
+            "# 论文数字溯源表\n\n"
+            "| Claim ID | 论文位置 | 主张原文 | 强度 | 来源 EXP-ID | 数据文件 | 图/表 ID | 复算报告 | 状态 |\n"
+            "|---|---|---|---|---|---|---|---|---|\n"
+            f"| CLM-001 | 摘要 | 在 12 个算例上均得到可行解 | 可行解 | {exp_id} | "
+            f"outputs/data/{exp_id}_solution.csv | FIG-001 | outputs/checks/{exp_id}.json | {status} |\n",
+            encoding="utf-8",
+        )
+
+    @staticmethod
+    def set_board_experiment(case, exp_id="EXP-001"):
+        (case / "experiments/board.md").write_text(
+            "# 实验赛马板\n\n"
+            "| 实验 ID | 候选路线 | 要回答的问题 | 最小配置 | 数据/实例范围 | 指标 | 预计成本 | status | 结果摘要 | 是否继续 | 下一项信息价值最高的实验 |\n"
+            "|---|---|---|---|---|---|---|---|---|---|---|\n"
+            f"| {exp_id} | M-01 | baseline 是否可行 | toy | toy instance | 成本 | low | done | 可行 | yes | 与枚举比较 |\n",
+            encoding="utf-8",
+        )
+
+    @staticmethod
+    def write_check_report(case, exp_id="EXP-001", kind="constraint", passed=False):
+        target = case / "experiments/outputs/checks"
+        target.mkdir(parents=True, exist_ok=True)
+        (target / f"{exp_id}.json").write_text(
+            json.dumps({
+                "exp_id": exp_id, "spec_id": "SPEC-A1-M01", "passed": passed,
+                "checks": [{"name": "capacity", "kind": kind, "passed": passed, "detail": "over capacity"}],
+            }, ensure_ascii=False),
+            encoding="utf-8",
         )
 
     @staticmethod
@@ -262,6 +296,8 @@ class CaseCheckTests(unittest.TestCase):
             self.add_decision(case, "C1")
             self.add_decision(case, "C2")
             self.add_decision(case, "C3")
+            self.set_board_experiment(case)
+            self.set_claim_map(case)
             report = check_case(case, "final")
         self.assertEqual(report.findings, ())
         self.assertEqual(report.exit_code, 0)
@@ -460,6 +496,157 @@ class CaseCheckTests(unittest.TestCase):
             self.update_checkpoint(case, case_id="another-case")
             report = check_case(case, "exploration")
         self.assertTrue(any(f.code == "CASE_ID_MISMATCH" and f.blocks for f in report.findings))
+
+
+    # --- 三角色重构新增的检查 ---
+
+    def test_failed_recompute_report_raises_the_risk_without_touching_checkpoint(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            self.write_check_report(case, kind="objective_mismatch", passed=False)
+            report = check_case(case, "model_selection")
+        codes = [f.code for f in report.findings]
+        self.assertIn("DETERMINISTIC_ERROR_BLOCK", codes)
+        risk = next(f for f in report.findings if f.code == "DETERMINISTIC_ERROR_BLOCK")
+        self.assertEqual(risk.owner, "ENGINEER")
+        self.assertIn("EXP-001:capacity", risk.reason)
+        self.assertFalse(risk.blocks)
+
+    def test_failed_recompute_report_blocks_paper_claims(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            self.add_review(case, "C3")
+            self.write_check_report(case, kind="leakage", passed=False)
+            report = check_case(case, "paper_claims")
+        risk = next(f for f in report.findings if f.code == "DETERMINISTIC_ERROR_BLOCK")
+        self.assertTrue(risk.blocks)
+
+    def test_passing_recompute_report_raises_nothing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            self.write_check_report(case, passed=True)
+            report = check_case(case, "model_selection")
+        self.assertNotIn("DETERMINISTIC_ERROR_BLOCK", [f.code for f in report.findings])
+
+    def test_unreadable_recompute_report_is_not_treated_as_a_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            target = case / "experiments/outputs/checks"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "EXP-009.json").write_text("{not json", encoding="utf-8")
+            report = check_case(case, "model_selection")
+        self.assertIn("CHECK_REPORT_UNREADABLE", [f.code for f in report.findings])
+
+    def test_selected_route_without_full_spec_is_reminded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            (case / "models/candidates.md").write_text(
+                "# 候选路线池\n\n## M-01：baseline\n\n- 状态：`champion`\n",
+                encoding="utf-8",
+            )
+            report = check_case(case, "model_selection")
+        finding = next(f for f in report.findings if f.code == "SPEC_MISSING")
+        self.assertEqual(finding.owner, "MODELER")
+        self.assertFalse(finding.blocks)
+
+    def test_full_spec_without_probe_is_reminded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            (case / "specs/SPEC-A1-M01.md").write_text(
+                "---\nspec_id: SPEC-A1-M01\nroute_id: M-01\nstatus: full\nlanguage: python\n---\n",
+                encoding="utf-8",
+            )
+            report = check_case(case, "model_selection")
+        self.assertIn("PROBE_MISSING", [f.code for f in report.findings])
+
+    def test_probe_then_full_spec_is_not_reminded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            for status in ("probe", "full"):
+                (case / f"specs/SPEC-A1-M01-{status}.md").write_text(
+                    f"---\nspec_id: SPEC-A1-M01-{status}\nroute_id: M-01\nstatus: {status}\n"
+                    "language: python\n---\n",
+                    encoding="utf-8",
+                )
+            report = check_case(case, "model_selection")
+        self.assertNotIn("PROBE_MISSING", [f.code for f in report.findings])
+
+    def test_prose_after_the_last_route_card_is_not_attributed_to_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            (case / "models/candidates.md").write_text(
+                "# 候选路线池\n\n"
+                "## M-01：baseline\n\n- 状态：`candidate`\n\n"
+                "## M-02：另一条\n\n- 状态：`candidate`\n\n"
+                "## 为什么 Challenger 是 M-01\n\nChallenger 的作用是保险。\n",
+                encoding="utf-8",
+            )
+            report = check_case(case, "model_selection")
+        self.assertNotIn("SPEC_MISSING", [f.code for f in report.findings])
+
+    def test_spec_reminders_do_not_fire_during_exploration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            (case / "models/candidates.md").write_text(
+                "# 候选路线池\n\n## M-01：baseline\n\n- 状态：`champion`\n", encoding="utf-8",
+            )
+            report = check_case(case, "exploration")
+        self.assertNotIn("SPEC_MISSING", [f.code for f in report.findings])
+
+    def test_unfilled_claim_map_blocks_final_but_only_reminds_at_paper_claims(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            self.add_review(case, "C3")
+            reminder = check_case(case, "paper_claims")
+            self.add_review(case, "C1")
+            self.add_review(case, "C2")
+            for node in ("C1", "C2", "C3"):
+                self.add_decision(case, node)
+            blocked = check_case(case, "final")
+        claim_reminders = [f for f in reminder.findings if "claim_map" in f.reason]
+        self.assertTrue(claim_reminders)
+        self.assertFalse(claim_reminders[0].blocks)
+        self.assertTrue(any("claim_map" in f.reason and f.blocks for f in blocked.findings))
+
+    def test_claim_referencing_an_unknown_experiment_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            self.add_review(case, "C3")
+            self.set_board_experiment(case, "EXP-001")
+            self.set_claim_map(case, exp_id="EXP-777")
+            report = check_case(case, "paper_claims")
+        self.assertTrue(any("无法追溯" in f.reason for f in report.findings))
+
+    def test_stale_claim_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            self.add_review(case, "C3")
+            self.set_board_experiment(case)
+            self.set_claim_map(case, status="stale")
+            report = check_case(case, "paper_claims")
+        self.assertTrue(any("stale" in f.reason for f in report.findings))
 
 
 if __name__ == "__main__":
