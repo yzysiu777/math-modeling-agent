@@ -29,11 +29,11 @@ ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_FILES = (
     "README.md", "AGENTS.md", "agent.md", "CLAUDE.md",
     "protocol/competition-workflow.md", "protocol/team-collaboration.md",
-    "templates/case_brief.md", "templates/model_candidate.md",
+    "templates/case_brief.md", "templates/checkpoint.yaml", "templates/model_candidate.md",
     "templates/model_comparison.md", "templates/experiment_board.md",
     "templates/decision_log.md", "templates/claude_review_packet.md",
     "templates/final_checklist.md", "scripts/router.py", "scripts/create_case.py",
-    "scripts/model_checks.py", "scripts/model_pool.py", "scripts/experiment_board.py", "scripts/run_demos.py",
+    "scripts/model_checks.py", "scripts/model_pool.py", "scripts/experiment_board.py", "scripts/check_case.py", "scripts/run_demos.py",
     ".agents/skills/industrial-mathematical-modeling/references/optimization-method-cards.md",
     ".agents/skills/industrial-mathematical-modeling/references/data-analysis-method-cards.md",
     ".agents/skills/industrial-mathematical-modeling/references/hybrid-method-cards.md",

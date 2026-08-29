@@ -25,6 +25,11 @@ def _board_seed() -> str:
     return (TEMPLATES / "experiment_board.md").read_text(encoding="utf-8")
 
 
+def _checkpoint_seed(case_id: str, route: str) -> str:
+    checkpoint = (TEMPLATES / "checkpoint.yaml").read_text(encoding="utf-8")
+    return checkpoint.replace("<case_id>", case_id).replace("<route>", route)
+
+
 def create_case(case_id: str, route: str, cases_root: Path = ROOT / "cases") -> Path:
     if not CASE_ID.fullmatch(case_id):
         raise ValueError("case-id must be 2-64 ASCII letters, digits, '-' or '_'")
@@ -45,6 +50,7 @@ def create_case(case_id: str, route: str, cases_root: Path = ROOT / "cases") -> 
     (case_dir / "models/candidates.md").write_text(_candidate_seed(route), encoding="utf-8")
     (case_dir / "models/comparison.md").write_text(_comparison_seed(), encoding="utf-8")
     (case_dir / "experiments/board.md").write_text(_board_seed(), encoding="utf-8")
+    (case_dir / "checkpoint.yaml").write_text(_checkpoint_seed(case_id, route), encoding="utf-8")
     (case_dir / "decisions.md").write_text((TEMPLATES / "decision_log.md").read_text(encoding="utf-8"), encoding="utf-8")
     (case_dir / "reviews/README.md").write_text("# 审核记录\n\n保存 C1、C2、C3 的精简报告和队员决定。\n", encoding="utf-8")
     (case_dir / "paper/README.md").write_text("# 案例论文\n\n在这里记录本案例与根 `paper/` 工程的章节、图表和引用对应关系。\n", encoding="utf-8")

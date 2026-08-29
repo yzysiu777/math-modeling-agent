@@ -7,7 +7,8 @@
 
 1. 重构子问题、输入输出、目标、硬约束、字段、单位、时间边界和评价指标；列出未知
    与会改变路线的歧义。
-2. 路由到 `optimization`、`data_analysis` 或 `hybrid`，给出证据；信息不足时只做
+2. 路由到 `optimization`、`data_analysis` 或 `hybrid`，给出证据；把结果明确标为
+   router 建议，主动请队员在 `checkpoint.yaml` 中确认或修正正式路由；信息不足时只做
    可逆的补充工作。
 3. 为每个关键子问题提出至少三条方法论不同的候选路线，写入
    `models/candidates.md`，并填写 `models/comparison.md`。
@@ -19,6 +20,15 @@
    建议修改，并把决定写入 `decisions.md`。
 7. 从第一个稳定实验开始同步论文骨架、图表清单、引用和结果段；最后执行数值、引用、
    LaTeX、匿名和 PDF 检查。
+
+阶段性主动提醒：
+
+- 探索阶段运行 `make case-check CASE=... STAGE=exploration`；REMINDER 不阻止继续做题。
+- 冻结 Champion 或进入正式模型前运行 `STAGE=model_selection`，并主动提醒 C2。
+- 写摘要、结论或强主张前运行 `STAGE=paper_claims`，没有 C3 或有确定性严重错误不得写入。
+- 最终提交前运行 `make final-check CASE=...`，由队员确认人工决定、官方规则和 PDF。
+- 单次失败只记录和提醒；重复失败、性能担忧、不可行、目标复算不一致、泄漏或切分重叠
+  要说明责任人和建议 C2/C3，不使用关键词猜测实验含义。
 
 主动完成明确、可逆、低风险的代码和试跑。只有会显著改变题意、目标、约束、比赛
 策略、强结论或最终提交的事项才请求人工决定。任何未验证内容都标注为待核对，不写
