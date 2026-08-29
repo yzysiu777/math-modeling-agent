@@ -27,11 +27,11 @@ except ImportError:  # pragma: no cover
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_FILES = (
-    "README.md", "AGENTS.md", "agent.md", "CLAUDE.md",
+    "README.md", "AGENTS.md", "agent.md", "REVIEWER.md",
     "protocol/competition-workflow.md", "protocol/team-collaboration.md",
     "templates/case_brief.md", "templates/checkpoint.yaml", "templates/model_candidate.md",
     "templates/model_comparison.md", "templates/experiment_board.md",
-    "templates/decision_log.md", "templates/claude_review_packet.md",
+    "templates/decision_log.md", "templates/independent_review_packet.md",
     "templates/final_checklist.md", "scripts/router.py", "scripts/create_case.py",
     "scripts/model_checks.py", "scripts/model_pool.py", "scripts/experiment_board.py", "scripts/check_case.py", "scripts/run_demos.py",
     ".agents/skills/industrial-mathematical-modeling/references/optimization-method-cards.md",
@@ -45,9 +45,17 @@ REQUIRED_SKILLS = (
     ".agents/skills/competition-paper-writing/SKILL.md",
 )
 REQUIRED_PROMPTS = (
-    "prompts/codex-start.md", "prompts/claude/C1_problem_challenge.md",
-    "prompts/claude/C2_model_challenge.md", "prompts/claude/C3_results_challenge.md",
-    "prompts/claude/README.md",
+    "prompts/codex-start.md", "prompts/reviewer/C1_problem_challenge.md",
+    "prompts/reviewer/C2_model_challenge.md", "prompts/reviewer/C3_results_challenge.md",
+    "prompts/reviewer/README.md",
+)
+RETIRED_REVIEWER_PATHS = (
+    "CLAUDE.md", "prompts/claude", "templates/claude_review_packet.md",
+)
+REVIEWER_ACTIVE_FILES = (
+    "REVIEWER.md", "templates/independent_review_packet.md",
+    "prompts/reviewer/README.md", "prompts/reviewer/C1_problem_challenge.md",
+    "prompts/reviewer/C2_model_challenge.md", "prompts/reviewer/C3_results_challenge.md",
 )
 REQUIRED_EXAMPLES = (
     "cases/examples/optimization/case_brief.md",
@@ -119,6 +127,19 @@ def validate_examples() -> List[str]:
 
 def validate_static_contract() -> List[str]:
     errors = [f"missing required file: {path}" for path in _missing(REQUIRED_FILES + REQUIRED_SKILLS + REQUIRED_PROMPTS)]
+    for relative in RETIRED_REVIEWER_PATHS:
+        if (ROOT / relative).exists():
+            errors.append(f"retired reviewer path is still active: {relative}")
+    for relative in REVIEWER_ACTIVE_FILES:
+        path = ROOT / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "Claude" in text or "CLAUDE" in text:
+            errors.append(f"active reviewer file still names a retired vendor: {relative}")
+        for marker in ("reviewer_provider", "reviewer_model", "review_session", "saw_main_conversation", "critical_node"):
+            if marker not in text:
+                errors.append(f"active reviewer file missing metadata marker {marker}: {relative}")
     errors.extend(validate_official_profiles())
     errors.extend(validate_examples())
     readme = ROOT / "README.md"

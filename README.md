@@ -6,8 +6,9 @@
 - 数据分析：清洗、统计、回归、分类、聚类、预测、时序与可解释性；
 - 混合建模：数据模型生成参数、预测或场景，优化模型完成决策。
 
-Codex 负责题意重构、候选模型、代码、实验和论文初稿；Claude 由队员在 C1、C2、C3
-三个关键节点手动调用；队员决定关键假设、路线取舍、强结论和最终提交。
+Codex 负责题意重构、候选模型、代码、实验和论文初稿；Independent Reviewer 由队员在
+C1、C2、C3 三个关键节点手动触发；队员决定关键假设、路线取舍、强结论和最终提交。
+审核者可以是 Gemini、Grok、隔离的新 Codex 任务、其他模型或人类专家，不绑定任何厂商。
 
 ## 1. 启用工作台
 
@@ -76,7 +77,7 @@ cases/huawei-cup-2026-a/input/
   -> 可解释 baseline
   -> 小实验赛马
   -> Champion / Challenger
-  -> Claude 关键挑战
+  -> Independent Reviewer 关键挑战
   -> 正式模型与稳健性实验
   -> 阶段提醒与人工决定
   -> 论文同步写作
@@ -115,18 +116,21 @@ path-flow 与 time-indexed 表述仍需 C2 和队员进行语义审查。
 - `experiments/board.md`：实验问题、配置、结果和下一步；
 - `decisions.md`：影响路线或论文强结论的人工决定。
 
-### 第四步：Claude 关键挑战
+### 第四步：Independent Reviewer 关键挑战
 
-Claude 不接管主解，只审核关键节点：
+Independent Reviewer 不接管主解，只审核关键节点。每次使用新会话和精简审核包，不能
+传递主解完整聊天或隐藏推理；同厂商不同模型也不能自动等同于完整独立性：
 
 | 节点 | 使用时机 | 提示词 |
 |---|---|---|
-| C1 | 题意、目标或硬约束存在关键歧义 | `prompts/claude/C1_problem_challenge.md` |
-| C2 | 候选路线形成，准备确定主架构 | `prompts/claude/C2_model_challenge.md` |
-| C3 | 主要结果稳定，准备写摘要和结论 | `prompts/claude/C3_results_challenge.md` |
+| C1 | 题意、目标或硬约束存在关键歧义 | `prompts/reviewer/C1_problem_challenge.md` |
+| C2 | 候选路线形成，准备确定主架构 | `prompts/reviewer/C2_model_challenge.md` |
+| C3 | 主要结果稳定，准备写摘要和结论 | `prompts/reviewer/C3_results_challenge.md` |
 
-让 Codex 按 `templates/claude_review_packet.md` 生成精简材料，人工复制到新的 Claude
-会话。队员将采纳或拒绝理由写入 `decisions.md`，再让 Codex 实施修改和针对性复算。
+让 Codex 按 `templates/independent_review_packet.md` 生成精简材料，人工复制到新的审核
+会话。包和报告注明 `reviewer_provider`、`reviewer_model`、`review_session: fresh`、
+`saw_main_conversation: false` 和 `critical_node`。队员将采纳或拒绝理由写入
+`decisions.md`，再让 Codex 实施修改和针对性复算。
 Codex 应在 C1/C2/C3 到达适用节点时主动提醒，不等待队员记起；单次失败只提醒，重复失败
 或确定性错误则升级到人工和相应审核节点。
 
@@ -173,7 +177,7 @@ cases/<case_id>/
 │   ├── code/                 可运行代码
 │   └── outputs/              关键结果和图表数据
 ├── decisions.md              路线与强结论的人工决定
-├── reviews/                  Claude C1/C2/C3 报告
+├── reviews/                  Independent Reviewer C1/C2/C3 报告
 └── paper/                    案例与根论文工程的对应说明
 ```
 
@@ -184,11 +188,11 @@ cases/<case_id>/
 ```text
 agent/
 ├── AGENTS.md                 Codex 自动读取的项目规则
-├── CLAUDE.md                 Claude 独立挑战边界
+├── REVIEWER.md               Independent Reviewer 独立审核边界
 ├── agent.md                  Codex 详细执行协议
 ├── .agents/skills/           Codex 自动发现的建模、赛马和论文 Skill
 ├── cases/                    真实案例与通用演示
-├── prompts/                  Codex 启动和 Claude C1/C2/C3 提示词
+├── prompts/                  Codex 启动和 Independent Reviewer C1/C2/C3 提示词
 ├── templates/                案例、候选路线、实验和审核包模板
 ├── scripts/                  初始化、结构检查和数值检查
 ├── paper/                    XeLaTeX 论文工程
@@ -231,7 +235,7 @@ make final-check CASE=cases/<case_id>
 
 这些脚本检查明显缺失、重复、数据泄漏、约束和目标值，不判断模型在科学意义上是否
 正确。案例检查还会提醒路由确认、C1/C2/C3、失败模式和人工决定；方法论差异和强结论
-仍需 Codex、Claude 与队员共同判断。
+仍需 Codex、Independent Reviewer 与队员共同判断。
 
 ## 7. 团队 Git 协作
 
@@ -240,7 +244,7 @@ make final-check CASE=cases/<case_id>
 - `model/<任务>`：模型、公式和算法；
 - `analysis/<任务>`：数据、实验和图表；
 - `paper/<章节>`：论文内容和排版；
-- `review/<编号>`：Claude 意见处理和复算。
+- `review/<编号>`：Independent Reviewer 意见处理和复算。
 
 每次提交写清改变内容、实验结果和下一步。同一份 `.tex` 或 Markdown 文件同一时间只
 安排一个主要写入者，减少比赛期间的合并冲突。
@@ -262,9 +266,9 @@ make final-check CASE=cases/<case_id>
 
 用 `insufficient_information` 创建案例，让 Codex 先读取题面后再更新路由。
 
-### Claude 是否需要 API
+### Independent Reviewer 是否需要 API
 
-不需要。当前采用人工复制精简审核包的方式，不自动调用 Claude API。
+不需要。当前采用人工复制精简审核包的方式，不自动调用任何模型 API，也不需要密钥。
 
 ### 最终 PDF 是否可以直接提交
 

@@ -52,7 +52,13 @@ def create_case(case_id: str, route: str, cases_root: Path = ROOT / "cases") -> 
     (case_dir / "experiments/board.md").write_text(_board_seed(), encoding="utf-8")
     (case_dir / "checkpoint.yaml").write_text(_checkpoint_seed(case_id, route), encoding="utf-8")
     (case_dir / "decisions.md").write_text((TEMPLATES / "decision_log.md").read_text(encoding="utf-8"), encoding="utf-8")
-    (case_dir / "reviews/README.md").write_text("# 审核记录\n\n保存 C1、C2、C3 的精简报告和队员决定。\n", encoding="utf-8")
+    (case_dir / "reviews/README.md").write_text(
+        "# Independent Reviewer 审核记录\n\n"
+        "保存队员手动触发的 C1、C2、C3 精简审核报告和决定。审核者可以是任意可用模型或人类专家；\n"
+        "报告应注明 reviewer_provider、reviewer_model、review_session: fresh、\n"
+        "saw_main_conversation: false 和 critical_node。\n",
+        encoding="utf-8",
+    )
     (case_dir / "paper/README.md").write_text("# 案例论文\n\n在这里记录本案例与根 `paper/` 工程的章节、图表和引用对应关系。\n", encoding="utf-8")
     (case_dir / "input/README.md").write_text("# 原始输入\n\n把题面和附件放在这里并保持只读，记录来源和字段说明。\n", encoding="utf-8")
     return case_dir

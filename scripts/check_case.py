@@ -560,7 +560,7 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
         findings.append(
             _finding(
                 "REMINDER", "C1_RECOMMENDED",
-                f"C1 题意挑战尚未留下有效报告（{c1_detail}）；请由队员判断歧义并可手动触发 Claude C1",
+                f"C1 题意挑战尚未留下有效报告（{c1_detail}）；请由队员判断歧义并可手动触发 Independent Reviewer C1",
                 "HUMAN", "C1",
             )
         )
@@ -575,7 +575,7 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
         findings.append(
             _finding(
                 "REMINDER", "C2_RECOMMENDED",
-                f"进入正式模型/路线取舍阶段但没有有效 C2 报告（{c2_detail}）；请由队员触发 Claude C2",
+                f"进入正式模型/路线取舍阶段但没有有效 C2 报告（{c2_detail}）；请由队员触发 Independent Reviewer C2",
                 "HUMAN", "C2",
             )
         )

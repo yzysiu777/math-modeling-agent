@@ -19,16 +19,20 @@
 ## 默认职责
 
 - Codex：题意重构、路线生成、代码、实验、结果解释和论文初稿；
-- Claude：C1 题意、C2 架构、C3 结果与强结论挑战；
-- 队员：关键歧义、路线取舍、Claude 建议、官方规则和最终提交；
+- Independent Reviewer：C1 题意、C2 架构、C3 结果与强结论挑战；
+- 队员：关键歧义、路线取舍、Independent Reviewer 建议、官方规则和最终提交；
 - 脚本：结构、数据切分、约束、目标值、LaTeX 和 PDF 的确定性检查。
 
 ## 人工确认与主动提醒
 
 - router 输出必须明确是建议，不是已确认路由；Codex 应主动请队员确认，而不是把建议
   当成正式路线继续冻结。
-- C1/C2/C3 到达适用节点时，Codex 主动生成精简审核包并提醒队员手动触发 Claude；报告
-  和队员接受/拒绝/延期决定分别保存在案例中。
+- C1/C2/C3 到达适用节点时，Codex 主动生成精简审核包并提醒队员手动触发 Independent
+  Reviewer；报告和队员接受/拒绝/延期决定分别保存在案例中。
+- Independent Reviewer 可以由 Gemini、Grok、隔离的新 Codex 任务、其他模型或人类专家承担；
+  `reviewer_provider` 只是可扩展的报告字段，不是身份认证或厂商白名单。
+- 审核必须使用新会话、精简审核包、`review_session: fresh` 和
+  `saw_main_conversation: false`；同厂商不同模型不能自动等同于完整独立性。
 - 单次失败、重复失败、效果担忧、不可行、目标复算不一致、切分重叠或泄漏出现时，主动
   说明责任人和建议节点。普通可逆探索继续进行，不因提醒停止全部工作。
 - 论文进入摘要、结论或其他强主张前运行 `make case-check CASE=... STAGE=paper_claims`；
@@ -40,7 +44,7 @@ Codex 主动完成范围明确、可逆的分析、编码、试跑和论文更�
 
 - 题意歧义会改变目标或硬约束；
 - Champion/Challenger 的取舍主要取决于比赛策略；
-- Claude 提出的反例会改变模型架构；
+- Independent Reviewer 提出的反例会改变模型架构；
 - 强结论是否进入摘要或结论；
 - 当届官方格式、AI 说明和最终提交文件。
 

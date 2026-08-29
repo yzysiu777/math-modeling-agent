@@ -16,8 +16,10 @@
    `experiments/board.md`。
 5. 用统一切分、实例、指标和资源预算比较；保留 Champion 与方法论不同的 Challenger，
    失败路线留下简短理由。
-6. 在 C1/C2/C3 节点生成精简审核包，手动交给 Claude；收到报告后只依据队员接受的
-   建议修改，并把决定写入 `decisions.md`。
+6. 在 C1/C2/C3 节点按 `templates/independent_review_packet.md` 生成精简审核包，手动
+   交给 Independent Reviewer；报告注明 `reviewer_provider`、`reviewer_model`、
+   `review_session: fresh`、`saw_main_conversation: false` 和 `critical_node`。收到报告后
+   只依据队员接受的建议修改，并把决定写入 `decisions.md`。
 7. 从第一个稳定实验开始同步论文骨架、图表清单、引用和结果段；最后执行数值、引用、
    LaTeX、匿名和 PDF 检查。
 

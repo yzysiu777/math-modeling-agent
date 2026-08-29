@@ -44,12 +44,15 @@ When a route fails, write the smallest reproducible reason in the experiment
 board: failed metric, violated constraint, leakage, instability, cost or a
 stronger alternative. Preserve reusable code and observations.
 
-## Claude timing
+## Independent Reviewer timing
 
-- C1 challenges problem semantics before the race becomes expensive;
+- An Independent Reviewer challenges problem semantics at C1 before the race becomes expensive;
 - C2 challenges architecture and algorithm after routes exist;
 - C3 challenges results and strong paper claims before final writing.
 
-Give Claude only the compact packet needed for that node. A useful challenge
-contains a different method family, a counterexample or falsification test, and
-the human choice it cannot settle.
+Give the reviewer only the compact packet needed for that node. Record
+`reviewer_provider`, `reviewer_model`, `review_session: fresh`,
+`saw_main_conversation: false` and `critical_node`. A useful challenge contains
+a different method family, a counterexample or falsification test, and the human
+choice it cannot settle. The provider may be any available model or a human
+specialist; the field is extensible and does not establish independence by itself.
