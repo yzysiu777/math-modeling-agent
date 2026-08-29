@@ -42,13 +42,30 @@ class CaseCheckTests(unittest.TestCase):
         )
 
     @staticmethod
-    def add_review(case, node, content=None):
-        content = content or (
-            f"# {node} 审核\n\n"
-            "结论：当前范围内可以继续。\n"
-            "已检查：题面、模型与关键结果。\n"
-            "未检查：完整规模实验与最终提交。\n"
+    def review_metadata(node):
+        return (
+            f"Review ID: review-{node.lower()}-001\n"
+            "Case ID: case-check\n"
+            "Reviewer provider: human_specialist\n"
+            "Reviewer model: review-model\n"
+            "Review session: fresh\n"
+            "Saw main conversation: false\n"
+            f"Critical node: {node}\n"
         )
+
+    @classmethod
+    def valid_review(cls, node, checked_label="What was checked", unchecked_label="What was not checked"):
+        return (
+            f"# {node} 审核\n\n"
+            + cls.review_metadata(node)
+            + "Verdict: PASS_WITH_LIMITATIONS\n"
+            + f"{checked_label}: 题面、模型与关键结果。\n"
+            + f"{unchecked_label}: 完整规模实验与最终提交。\n"
+        )
+
+    @staticmethod
+    def add_review(case, node, content=None):
+        content = content or CaseCheckTests.valid_review(node)
         (case / "reviews" / f"{node}_review.md").write_text(content, encoding="utf-8")
 
     @staticmethod
@@ -93,6 +110,77 @@ class CaseCheckTests(unittest.TestCase):
             report = check_case(case, "exploration")
         self.assertEqual(report.exit_code, 1)
         self.assertTrue(any(f.code == "ROUTE_CONFIRMATION_REQUIRED" and f.blocks for f in report.findings))
+
+    def test_new_prompt_fixed_output_is_valid_for_each_review_node(self):
+        for node in ("C1", "C2", "C3"):
+            with self.subTest(node=node):
+                with tempfile.TemporaryDirectory() as directory:
+                    case = self.make_case(directory)
+                    self.add_review(case, node)
+                    valid, detail = _valid_review(case, node)
+                self.assertTrue(valid, detail)
+
+    def test_review_parser_accepts_underscore_scope_labels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.add_review(
+                case,
+                "C3",
+                self.valid_review("C3", "what_was_checked", "what_was_not_checked"),
+            )
+            valid, detail = _valid_review(case, "C3")
+        self.assertTrue(valid, detail)
+
+    def test_review_parser_accepts_underscore_metadata_labels(self):
+        content = (
+            "# C3\n"
+            "review_id: review-c3-yaml\n"
+            "case_id: case-check\n"
+            "reviewer_provider: human_specialist\n"
+            "reviewer_model: review-model\n"
+            "review_session: fresh\n"
+            "saw_main_conversation: false\n"
+            "critical_node: C3\n"
+            "verdict: PASS_WITH_LIMITATIONS\n"
+            "what_was_checked: 题面、模型与关键结果\n"
+            "what_was_not_checked: 完整规模实验与最终提交\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.add_review(case, "C3", content)
+            valid, detail = _valid_review(case, "C3")
+        self.assertTrue(valid, detail)
+
+    def test_reviewer_metadata_is_required_and_bound_to_case_and_node(self):
+        base = self.valid_review("C3")
+        replacements = (
+            ("Reviewer provider: human_specialist", "Reviewer provider: TODO"),
+            ("Reviewer model: review-model", "Reviewer model: <实际模型>"),
+            ("Review session: fresh", "Review session: reused"),
+            ("Saw main conversation: false", "Saw main conversation: true"),
+            ("Critical node: C3", "Critical node: C1"),
+            ("Case ID: case-check", "Case ID: another-case"),
+            ("Review ID: review-c3-001", "Review ID: TODO"),
+            ("Review ID: review-c3-001", "Review ID: "),
+            ("Reviewer provider: human_specialist\n", ""),
+            ("Reviewer model: review-model\n", ""),
+        )
+        for current, replacement in replacements:
+            with self.subTest(replacement=replacement):
+                with tempfile.TemporaryDirectory() as directory:
+                    case = self.make_case(directory)
+                    self.add_review(case, "C3", base.replace(current, replacement))
+                    valid, detail = _valid_review(case, "C3")
+                self.assertFalse(valid, detail)
+
+    def test_invalid_reviewer_metadata_blocks_c3_case_check(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            self.add_review(case, "C3", self.valid_review("C3").replace("Review session: fresh", "Review session: reused"))
+            report = check_case(case, "paper_claims")
+        self.assertTrue(any(f.code == "C3_REQUIRED" and f.blocks for f in report.findings))
 
     def test_c3_requires_real_report_not_readme_or_placeholder(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -146,8 +234,14 @@ class CaseCheckTests(unittest.TestCase):
 
     def test_review_field_values_and_natural_markdown_sections_are_valid(self):
         cases = (
-            "# C3\n结论：可以继续。\n已检查范围：题面和模型。\n未检查范围：最终规模实验。\n",
-            "# C3\n\n## 结论\n当前范围内可以继续。\n\n## 已检查范围\n题面、模型和关键结果。\n\n## 未检查范围\n完整规模实验和最终提交。\n",
+            self.valid_review("C3", "已检查范围", "未检查范围"),
+            (
+                "# C3\n\n"
+                + self.review_metadata("C3")
+                + "## 结论\n当前范围内可以继续。\n\n"
+                "## 已检查范围\n题面、模型和关键结果。\n\n"
+                "## 未检查范围\n完整规模实验和最终提交。\n"
+            ),
         )
         for content in cases:
             with self.subTest(content=content):

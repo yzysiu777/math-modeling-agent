@@ -45,12 +45,12 @@ _REVIEW_FIELDS = (
     (
         "checked",
         "已检查范围",
-        r"(?:已检查(?:的)?(?:范围|内容|项)?|检查(?:的)?范围|审核范围|checked(?:\s+scope)?|reviewed(?:\s+scope)?|scope)",
+        r"(?:已检查(?:的)?(?:范围|内容|项)?|检查(?:的)?范围|审核范围|checked(?:\s+scope)?|reviewed(?:\s+scope)?|what\s+was\s+checked|what_was_checked|scope)",
     ),
     (
         "unchecked",
         "未检查范围",
-        r"(?:未检查(?:的)?(?:范围|内容|项)?|未覆盖(?:的)?范围|未验证|未审|unchecked(?:\s+scope)?|unreviewed(?:\s+scope)?|not\s+checked|not\s+reviewed|out\s+of\s+scope|limitation)",
+        r"(?:未检查(?:的)?(?:范围|内容|项)?|未覆盖(?:的)?范围|未验证|未审|unchecked(?:\s+scope)?|unreviewed(?:\s+scope)?|what\s+was\s+not\s+checked|what_was_not_checked|not\s+checked|not\s+reviewed|out\s+of\s+scope|limitation)",
     ),
 )
 _REVIEW_FIELD_LABELS = re.compile(
@@ -80,6 +80,23 @@ _DECISION_HEADER = re.compile(
 )
 _REASON_HEADER = re.compile(
     r"(?:原因|理由|说明|备注|reason|rationale|justification|evidence|note)",
+    re.IGNORECASE,
+)
+_REVIEW_METADATA_FIELDS = {
+    "review_id": r"(?:review[_\s]+id)",
+    "case_id": r"(?:case[_\s]+id)",
+    "reviewer_provider": r"(?:reviewer[_\s]+provider)",
+    "reviewer_model": r"(?:reviewer[_\s]+model)",
+    "review_session": r"(?:review[_\s]+session)",
+    "saw_main_conversation": r"(?:saw[_\s]+main[_\s]+conversation)",
+    "critical_node": r"(?:critical[_\s]+node)",
+}
+_REVIEW_METADATA_LINE = re.compile(
+    r"^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+)?(?P<label>"
+    + "|".join(
+        rf"(?P<{key}>{pattern})" for key, pattern in _REVIEW_METADATA_FIELDS.items()
+    )
+    + r")\s*[:：]\s*(?P<value>.*?)\s*$",
     re.IGNORECASE,
 )
 
@@ -120,6 +137,17 @@ class CaseReport:
 def _has_value(value: Any) -> bool:
     normalized = " ".join(str(value or "").casefold().split()).strip(" .。_`'\"")
     return bool(normalized) and normalized not in PLACEHOLDERS
+
+
+def _has_metadata_value(value: Any) -> bool:
+    """Reject empty/template metadata without changing general field semantics."""
+
+    normalized = " ".join(str(value or "").casefold().split()).strip(" .。_`'\"")
+    if not _has_value(value):
+        return False
+    if re.fullmatch(r"<[^>]+>", normalized):
+        return False
+    return normalized not in {"none", "null", "unknown", "未提供", "未知"}
 
 
 def _is_true(value: Any) -> bool:
@@ -201,11 +229,36 @@ def _review_field(line: str) -> tuple[str, str] | None:
     return field, match.group("inline") or ""
 
 
+def _review_metadata(text: str) -> dict[str, list[str]]:
+    """Extract readable YAML-style or fixed-output reviewer metadata labels."""
+
+    values: dict[str, list[str]] = {key: [] for key in _REVIEW_METADATA_FIELDS}
+    for line in text.splitlines():
+        match = _REVIEW_METADATA_LINE.fullmatch(line)
+        if not match:
+            continue
+        field = next(
+            key for key in _REVIEW_METADATA_FIELDS if match.group(key) is not None
+        )
+        values[field].append(match.group("value").strip().strip("`"))
+    return values
+
+
+def _metadata_error(values: dict[str, list[str]], field: str, label: str) -> str | None:
+    entries = values.get(field, [])
+    if not entries or not any(_has_metadata_value(value) for value in entries):
+        return f"{label}缺失或只有占位内容"
+    normalized = {" ".join(value.casefold().split()) for value in entries}
+    if len(normalized) > 1:
+        return f"{label}存在冲突值"
+    return None
+
+
 def _is_markdown_heading(line: str) -> bool:
     return re.match(r"^\s*#{1,6}(?:\s|$)", line) is not None
 
 
-def _review_errors(path: Path, node: str) -> list[str]:
+def _review_errors(path: Path, node: str, expected_case_id: str | None = None) -> list[str]:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
@@ -214,6 +267,32 @@ def _review_errors(path: Path, node: str) -> list[str]:
         return ["报告为空或只有占位内容"]
     node_pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(node)}(?![A-Za-z0-9])", re.IGNORECASE)
     errors = [] if node_pattern.search(text) else ["节点缺失"]
+    metadata = _review_metadata(text)
+    for field, label in (
+        ("review_id", "Review ID"),
+        ("reviewer_provider", "reviewer_provider"),
+        ("reviewer_model", "reviewer_model"),
+    ):
+        if error := _metadata_error(metadata, field, label):
+            errors.append(error)
+    case_id_error = _metadata_error(metadata, "case_id", "Case ID")
+    if case_id_error:
+        errors.append(case_id_error)
+    elif expected_case_id is not None:
+        case_ids = {" ".join(value.casefold().split()) for value in metadata["case_id"]}
+        if expected_case_id.casefold() not in case_ids:
+            errors.append(f"Case ID 与案例目录 {expected_case_id!r} 不一致")
+
+    session_values = {" ".join(value.casefold().split()) for value in metadata["review_session"]}
+    if session_values != {"fresh"}:
+        errors.append("review_session 必须为 fresh")
+    conversation_values = {" ".join(value.casefold().split()) for value in metadata["saw_main_conversation"]}
+    if conversation_values != {"false"}:
+        errors.append("saw_main_conversation 必须为 false")
+    critical_values = {" ".join(value.casefold().split()) for value in metadata["critical_node"]}
+    if critical_values != {node.casefold()}:
+        errors.append(f"critical_node 必须与当前节点 {node} 一致")
+
     sections: dict[str, list[str]] = {key: [] for key, _label, _pattern in _REVIEW_FIELDS}
     current: str | None = None
     for line in text.splitlines():
@@ -243,7 +322,7 @@ def _valid_review(case_dir: Path, node: str) -> tuple[bool, str]:
         return False, f"reviews/ 中没有 {node}_*.md 审核报告（README.md 不计入）"
     failures = []
     for path in candidates:
-        errors = _review_errors(path, node)
+        errors = _review_errors(path, node, expected_case_id=case_dir.name)
         if not errors:
             return True, path.name
         failures.append(f"{path.name}: {'、'.join(errors)}")
@@ -560,7 +639,7 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
         findings.append(
             _finding(
                 "REMINDER", "C1_RECOMMENDED",
-                f"C1 题意挑战尚未留下有效报告（{c1_detail}）；请由队员判断歧义并可手动触发 Claude C1",
+                f"C1 题意挑战尚未留下有效报告（{c1_detail}）；请由队员判断歧义并可手动触发 Independent Reviewer C1",
                 "HUMAN", "C1",
             )
         )
@@ -575,7 +654,7 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
         findings.append(
             _finding(
                 "REMINDER", "C2_RECOMMENDED",
-                f"进入正式模型/路线取舍阶段但没有有效 C2 报告（{c2_detail}）；请由队员触发 Claude C2",
+                f"进入正式模型/路线取舍阶段但没有有效 C2 报告（{c2_detail}）；请由队员触发 Independent Reviewer C2",
                 "HUMAN", "C2",
             )
         )

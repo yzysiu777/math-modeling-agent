@@ -17,9 +17,10 @@
 - [ ] 随机种子、参数、代码入口和环境已记录
 - [ ] 结果、图表和论文数字来自同一实验记录
 
-## Claude 与人工
+## Independent Reviewer 与人工
 
 - [ ] 需要的 C1/C2/C3 挑战已完成并保存
+- [ ] 审核报告已注明 provider、model、`review_session: fresh`、`saw_main_conversation: false` 和 critical node
 - [ ] 队员已在 `decisions.md` 记录接受/拒绝及原因
 - [ ] `make case-check CASE=... STAGE=paper_claims` 已运行且没有阻断项
 - [ ] 未检查内容、不确定性和限制已进入论文或交接

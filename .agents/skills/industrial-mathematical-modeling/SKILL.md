@@ -32,8 +32,9 @@ explain the evidence.
 5. Compare candidates with the same split, instances, constraints and metrics.
 6. Keep a Champion and a methodologically different Challenger until the
    strategy is clear.
-7. Ask Claude for a focused C1, C2 or C3 challenge when the problem, model or
-   conclusion reaches a decision point.
+7. Ask an Independent Reviewer for a focused C1, C2 or C3 challenge when the
+   problem, model or conclusion reaches a decision point. Use a fresh session,
+   a compact packet and a different method family; record the reviewer metadata.
 8. Expand only after the route survives the cheap tests; update the paper as
    experiments stabilize.
 

@@ -28,8 +28,13 @@ review/<编号>      审核意见整理和复现
 提交说明包含：改变了什么、为什么改变、运行了什么、结果和下一步。被淘汰路线
 保留在 `models/comparison.md` 或 `experiments/board.md`，不删除来美化结果。
 
-## Claude 使用
+## Independent Reviewer 使用
 
-队员手动把精简审核包复制到新的 Claude 会话。报告保存到案例 `reviews/`，只提出
-挑战和建议；队员明确接受或拒绝后，Codex 才实施修改。不得让 Claude 同时写方案、
+队员手动把精简审核包复制到新的 Independent Reviewer 会话。审核者可以是 Gemini、
+Grok、隔离的新 Codex 任务、其他模型或人类专家。报告保存到案例 `reviews/`，只提出
+挑战和建议；队员明确接受或拒绝后，Codex 才实施修改。不得让同一主会话同时写方案、
 审方案和替自己宣布结果。
+
+每个审核包/报告都保留 `reviewer_provider`、`reviewer_model`、`review_session: fresh`、
+`saw_main_conversation: false` 和 `critical_node`。审核者是否独立取决于新会话、最小
+审核包、方法论差异和反例任务，不取决于厂商名称；不传递主解完整聊天或隐藏推理。

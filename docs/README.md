@@ -5,7 +5,7 @@
 - [工作台使用说明](../README.md)
 - [Codex 项目规则](../AGENTS.md)
 - [Codex 执行协议](../agent.md)
-- [Claude 挑战协议](../CLAUDE.md)
+- [Independent Reviewer 审核协议](../REVIEWER.md)
 
 ## 工作方式
 
@@ -21,4 +21,3 @@
 - [LaTeX 工程](../paper/README.md)
 
 本目录只说明当前版本。已删除的设计草案和早期流程可通过 Git 历史查看，不在比赛时加载。
-

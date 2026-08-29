@@ -6,9 +6,10 @@ codex:
   purpose: "题意、候选路线、实验和论文主线"
   workspace_write: true
 
-claude:
-  platform: claude
-  role: independent_adversary
+independent_reviewer:
+  provider: <gemini | grok | codex_fresh_task | other_model | human_specialist>
+  model: ""
+  role: independent_reviewer
   purpose: "人工触发的 C1/C2/C3 关键挑战"
   workspace_write: false
   session_mode: manual_copy_of_compact_packet
@@ -22,5 +23,5 @@ deterministic:
 human:
   decides_problem_ambiguity: true
   decides_model_tradeoffs: true
-  decides_claude_suggestions: true
+  decides_independent_reviewer_suggestions: true
   confirms_official_rules_and_submission: true

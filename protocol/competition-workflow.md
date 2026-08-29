@@ -13,7 +13,7 @@
   -> 快速 baseline
   -> 小实验赛马
   -> Champion / Challenger
-  -> Claude C1/C2/C3 关键挑战
+  -> Independent Reviewer C1/C2/C3 关键挑战
   -> 深化模型与稳健性实验
   -> 论文同步写作
   -> 最终数值与格式检查
@@ -32,7 +32,7 @@
 表达、关键假设、数据需求、实现/运行成本、预期优势、风险和最便宜的证伪实验。
 可先读取 `.agents/skills/industrial-mathematical-modeling/references/` 下对应的实战方法卡。
 `scripts/model_pool.py` 只检查空字段、非法状态、重复路线 ID 和明显重复的方法族；真正
-的方法论差异仍由 Codex、Claude C2 与队员判断。例如 MIP 的 arc-flow、path-flow、
+的方法论差异仍由 Codex、Independent Reviewer C2 与队员判断。例如 MIP 的 arc-flow、path-flow、
 time-indexed 表述是否足够独立，不能由这个语法检查器自动决定。
 
 运筹题按适用性覆盖精确规划、网络/动态规划、分解或松弛、启发式/元启发式、鲁棒
@@ -59,8 +59,11 @@ PDF 或团队指定的里程碑版本可以额外记录 SHA-256，方便确认�
 - C2：模型架构、算法、公式—代码一致性、替代方法族和反例；
 - C3：主要结果、对照公平性、泄漏、稳定性、数字来源和论文强结论。
 
-每次给 Claude 的包只保留完成该节点所需内容。Claude 不重跑整题，只输出最高风险
-问题、方法论不同的挑战视角、最便宜的区分实验、路线建议、人工决定和未检查范围。
+每次给 Independent Reviewer 的包只保留完成该节点所需内容。Independent Reviewer 不
+重跑整题，只输出最高风险问题、方法论不同的挑战视角、最便宜的区分实验、路线建议、
+人工决定和未检查范围。包和报告注明 `reviewer_provider`、`reviewer_model`、
+`review_session: fresh`、`saw_main_conversation: false` 和 `critical_node`；provider
+值允许扩展，不构成厂商白名单。
 队员把采纳/拒绝及原因写入 `decisions.md`。
 
 ## 5. 阶段检查与主动提醒

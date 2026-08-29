@@ -25,6 +25,10 @@ class CaseAndBoardTests(unittest.TestCase):
             self.assertTrue((case / "case_brief.md").is_file())
             self.assertIn("`data_analysis`", (case / "case_brief.md").read_text(encoding="utf-8"))
             self.assertTrue((case / "models/candidates.md").is_file())
+            reviewer_readme = (case / "reviews/README.md").read_text(encoding="utf-8")
+            self.assertIn("Independent Reviewer", reviewer_readme)
+            self.assertIn("reviewer_provider", reviewer_readme)
+            self.assertNotIn("Claude", reviewer_readme)
             self.assertEqual(validate_candidate_pool(case / "models/candidates.md"), [])
             self.assertEqual(validate_experiment_board(case / "experiments/board.md"), [])
             with self.assertRaises(FileExistsError):
