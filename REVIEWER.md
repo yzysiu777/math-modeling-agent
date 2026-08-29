@@ -57,9 +57,15 @@ critical_node: C1 | C2 | C3
 make review-packet CASE=cases/<case_id> NODE=C2
 ```
 
-脚本从案例的可见文件生成草稿到 `cases/<case_id>/reviews/packets/`，并明确列出**未提供
-的材料**，供审核者判断哪些结论无法验证。主 Agent 必须补完「最担心的问题」和希望回答
-的 3–5 个问题，队员再复制到全新会话。脚本不调用任何模型 API。
+脚本从案例的可见文件生成草稿到 `cases/<case_id>/reviews/packets/`。它在包头写明
+`packet_complete: true|false`，并列出**缺失的关键证据**，供审核者判断哪些结论无法
+验证 —— 缺证据时正确的结论是 `BLOCKED`，不是 `PASS`。
+
+包**不保证单文件自包含**。数据文件被截断、图为二进制、原题附件为非文本格式时，
+脚本会输出「附件清单」；这些材料必须与包一并提供给审核者。
+
+主 Agent 补完「最担心的问题」和希望回答的 3–5 个问题后，队员在全新会话中交给审核者。
+脚本不调用任何模型 API。文件名带秒级时间戳，同日重复生成不会覆盖历史包。
 
 ## 审核包最低内容
 
@@ -71,8 +77,14 @@ make review-packet CASE=cases/<case_id> NODE=C2
 - 文件路径、版本和必要的输入说明；
 - 明确未提供、因此不能判断的内容。
 
-C2 包中会附上 `specs/` 的实现规格清单，C3 包中会附上 `paper/claim_map.md` 与
-`experiments/outputs/checks/` 的复算报告，便于审核者判断实现与结论是否有据。
+各节点的证据下限：
+
+- **C1**：`input/` 下的原题材料与输入清单。只给建模手写的 `case_brief.md` 不够 ——
+  那是**待核对的对象**，不是核对的依据。缺原题时包必须标记为不完整。
+- **C2**：Champion/Challenger 的 full 规格中的目标与判据、数学表述、算法、未决问题
+  四段正文，加 probe 结果回填和未解决的回问。规格 front matter 不构成模型。
+- **C3**：`paper/claim_map.md` 的强主张原文、引用到的结果数据片段、复算报告逐项结论
+  （含未通过项）和对应的图表清单条目。
 
 ## 固定输出
 

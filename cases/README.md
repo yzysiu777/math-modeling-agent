@@ -28,8 +28,8 @@ cases/<case_id>/
 
 | 目录 | 主要写入者 | 其他角色 |
 |---|---|---|
-| `models/`、`specs/` | 建模手 | 只读；要改就回问 |
-| `experiments/code/`、`experiments/outputs/` | 编程手 | 只读；写作手只从 `outputs/` 和 `board.md` 取材 |
+| `models/`、`specs/` | 建模手 | 编程手与写作手均只读；要改就回问 |
+| `experiments/code/`、`experiments/outputs/` | 编程手 | 写作手只读 `outputs/`、`board.md` 和 `checks/`，不进 `code/` |
 | `paper/`、`claim_map.md` | 写作手 | 只读 |
 | `decisions.md`、`checkpoint.yaml` | 队员 | 角色可提议，不代替确认 |
 | `reviews/` | 队员粘贴审核报告 | `packets/` 由 `make review-packet` 生成 |

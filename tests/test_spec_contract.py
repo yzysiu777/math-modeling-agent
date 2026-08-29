@@ -19,6 +19,10 @@ subproblem: 问题1
 method_family: mixed-integer programming
 status: full
 language: python
+probe_spec_id: SPEC-A1-M02-probe
+probe_exp_id: EXP-001
+probe_result: PASS
+probe_waiver_reason: ""
 ---
 
 ## 1. 目标与判据
@@ -157,6 +161,66 @@ class SpecCheckTests(unittest.TestCase):
         self.assertTrue(errors)
 
 
+class ProbeClosureTests(unittest.TestCase):
+    """A probe file existing proves nothing; the probe has to have run."""
+
+    def write(self, directory, text):
+        path = Path(directory) / "SPEC-A.md"
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_passed_probe_closes_the_loop(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(validate_spec(self.write(directory, FULL_SPEC)), [])
+
+    def test_missing_probe_result_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            text = FULL_SPEC.replace("probe_result: PASS\n", "")
+            errors = validate_spec(self.write(directory, text))
+        self.assertTrue(any("no probe_result" in error for error in errors))
+
+    def test_failed_probe_cannot_be_promoted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            text = FULL_SPEC.replace("probe_result: PASS", "probe_result: FAIL")
+            errors = validate_spec(self.write(directory, text))
+        self.assertTrue(any("probe_result is FAIL" in error for error in errors))
+
+    def test_invalid_probe_result_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            text = FULL_SPEC.replace("probe_result: PASS", "probe_result: probably-fine")
+            errors = validate_spec(self.write(directory, text))
+        self.assertTrue(any("invalid probe_result" in error for error in errors))
+
+    def test_waiver_requires_a_written_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            text = FULL_SPEC.replace("probe_result: PASS", "probe_result: WAIVED")
+            errors = validate_spec(self.write(directory, text))
+            self.assertTrue(any("probe_waiver_reason" in error for error in errors))
+
+            stated = text.replace('probe_waiver_reason: ""',
+                                  "probe_waiver_reason: 题面第 3 问直接指定使用该调度算法，无替代方法族可比")
+            self.assertEqual(validate_spec(self.write(directory, stated)), [])
+
+    def test_placeholder_waiver_reason_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            text = FULL_SPEC.replace("probe_result: PASS", "probe_result: WAIVED")
+            text = text.replace('probe_waiver_reason: ""', "probe_waiver_reason: 待补充")
+            errors = validate_spec(self.write(directory, text))
+        self.assertTrue(any("probe_waiver_reason" in error for error in errors))
+
+    def test_pass_requires_probe_spec_and_experiment_ids(self):
+        with tempfile.TemporaryDirectory() as directory:
+            text = FULL_SPEC.replace("probe_exp_id: EXP-001", "probe_exp_id: ")
+            errors = validate_spec(self.write(directory, text))
+        self.assertTrue(any("probe_exp_id" in error for error in errors))
+
+    def test_probe_spec_itself_needs_no_closure_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "SPEC-B.md"
+            path.write_text(PROBE_SPEC, encoding="utf-8")
+            self.assertEqual(validate_spec(path), [])
+
+
 class CheckReportTests(unittest.TestCase):
     def test_report_round_trips_and_marks_overall_status(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -206,7 +270,8 @@ class ReviewPacketTests(unittest.TestCase):
             "saw_main_conversation: false", "critical_node: C2", "case_id: packet-demo",
         ):
             self.assertIn(marker, packet)
-        self.assertIn("未提供的材料", packet)
+        self.assertIn("审核包不完整", packet)
+        self.assertIn("packet_complete: false", packet)
         self.assertIn("specs/", packet)
 
     def test_each_node_pulls_its_own_material(self):
@@ -215,8 +280,76 @@ class ReviewPacketTests(unittest.TestCase):
             c1 = build_packet(case, "C1")
             c3 = build_packet(case, "C3")
         self.assertNotIn("候选路线池", c1)
-        self.assertIn("论文数字溯源", c3)
+        self.assertIn("input/", c1)
         self.assertIn("C3_results_challenge.md", c3)
+        self.assertIn("claim_map.md", c3)
+
+    def test_c1_without_original_statement_is_marked_incomplete(self):
+        """C1 checks fidelity to the problem; the Modeler's brief is the object, not the evidence."""
+
+        with tempfile.TemporaryDirectory() as directory:
+            case = create_case("packet-demo", "optimization", Path(directory))
+            blind = build_packet(case, "C1")
+            self.assertIn("packet_complete: false", blind)
+            self.assertIn("无法核对题意是否忠实于原题", blind)
+
+            (case / "input/statement.md").write_text(
+                "# 原题\n\n某公司有两个服务点与三个需求点，容量各为 2。\n", encoding="utf-8")
+            with_statement = build_packet(case, "C1")
+        self.assertIn("packet_complete: true", with_statement)
+        self.assertIn("原始输入清单", with_statement)
+        self.assertIn("某公司有两个服务点", with_statement)
+
+    def test_c2_carries_full_spec_body_not_only_front_matter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = create_case("packet-demo", "optimization", Path(directory))
+            (case / "models/candidates.md").write_text(
+                "# 候选路线池\n\n## M-02：枚举\n\n- 状态：`champion`\n", encoding="utf-8")
+            (case / "specs/SPEC-A1-M02.md").write_text(FULL_SPEC, encoding="utf-8")
+            packet = build_packet(case, "C2")
+        self.assertIn("决策变量 x[i][j]", packet)          # 第 2 段数学表述
+        self.assertIn("PuLP + CBC", packet)                # 第 4 段算法
+        self.assertIn("容量不足时是否允许部分服务", packet)  # 第 8 段未决问题
+        self.assertIn("mixed-integer programming", packet)
+
+    def test_c3_carries_claim_text_and_its_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = create_case("packet-demo", "optimization", Path(directory))
+            outputs = case / "experiments/outputs"
+            (outputs / "data").mkdir(parents=True, exist_ok=True)
+            (outputs / "data/EXP-001_solution.csv").write_text("a,b\n1,2\n", encoding="utf-8")
+            (outputs / "checks").mkdir(parents=True, exist_ok=True)
+            (outputs / "checks/EXP-001.json").write_text(
+                json.dumps({"exp_id": "EXP-001", "checks": [
+                    {"name": "capacity", "kind": "constraint", "passed": False, "detail": "超容量 2"}]}),
+                encoding="utf-8")
+            (case / "paper/claim_map.md").write_text(
+                "| Claim ID | 论文位置 | 主张原文 | 强度 | 来源 EXP-ID | 数据文件 | 图/表 ID | 复算报告 | 状态 |\n"
+                "|---|---|---|---|---|---|---|---|---|\n"
+                "| CLM-001 | 摘要 | 全部算例均可行 | 可行解 | EXP-001 | "
+                "outputs/data/EXP-001_solution.csv | — | outputs/checks/EXP-001.json | draft |\n",
+                encoding="utf-8")
+            packet = build_packet(case, "C3")
+        self.assertIn("全部算例均可行", packet)              # 强结论原文
+        self.assertIn("结果数据片段", packet)                # 实际数据摘录
+        self.assertIn("复算报告摘要", packet)
+        self.assertIn("**1 项未通过**", packet)              # 未通过项必须出现在包里
+        self.assertIn("超容量 2", packet)
+
+    def test_same_day_regeneration_does_not_overwrite(self):
+        from scripts.make_review_packet import _unique_target
+
+        with tempfile.TemporaryDirectory() as directory:
+            packets = Path(directory)
+            first, first_id = _unique_target(packets, "C2")
+            first.write_text("first", encoding="utf-8")
+            second, second_id = _unique_target(packets, "C2")
+            second.write_text("second", encoding="utf-8")
+            # 早先的包必须原样保留，不能被同日同节点的新包静默覆盖
+            self.assertNotEqual(first, second)
+            self.assertNotEqual(first_id, second_id)
+            self.assertEqual(first.read_text(encoding="utf-8"), "first")
+            self.assertEqual(len(list(packets.iterdir())), 2)
 
     def test_invalid_node_and_missing_case_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

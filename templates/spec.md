@@ -7,6 +7,14 @@ method_family: <mixed-integer programming / dynamic programming / heuristic / tr
 status: full
 language: python
 depends_on: []
+
+# probe 闭环：full 规格必须能追溯到已经跑过并通过的 probe。
+# probe_result 取 PASS / FAIL / WAIVED。
+# 只有题面直接指定算法等特殊情况才写 WAIVED，且必须写明豁免理由。
+probe_spec_id: SPEC-<子问题>-<路线 ID>-probe
+probe_exp_id: EXP-
+probe_result: PASS
+probe_waiver_reason: ""
 ---
 
 # <路线名称> 实现规格

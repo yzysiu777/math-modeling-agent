@@ -4,9 +4,23 @@
 转去做其他不受阻的工作，不要自行发明建模决策。
 
 - 提问角色：`engineer` / `writer`
+- 目标角色 `target_role`：`modeler` / `engineer` —— 谁来回答这些问题
+- 问题类型 `question_type`：`model_contract`（模型契约） / `result_reproduction`（结果复现）
+  / `paper_wording`（论文表述）
 - 目标规格：`specs/<spec_id>.md`
 - 相关实验 ID：
 - 当前状态：`blocked`（整条路线停住） / `partial`（其余部分继续）
+
+三种类型的处理方式不同：
+
+| question_type | 谁回答 | 答复后必须做什么 |
+|---|---|---|
+| `model_contract` | 建模手 | **必须回写规格**，只在回问文件里答复会让规格和实现脱节 |
+| `result_reproduction` | 编程手 | 重跑或补跑，回填 `board.md` 与复算报告；规格通常不动 |
+| `paper_wording` | 写作手与提出方 | 调整论文表述或 `claim_map.md` 的强度字段；数值一律不动 |
+
+只有 `model_contract` 强制回写规格。把复现问题或表述问题也塞进规格，会让规格变成
+杂物间。
 
 ## 需要上游决定的问题
 
@@ -36,3 +50,5 @@
 | Q1 |  |  |  |
 
 若答复改变了目标、硬约束或强结论边界，同时在 `decisions.md` 记一条。
+
+`model_contract` 类的答复必须同步更新对应规格文件；另外两类不要求改规格。

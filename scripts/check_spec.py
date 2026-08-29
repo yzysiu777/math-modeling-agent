@@ -16,6 +16,12 @@ from typing import Dict, List, Sequence
 
 VALID_STATUS = frozenset({"probe", "full"})
 VALID_LANGUAGE = frozenset({"python", "matlab"})
+#: probe -> full 闭环的判定值。``PENDING`` 表示规格已写但探针尚未跑完 ——
+#: 这是合法的中间状态，早期不阻断，但不能带着它进入路线结论或论文强结论。
+#: ``WAIVED`` 是人工豁免，必须写明理由。
+VALID_PROBE_RESULT = frozenset({"pass", "fail", "pending", "waived"})
+#: 闭环已成立的取值；其余取值在强结论阶段会被 check_case.py 阻断。
+CLOSED_PROBE_RESULT = frozenset({"pass", "waived"})
 
 _PLACEHOLDERS = frozenset(
     {"", "-", "—", "待填写", "待填", "待补充", "todo", "tbd", "n/a", "n/a。", "无"}
@@ -44,6 +50,8 @@ _PROBE_SECTIONS: Sequence[tuple[str, str]] = (
     ("4", "实现要点"),
 )
 _REQUIRED_FM = ("spec_id", "case_id", "route_id", "subproblem", "method_family", "status", "language")
+#: full 规格额外要求的 probe 闭环字段。probe 规格不需要它们。
+_PROBE_CLOSURE_FM = ("probe_spec_id", "probe_exp_id", "probe_result")
 #: Sections whose emptiness defeats the purpose of the contract.  Section 7 and 8
 #: may legitimately be short, and section 8 may say "none" explicitly.
 _MUST_HAVE_CONTENT = {"1", "2", "3", "4", "5", "6"}
@@ -119,6 +127,46 @@ def parse_spec(path: Path) -> tuple[Spec | None, List[str]]:
     return Spec(path, front_matter, sections), []
 
 
+def _probe_closure_errors(name: str, spec: Spec) -> List[str]:
+    """Check that a full spec traces back to a probe that actually ran.
+
+    A probe file merely existing proves nothing; the point of the cheap test is
+    that it was executed and produced a verdict.  The waiver path stays open for
+    the legitimate case where the statement itself dictates the algorithm, but a
+    waiver has to say why.
+    """
+
+    errors: List[str] = []
+    result = spec.front_matter.get("probe_result", "").strip().strip("`'\"").casefold()
+    if not result:
+        return [
+            f"{name}: full spec has no probe_result; a full spec must trace back to a probe "
+            "that ran (PASS) or to a written waiver (WAIVED)"
+        ]
+    if result not in VALID_PROBE_RESULT:
+        return [f"{name}: invalid probe_result {result!r}; use one of {sorted(VALID_PROBE_RESULT)}"]
+
+    if result == "fail":
+        errors.append(
+            f"{name}: probe_result is FAIL; a route whose probe was falsified must not be "
+            "promoted to a full spec without re-running the probe"
+        )
+    if result == "waived":
+        if not _has_value(spec.front_matter.get("probe_waiver_reason", "")):
+            errors.append(
+                f"{name}: probe_result is WAIVED but probe_waiver_reason is empty or a placeholder; "
+                "state why the cheap falsification step was skipped"
+            )
+    else:
+        for field in ("probe_spec_id", "probe_exp_id"):
+            if not _has_value(spec.front_matter.get(field, "")):
+                errors.append(
+                    f"{name}: front matter field {field!r} is missing or a placeholder; "
+                    "it is required unless probe_result is WAIVED"
+                )
+    return errors
+
+
 def validate_spec(path: Path) -> List[str]:
     """Return every syntactic problem found in one spec file."""
 
@@ -137,6 +185,9 @@ def validate_spec(path: Path) -> List[str]:
     language = spec.language
     if language and language not in VALID_LANGUAGE:
         errors.append(f"{name}: invalid language {language!r}; use one of {sorted(VALID_LANGUAGE)}")
+
+    if status == "full":
+        errors.extend(_probe_closure_errors(name, spec))
 
     expected = _PROBE_SECTIONS if status == "probe" else _FULL_SECTIONS
     required = _PROBE_MUST_HAVE_CONTENT if status == "probe" else _MUST_HAVE_CONTENT

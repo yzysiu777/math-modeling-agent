@@ -1,4 +1,4 @@
-"""EXP-DA-001 / EXP-DA-002: SPEC-P1-M02 的实现（历史均值 baseline + 线性回归）。
+"""EXP-DA-001 / EXP-DATA-002: SPEC-P1-M02 的实现（历史均值 baseline + 线性回归）。
 
 演示数据类题目的编程手一侧：时间序切分、泄漏反例、独立复算并按输出契约落盘。
 运行：python cases/examples/data-analysis/experiments/code/python/run_demo.py
@@ -21,7 +21,7 @@ from scripts.model_checks import (  # noqa: E402
 
 CASE = Path(__file__).resolve().parents[3]
 OUT = CASE / "experiments/outputs"
-EXP_ID = "EXP-DA-002"
+EXP_ID = "EXP-DATA-002"
 SPEC_ID = "SPEC-P1-M02"
 
 

@@ -13,7 +13,11 @@
 | 编程手 Engineer | `prompts/engineer.md` | `$competition-engineering` | 代码、结果数据、图、复算报告 |
 | 写作手 Writer | `prompts/writer.md` | `$competition-paper-writing` | 论文章节、数字溯源表 |
 
-第四个角色 Independent Reviewer 由队员在 C1/C2/C3 手动触发，见 `REVIEWER.md`。
+写作手对 Champion full 规格、`models/comparison.md` 和 `decisions.md` 有**只读**访问权 ——
+论文要写模型假设和公式，这些只能来自规格，不能从代码反推，也不能由写作手自行发明。
+
+Independent Reviewer 不是第四个生产角色，而是**横切三者的独立审核机制**：它不产出主解、
+不接管任何环节，只在 C1/C2/C3 三个关键节点由队员手动触发一次性挑战，见 `REVIEWER.md`。
 
 角色索引和触发语在 `prompts/README.md`，交接契约在 `prompts/contracts/`。
 

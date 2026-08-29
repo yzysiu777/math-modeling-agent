@@ -35,14 +35,45 @@ class CaseCheckTests(unittest.TestCase):
             },
         )
 
-    @staticmethod
-    def set_claim_map(case, exp_id="EXP-001", status="verified"):
+    @classmethod
+    def set_claim_map(cls, case, exp_id="EXP-001", status="verified", create_evidence=True,
+                      data_file=None, figure_id="FIG-001", report_file=None):
+        """Write one claim row and, by default, the evidence files it points at."""
+
+        data_file = data_file if data_file is not None else f"outputs/data/{exp_id}_solution.csv"
+        report_file = report_file if report_file is not None else f"outputs/checks/{exp_id}.json"
+        if create_evidence:
+            cls.set_evidence(case, exp_id=exp_id, figure_id=figure_id)
         (case / "paper/claim_map.md").write_text(
             "# 论文数字溯源表\n\n"
             "| Claim ID | 论文位置 | 主张原文 | 强度 | 来源 EXP-ID | 数据文件 | 图/表 ID | 复算报告 | 状态 |\n"
             "|---|---|---|---|---|---|---|---|---|\n"
             f"| CLM-001 | 摘要 | 在 12 个算例上均得到可行解 | 可行解 | {exp_id} | "
-            f"outputs/data/{exp_id}_solution.csv | FIG-001 | outputs/checks/{exp_id}.json | {status} |\n",
+            f"{data_file} | {figure_id} | {report_file} | {status} |\n",
+            encoding="utf-8",
+        )
+
+    @staticmethod
+    def set_evidence(case, exp_id="EXP-001", figure_id="FIG-001", check_passed=True):
+        """Create the data file, recomputation report and figure entry a claim cites."""
+
+        outputs = case / "experiments/outputs"
+        (outputs / "data").mkdir(parents=True, exist_ok=True)
+        (outputs / f"data/{exp_id}_solution.csv").write_text("a,b\n1,2\n", encoding="utf-8")
+        (outputs / "checks").mkdir(parents=True, exist_ok=True)
+        (outputs / f"checks/{exp_id}.json").write_text(
+            json.dumps({"exp_id": exp_id, "spec_id": "SPEC-A1-M01", "passed": check_passed,
+                        "checks": [{"name": "capacity", "kind": "constraint",
+                                    "passed": check_passed, "detail": ""}]},
+                       ensure_ascii=False),
+            encoding="utf-8",
+        )
+        (outputs / "figures").mkdir(parents=True, exist_ok=True)
+        (outputs / "figures/manifest.md").write_text(
+            "# 图表清单\n\n"
+            "| FIG-ID | 来源 EXP-ID | 生成脚本 | 数据文件 | 图题草稿 | 论文位置 | 状态 |\n"
+            "|---|---|---|---|---|---|---|\n"
+            f"| {figure_id} | {exp_id} | plot.py | data.csv | 图题 | 第 4 章 | final |\n",
             encoding="utf-8",
         )
 
@@ -647,6 +678,233 @@ class CaseCheckTests(unittest.TestCase):
             self.set_claim_map(case, status="stale")
             report = check_case(case, "paper_claims")
         self.assertTrue(any("stale" in f.reason for f in report.findings))
+
+
+    # --- MMAG-006：claim 证据存在性 ---
+
+    def _paper_claims_ready(self, case):
+        """Bring a case to the point where only claim-map issues remain."""
+
+        self.confirm(case)
+        self.set_comparison(case)
+        self.add_review(case, "C3")
+        self.set_board_experiment(case)
+
+    def test_claim_pointing_at_a_missing_csv_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self._paper_claims_ready(case)
+            self.set_claim_map(case, data_file="outputs/data/does_not_exist.csv")
+            reminder = check_case(case, "paper_claims")
+            self.add_review(case, "C1")
+            self.add_review(case, "C2")
+            for node in ("C1", "C2", "C3"):
+                self.add_decision(case, node)
+            blocked = check_case(case, "final")
+        self.assertTrue(any(f.code == "CLAIM_EVIDENCE_MISSING" and "数据文件" in f.reason
+                            for f in reminder.findings))
+        self.assertFalse(any(f.code == "CLAIM_EVIDENCE_MISSING" and f.blocks
+                             for f in reminder.findings))
+        self.assertTrue(any(f.code == "CLAIM_EVIDENCE_MISSING" and f.blocks
+                            for f in blocked.findings))
+        self.assertEqual(blocked.exit_code, 1)
+
+    def test_claim_pointing_at_a_missing_check_report_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self._paper_claims_ready(case)
+            self.set_claim_map(case, report_file="outputs/checks/nope.json")
+            report = check_case(case, "paper_claims")
+        self.assertTrue(any("复算报告不存在" in f.reason for f in report.findings))
+
+    def test_claim_pointing_at_an_unparsable_check_report_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self._paper_claims_ready(case)
+            self.set_claim_map(case)
+            (case / "experiments/outputs/checks/EXP-001.json").write_text("{broken", encoding="utf-8")
+            report = check_case(case, "paper_claims")
+        self.assertTrue(any("无法解析" in f.reason for f in report.findings))
+
+    def test_claim_pointing_at_an_unknown_figure_id_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self._paper_claims_ready(case)
+            # manifest 里只有 FIG-001，claim 却引用 FIG-404
+            self.set_evidence(case, figure_id="FIG-001")
+            self.set_claim_map(case, create_evidence=False, figure_id="FIG-404")
+            report = check_case(case, "paper_claims")
+        self.assertTrue(any(f.code == "CLAIM_EVIDENCE_MISSING" and "FIG-404" in f.reason
+                            for f in report.findings))
+
+    def test_claim_pointing_at_a_stale_figure_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self._paper_claims_ready(case)
+            self.set_claim_map(case)
+            manifest = case / "experiments/outputs/figures/manifest.md"
+            manifest.write_text(manifest.read_text(encoding="utf-8").replace("| final |", "| stale |"),
+                                encoding="utf-8")
+            report = check_case(case, "paper_claims")
+        self.assertTrue(any("stale" in f.reason for f in report.findings))
+
+    def test_verified_claim_bound_to_a_failed_check_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self._paper_claims_ready(case)
+            self.set_claim_map(case, create_evidence=False, status="verified")
+            self.set_evidence(case, check_passed=False)
+            report = check_case(case, "paper_claims")
+        self.assertTrue(any(f.code == "CLAIM_CONTRADICTS_CHECK" for f in report.findings))
+
+    def test_claim_map_without_a_usable_header_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self._paper_claims_ready(case)
+            (case / "paper/claim_map.md").write_text(
+                "# 溯源\n\n| 甲 | 乙 |\n|---|---|\n| CLM-001 | 有内容 |\n", encoding="utf-8")
+            report = check_case(case, "paper_claims")
+        self.assertTrue(any(f.code == "CLAIM_MAP_HEADER_INVALID" for f in report.findings))
+
+    def test_claim_with_placeholder_required_fields_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self._paper_claims_ready(case)
+            self.set_evidence(case)
+            (case / "paper/claim_map.md").write_text(
+                "| Claim ID | 论文位置 | 主张原文 | 强度 | 来源 EXP-ID | 数据文件 | 图/表 ID | 复算报告 | 状态 |\n"
+                "|---|---|---|---|---|---|---|---|---|\n"
+                "| CLM-001 | 摘要 | 待填写 | 待填写 | EXP-001 | "
+                "outputs/data/EXP-001_solution.csv | FIG-001 | outputs/checks/EXP-001.json | draft |\n",
+                encoding="utf-8")
+            report = check_case(case, "paper_claims")
+        self.assertTrue(any(f.code == "CLAIM_MAP_INCOMPLETE" for f in report.findings))
+
+    def test_fully_resolvable_claim_map_raises_nothing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self._paper_claims_ready(case)
+            self.set_claim_map(case)
+            report = check_case(case, "paper_claims")
+        self.assertFalse([f for f in report.findings if f.code.startswith("CLAIM_")])
+
+    # --- MMAG-006：损坏的复算报告分阶段 ---
+
+    def test_corrupt_check_report_reminds_early_and_blocks_at_paper_claims(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self._paper_claims_ready(case)
+            self.set_claim_map(case)
+            target = case / "experiments/outputs/checks"
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "EXP-777.json").write_text("{not json", encoding="utf-8")
+            early = check_case(case, "exploration")
+            selecting = check_case(case, "model_selection")
+            claiming = check_case(case, "paper_claims")
+        early_hit = [f for f in early.findings if f.code == "CHECK_REPORT_UNREADABLE"]
+        self.assertTrue(early_hit)
+        self.assertFalse(early_hit[0].blocks)
+        self.assertEqual(early.exit_code, 0)
+        self.assertFalse([f for f in selecting.findings
+                          if f.code == "CHECK_REPORT_UNREADABLE" and f.blocks])
+        self.assertTrue([f for f in claiming.findings
+                         if f.code == "CHECK_REPORT_UNREADABLE" and f.blocks])
+        self.assertEqual(claiming.exit_code, 1)
+
+    # --- MMAG-006：probe -> full 闭环 ---
+
+    @staticmethod
+    def write_spec(case, name, route="M-01", status="full", probe_result="PASS",
+                   probe_exp_id="EXP-001", waiver=""):
+        (case / "specs").mkdir(parents=True, exist_ok=True)
+        (case / f"specs/{name}").write_text(
+            "---\n"
+            f"spec_id: {name[:-3]}\nroute_id: {route}\nstatus: {status}\nlanguage: python\n"
+            f"probe_spec_id: {name[:-3]}-probe\nprobe_exp_id: {probe_exp_id}\n"
+            f"probe_result: {probe_result}\nprobe_waiver_reason: {waiver}\n"
+            "---\n",
+            encoding="utf-8",
+        )
+
+    def test_full_spec_with_passed_probe_in_the_board_is_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            self.set_board_experiment(case, "EXP-001")
+            self.write_spec(case, "SPEC-A1-M01.md")
+            report = check_case(case, "model_selection")
+        self.assertFalse([f for f in report.findings if f.code == "PROBE_NOT_CLOSED"])
+
+    def test_pending_probe_reminds_early_and_blocks_before_paper_claims(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            self.set_board_experiment(case, "EXP-001")
+            self.add_review(case, "C3")
+            self.set_claim_map(case)
+            self.write_spec(case, "SPEC-A1-M01.md", probe_result="PENDING")
+            selecting = check_case(case, "model_selection")
+            claiming = check_case(case, "paper_claims")
+        selecting_hit = [f for f in selecting.findings if f.code == "PROBE_NOT_CLOSED"]
+        self.assertTrue(selecting_hit)
+        self.assertFalse(selecting_hit[0].blocks)
+        self.assertTrue([f for f in claiming.findings
+                         if f.code == "PROBE_NOT_CLOSED" and f.blocks])
+
+    def test_probe_experiment_absent_from_the_board_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            self.set_board_experiment(case, "EXP-001")
+            self.write_spec(case, "SPEC-A1-M01.md", probe_exp_id="EXP-999")
+            report = check_case(case, "model_selection")
+        self.assertTrue(any(f.code == "PROBE_NOT_CLOSED" and "EXP-999" in f.reason
+                            for f in report.findings))
+
+    def test_waiver_without_reason_is_reported_and_with_reason_passes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            self.set_comparison(case)
+            self.set_board_experiment(case, "EXP-001")
+            self.write_spec(case, "SPEC-A1-M01.md", probe_result="WAIVED")
+            bare = check_case(case, "model_selection")
+            self.write_spec(case, "SPEC-A1-M01.md", probe_result="WAIVED",
+                            waiver="题面第 3 问直接指定该调度算法，无替代方法族可比")
+            stated = check_case(case, "model_selection")
+        self.assertTrue([f for f in bare.findings if f.code == "PROBE_NOT_CLOSED"])
+        self.assertFalse([f for f in stated.findings if f.code == "PROBE_NOT_CLOSED"])
+
+    def test_selection_conflict_between_the_two_records_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.confirm(case)
+            (case / "models/candidates.md").write_text(
+                "# 候选路线池\n\n## M-02：枚举\n\n- 状态：`champion`\n\n"
+                "## M-01：贪心\n\n- 状态：`challenger`\n", encoding="utf-8")
+            (case / "models/comparison.md").write_text(
+                "# 路线比较\n\n当前 Champion：M-03\n当前 Challenger：M-01\n", encoding="utf-8")
+            conflicting = check_case(case, "model_selection")
+
+            (case / "models/comparison.md").write_text(
+                "# 路线比较\n\n当前 Champion：M-02\n当前 Challenger：M-01\n", encoding="utf-8")
+            aligned = check_case(case, "model_selection")
+        hit = [f for f in conflicting.findings if f.code == "SELECTION_CONFLICT"]
+        self.assertTrue(hit)
+        self.assertIn("M-03", hit[0].reason)
+        self.assertIn("M-02", hit[0].reason)
+        self.assertFalse(hit[0].blocks)
+        self.assertFalse([f for f in aligned.findings if f.code == "SELECTION_CONFLICT"])
+
+    def test_probe_closure_does_not_fire_during_exploration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.make_case(directory)
+            self.write_spec(case, "SPEC-A1-M01.md", probe_result="PENDING")
+            report = check_case(case, "exploration")
+        self.assertFalse([f for f in report.findings if f.code == "PROBE_NOT_CLOSED"])
 
 
 if __name__ == "__main__":

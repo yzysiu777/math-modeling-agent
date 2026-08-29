@@ -40,6 +40,39 @@ class WorkspaceContractTests(unittest.TestCase):
         ):
             self.assertFalse((ROOT / retired).exists(), retired)
 
+    def test_writer_input_contract_is_not_self_contradictory(self):
+        """The Writer must write model assumptions, so it needs read access to specs."""
+
+        writer = (ROOT / "prompts/writer.md").read_text(encoding="utf-8")
+        results = (ROOT / "prompts/contracts/results.md").read_text(encoding="utf-8")
+        skill = (ROOT / ".agents/skills/competition-paper-writing/SKILL.md").read_text(encoding="utf-8")
+
+        for text, label in ((writer, "writer.md"), (results, "results.md"), (skill, "SKILL.md")):
+            # 旧表述把材料限制为结果三件套，却又要求写模型假设和公式
+            self.assertNotIn("只从三个入口", text, label)
+            self.assertNotIn("three entry points only", text, label)
+
+        # 模型真值必须是写作手的合法只读来源
+        for marker in ("模型真值", "结果真值", "写作规范"):
+            self.assertIn(marker, writer, marker)
+        self.assertIn("specs/SPEC-*.md", writer)
+        self.assertIn("Model truth", skill)
+        self.assertIn("read-only", skill)
+        # 只读边界不得被削弱
+        self.assertIn("不修改", results)
+        self.assertIn("不改规格", (ROOT / "README.md").read_text(encoding="utf-8"))
+
+    def test_independent_reviewer_is_a_cross_cutting_mechanism(self):
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("不是第四个生产角色", agents)
+        self.assertNotIn("第四个角色 Independent Reviewer", agents)
+
+    def test_brainstorming_term_is_spelled_correctly(self):
+        for path in ROOT.rglob("*.md"):
+            if ".venv" in path.parts or ".git" in path.parts:
+                continue
+            self.assertNotIn("头脑砖暴", path.read_text(encoding="utf-8"), str(path))
+
     def test_role_prompts_state_their_handoff_boundary(self):
         engineer = (ROOT / "prompts/engineer.md").read_text(encoding="utf-8")
         self.assertIn("不得修改模型", engineer)

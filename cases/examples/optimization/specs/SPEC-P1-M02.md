@@ -7,6 +7,12 @@ method_family: exact enumeration
 status: full
 language: python
 depends_on: []
+
+# probe 闭环：full 规格必须能追溯到已经跑过的 probe。
+probe_spec_id: SPEC-P1-M02-probe
+probe_exp_id: EXP-OPT-002
+probe_result: PASS
+probe_waiver_reason: ""
 ---
 
 # 小规模精确枚举 实现规格

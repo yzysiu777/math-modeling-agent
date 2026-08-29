@@ -7,6 +7,12 @@ method_family: linear regression
 status: full
 language: python
 depends_on: []
+
+# probe 闭环：full 规格必须能追溯到已经跑过的 probe。
+probe_spec_id: SPEC-P1-M02-probe
+probe_exp_id: EXP-DATA-002
+probe_result: PASS
+probe_waiver_reason: ""
 ---
 
 # 时间感知线性回归 实现规格
@@ -78,8 +84,8 @@ probe（`SPEC-P1-M02-probe`）已通过。本规格固定切分口径与复算�
 
 | 文件 | 格式 | 列名与单位 | 说明 |
 |---|---|---|---|
-| `experiments/outputs/data/EXP-DA-002_predictions.csv` | CSV UTF-8 | `id`、`time`（期）、`y_true`、`y_pred_baseline`、`y_pred_linear` | 留出段逐行预测 |
-| `experiments/outputs/data/EXP-DA-002_metrics.json` | JSON | 见共享格式，另含 `split`、`baseline_test_mae`、`linear_test_mae` | 切分规模与两个 MAE |
+| `experiments/outputs/data/EXP-DATA-002_predictions.csv` | CSV UTF-8 | `id`、`time`（期）、`y_true`、`y_pred_baseline`、`y_pred_linear` | 留出段逐行预测 |
+| `experiments/outputs/data/EXP-DATA-002_metrics.json` | JSON | 见共享格式，另含 `split`、`baseline_test_mae`、`linear_test_mae` | 切分规模与两个 MAE |
 
 ### 图表产物
 
@@ -94,7 +100,7 @@ probe（`SPEC-P1-M02-probe`）已通过。本规格固定切分口径与复算�
 | 时间顺序无倒置 | 同上（`time_key="time"`） | 0 个错误 |
 | 泄漏反例能被检出 | 同上，输入重复实体的切分 | 必须返回非空错误，`kind: leakage` |
 
-复算报告写入 `experiments/outputs/checks/EXP-DA-002.json`。
+复算报告写入 `experiments/outputs/checks/EXP-DATA-002.json`。
 
 「反例能被检出」这一项容易被当成多余 —— 它不是。一个从不报错的检查器和没有检查器
 是一样的，而这种失效是静默的。

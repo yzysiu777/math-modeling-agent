@@ -42,10 +42,10 @@ paper/claim_map.md            三条主张的强度为什么是那样定的
 
 ## hybrid：MATLAB 侧的验证状态
 
-`experiments/code/matlab/run_EXP_HYB_003.m` **未在开发环境中实际执行**（该环境无
+`experiments/code/matlab/run_EXP_HYB_001.m` **未在开发环境中实际执行**（该环境无
 MATLAB）。已验证的是：
 
-- Python 复算脚本 `recompute_EXP_HYB_003.py` 的三条路径 —— 缺少 MATLAB 产物时正确
+- Python 复算脚本 `recompute_EXP_HYB_001.py` 的三条路径 —— 缺少 MATLAB 产物时正确
   跳过、数据正确时 PASS、数据被改错时 FAIL；
 - 规格里的手算预期值（q\* = 8，成本 8；场景成本 8 / 8 / 18）。
 

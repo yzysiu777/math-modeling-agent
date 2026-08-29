@@ -27,10 +27,21 @@ the model and experiments, not a final-day decoration.
 
 ## Sourcing
 
-Take material from three entry points only: `experiments/board.md` for what
-happened, `experiments/outputs/figures/manifest.md` for available figures, and
-`experiments/outputs/data/` for numbers. Do not read the code directory and do
-not copy numbers out of a chat transcript.
+A paper states both what the model is and what the results are, so material
+comes from three read-only classes:
+
+- **Model truth** - the accepted Champion full spec (`specs/SPEC-*.md` with
+  `status: full`), `models/comparison.md` and `decisions.md`. Source for
+  assumptions, symbols, formulas, constraints, algorithm structure and the
+  reasoning behind route selection.
+- **Result truth** - `experiments/board.md`, `experiments/outputs/data/`,
+  `experiments/outputs/figures/manifest.md` and `experiments/outputs/checks/`.
+- **Writing standards** - the `writing/` guides and the current official rules.
+
+All three are read-only for the Writer. Do not reconstruct a model definition
+from the code: an implementation detail is not a model definition, and a
+mismatch between spec and code is something to ask about, not something for the
+Writer to reconcile. Do not copy numbers out of a chat transcript.
 
 Refuse to write a result and ask instead when a number has no file, a figure's
 source experiment is absent from the board, a figure is marked `stale`, a

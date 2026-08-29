@@ -45,7 +45,7 @@ depends_on: []
 
 ## 5. 结果回填
 
-- 实验 ID：EXP-DA-002
+- 实验 ID：EXP-DATA-002
 - 实际结果：线性回归 test MAE = 0.5，历史均值 baseline test MAE = 10.9；正常切分
   0 个错误；泄漏反例被检出（`test contains duplicate id values`）。
 - 判定：`PASS`

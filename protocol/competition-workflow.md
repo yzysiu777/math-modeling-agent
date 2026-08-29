@@ -13,7 +13,7 @@
 
 ```text
 题意重构                                    建模手
-  -> 头脑砖暴：发散 ≥6 条，收敛 ≥3 条        建模手
+  -> 头脑风暴：发散 ≥6 条，收敛 ≥3 条        建模手
   -> 七维度评估，决定先跑哪条 probe          建模手
   -> probe 轻测试证伪                        建模手出规格，编程手跑
   -> 通过的路线写 full 规格                  建模手
@@ -32,7 +32,7 @@
 允许可逆探索。路由只有 `optimization`、`data_analysis`、`hybrid` 和
 `insufficient_information`。
 
-## 2. 头脑砖暴与候选模型池
+## 2. 头脑风暴与候选模型池
 
 先**发散**：每个关键子问题无过滤地列 ≥6 条想法，跨方法族取样，刻意包含一条极简路线
 和一条超预算路线来框定上下界。再**收敛**：筛到至少三条方法论不同的路线。
@@ -59,7 +59,10 @@ time-indexed 表述是否足够独立，不能由这个语法检查器自动决�
 的那条假设，用 ≤50 行代码、≤1 分钟去打它，判据在写代码之前定死。probe `FAIL` 是好
 结果 —— 一分钟换掉一条错路。
 
-probe 通过后才写 full 规格（`templates/spec.md`），八段齐全：目标与判据、数学表述、
+probe 通过后才写 full 规格（`templates/spec.md`）。full 规格的 front matter 要写清
+`probe_spec_id`、`probe_exp_id` 和 `probe_result`（`PASS` / `PENDING` / `WAIVED`），
+使闭环可追溯 —— probe 文件存在不等于 probe 跑过。确实要跳过时写 `WAIVED` 并说明理由。
+正文八段齐全：目标与判据、数学表述、
 数据契约、算法、输出契约、复算要求、明确不做、未决问题。写完自检：看不到本会话的
 编程手，只读这份文件能不能唯一确定实现？
 
@@ -111,9 +114,13 @@ PDF 或团队指定的里程碑版本可以额外记录 SHA-256，方便确认�
 | 时点 | 命令 | 预期行为 |
 |---|---|---|
 | 题意和便宜实验 | `make case-check CASE=... STAGE=exploration` | 路由未确认、单次失败等只提醒，不阻止探索 |
-| 冻结 Champion/正式模型 | `make case-check CASE=... STAGE=model_selection` | 未确认路由阻断；缺 C2、缺规格、跳过 probe、重复失败或效果担忧提醒 |
-| 写摘要、结论或强主张 | `make case-check CASE=... STAGE=paper_claims` | 缺 C3、确定性严重错误阻断；claim_map 不可追溯提醒 |
-| 最终提交 | `make final-check CASE=...` | 另查规格、人工决定、claim_map 可追溯和 LaTeX/PDF QA |
+| 冻结 Champion/正式模型 | `make case-check CASE=... STAGE=model_selection` | 未确认路由阻断；缺 C2、缺规格、probe 未闭环、取舍记录冲突、重复失败或效果担忧提醒 |
+| 写摘要、结论或强主张 | `make case-check CASE=... STAGE=paper_claims` | 缺 C3、确定性严重错误、probe 未闭环、复算报告损坏阻断；claim_map 证据缺失提醒 |
+| 最终提交 | `make final-check CASE=...` | 另查规格、人工决定、claim_map 证据存在性和 LaTeX/PDF QA |
+
+`claim_map` 的证据检查覆盖：EXP-ID 在实验板中存在、引用的数据文件与复算报告确实存在
+且可解析、Figure ID 在图表清单中且未标 `stale`、已验证的强结论没有绑定失败的确定性
+检查。这些只是**存在性和已记录状态**校验，不是数值证明。
 
 每条输出都包含稳定编号、触发原因、责任人、建议节点和是否阻断。失败摘要的内容由
 实验成员记录，检查器不使用关键词表猜测失败原因；不可行、目标复算不一致、切分重叠

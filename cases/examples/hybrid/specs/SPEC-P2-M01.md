@@ -7,6 +7,12 @@ method_family: forecast-then-optimize
 status: full
 language: matlab
 depends_on: []
+
+# probe 闭环：full 规格必须能追溯到已经跑过的 probe。
+probe_spec_id: SPEC-P2-M01-probe
+probe_exp_id: EXP-HYB-001
+probe_result: PENDING
+probe_waiver_reason: "本机无 MATLAB，probe 尚未实际执行；规格第 1 段已写明手算预期值供实测核对"
 ---
 
 # 预测驱动库存决策 实现规格（MATLAB 主实现）
@@ -71,8 +77,8 @@ depends_on: []
 
 | 文件 | 格式 | 列名与单位 | 说明 |
 |---|---|---|---|
-| `experiments/outputs/data/EXP-HYB-003_solution.csv` | CSV UTF-8 | `exp_id`、`demand_units`（units）、`quantity_units`（units）、`cost_yuan`（成本单位） | 每个扰动场景一行 |
-| `experiments/outputs/data/EXP-HYB-003_metrics.json` | JSON | 见共享格式，另含 `quantity`、`forecast`、`capacity`、`holding_cost`、`shortage_cost` | 复算脚本依赖这些参数 |
+| `experiments/outputs/data/EXP-HYB-001_solution.csv` | CSV UTF-8 | `exp_id`、`demand_units`（units）、`quantity_units`（units）、`cost_yuan`（成本单位） | 每个扰动场景一行 |
+| `experiments/outputs/data/EXP-HYB-001_metrics.json` | JSON | 见共享格式，另含 `quantity`、`forecast`、`capacity`、`holding_cost`、`shortage_cost` | 复算脚本依赖这些参数 |
 
 MATLAB 侧 `writetable` 必须带 `'Encoding','UTF-8'` 且不写行名，否则 Python 侧读入会
 出现列名乱码或多余索引列。
@@ -84,7 +90,7 @@ MATLAB 侧 `writetable` 必须带 `'Encoding','UTF-8'` 且不写行名，否则 
 
 ## 6. 复算要求
 
-**复算在 Python 侧完成**（`experiments/code/python/recompute_EXP_HYB_003.py`），因为
+**复算在 Python 侧完成**（`experiments/code/python/recompute_EXP_HYB_001.py`），因为
 阶段检查与 CI 只能运行 Python。MATLAB 侧不写复算报告。
 
 | 复算项 | 使用函数 | 判定阈值 |

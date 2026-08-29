@@ -23,16 +23,30 @@
 
 ## 开场
 
-1. 读 `AGENTS.md`、`agent.md`、`prompts/contracts/results.md`；
+1. 读 `AGENTS.md`、`agent.md`、`prompts/contracts/results.md` 和 `prompts/contracts/spec.md`
+   （规格是你写模型部分的唯一依据）；
 2. 读 `writing/` 六份规范：`OFFICIAL_RULES.md`、`PAPER_STYLE_GUIDE.md`、
    `NATIONAL_AWARD_LANGUAGE.md`、`FIGURE_TABLE_FORMULA_RULES.md`、
    `AI_COMPLIANCE.md`、`QA_CHECKLIST.md`；
 3. 读模板：`templates/paper_outline.md`、`writing/templates/abstract_template.md`；
 4. 按需加载 `$competition-paper-writing`。
 
-**取材只从三个入口**：`experiments/board.md`（发生了什么）、
-`experiments/outputs/figures/manifest.md`（有哪些图）、`experiments/outputs/data/`
-（数字在哪）。不要进代码目录翻文件，也不要从聊天记录里抄数字。
+### 你的三类只读来源
+
+论文要同时写清「模型是什么」和「结果是什么」，所以取材来源分三类。**全部只读** ——
+你不修改其中任何一个。
+
+| 类别 | 文件 | 用来写 |
+|---|---|---|
+| **模型真值** | 已被接受的 Champion full 规格 `specs/SPEC-*.md`（`status: full`）、`models/comparison.md`、`decisions.md` | 假设、符号、公式、约束、算法结构、路线取舍理由 |
+| **结果真值** | `experiments/board.md`、`experiments/outputs/data/`、`experiments/outputs/figures/manifest.md`、`experiments/outputs/checks/` | 数字、图表、复算结论、失败与局限 |
+| **写作规范** | `writing/` 六份规范、`templates/paper_outline.md`、当届官方文件 | 结构、语言、格式、引用、AI 声明 |
+
+**不要进代码目录反推模型定义。** 实现细节不是模型定义 —— 代码里的某个容差、某个
+循环边界，可能是工程选择，也可能是没写进规格的偏差。论文里的模型只以规格为准；
+规格与实现对不上是要回问的事，不是你替它们调和的事。
+
+也不要从聊天记录里抄数字。
 
 比赛开始后，**当届官方模板、格式规范和 AI 使用规定覆盖仓库里的一切历史快照**。
 `writing/official/` 下的 2025 年文件只是参考。
@@ -124,8 +138,8 @@ C3 一查就露。
 make review-packet CASE=cases/<case_id> NODE=C3
 ```
 
-从 `claim_map.md` 里挑 **3–5 条最值得抽查的强主张**放进审核包 —— 不是全部，是风险
-最高的那几条。审核者会局部复算指标和硬约束，检查切分、对照公平性、稳定性、数字来源
+脚本会把 `claim_map.md` 的强主张、引用到的数据片段、复算报告结论和图表条目放进包里。
+你要在「待补」处指出 **3–5 条最值得抽查的**，不是全部，是风险最高的那几条。审核者会局部复算指标和硬约束，检查切分、对照公平性、稳定性、数字来源
 和表述强度。
 
 报告回来后，队员的接受/拒绝/延期及原因写进 `decisions.md`，再实施修改。

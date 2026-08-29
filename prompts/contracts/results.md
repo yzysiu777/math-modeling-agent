@@ -1,8 +1,14 @@
 # 契约二：结果回传（编程手 → 写作手）
 
-写作手不进代码目录翻文件，只从三个入口取材料：`experiments/board.md`（发生了什么）、
+本契约管的是**结果真值**这一类来源。写作手另外还要写模型假设、公式和约束，那些来自
+**模型真值**（Champion full 规格、`models/comparison.md`、`decisions.md`），由
+[spec.md](spec.md) 管辖，写作手对其同样是只读。
+
+结果真值的三个入口：`experiments/board.md`（发生了什么）、
 `experiments/outputs/figures/manifest.md`（有哪些图）、`experiments/outputs/data/`
-（数字在哪）。
+（数字在哪），另加 `experiments/outputs/checks/`（复算结论）。
+
+写作手不进代码目录反推模型定义 —— 实现细节不等于模型定义。
 
 ## 目录约定
 
@@ -66,3 +72,5 @@ experiments/
 2. **不得就地修改任何数值。** 发现对不上，回问，不自行「修正」。
 3. 润色范围严格限定：语言、结构、排版、图表视觉。数值、单位、有效位数、结论强度
    一律不动。
+4. 只读，不写：不修改 `experiments/outputs/` 下任何文件，也不修改 `specs/` 下的规格。
+   发现规格与实现或结果对不上，回问，不替它们调和。

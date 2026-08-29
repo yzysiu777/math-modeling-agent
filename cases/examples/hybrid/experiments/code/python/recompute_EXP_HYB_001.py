@@ -1,4 +1,4 @@
-"""EXP-HYB-003 的 Python 独立复算（主实现在 MATLAB）。
+"""EXP-HYB-001 的 Python 独立复算（主实现在 MATLAB）。
 
 跨语言契约的下半段：读 MATLAB 导出的 CSV/JSON，按规格文字重新表达约束和目标，
 独立重算一遍，再写 outputs/checks/<EXP-ID>.json。
@@ -7,7 +7,7 @@
 MATLAB 写的报告不会被自动读取。用另一种语言从落盘数据重算，同时也验证了导出格式
 是否正确 —— 同一套代码算两遍证明不了任何事。
 
-运行前先在 MATLAB 中执行 run_EXP_HYB_003。
+运行前先在 MATLAB 中执行 run_EXP_HYB_001。
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from scripts.model_checks import (  # noqa: E402
 
 CASE = Path(__file__).resolve().parents[3]
 OUT = CASE / "experiments/outputs"
-EXP_ID = "EXP-HYB-003"
+EXP_ID = "EXP-HYB-001"
 SPEC_ID = "SPEC-P2-M01"
 
 
@@ -33,7 +33,7 @@ def main() -> int:
     metrics_path = OUT / f"data/{EXP_ID}_metrics.json"
     solution_path = OUT / f"data/{EXP_ID}_solution.csv"
     if not metrics_path.is_file() or not solution_path.is_file():
-        print(f"SKIP {EXP_ID}: 未找到 MATLAB 导出的结果；请先在 MATLAB 中运行 run_EXP_HYB_003")
+        print(f"SKIP {EXP_ID}: 未找到 MATLAB 导出的结果；请先在 MATLAB 中运行 run_EXP_HYB_001")
         return 0
 
     metrics = load_result(metrics_path)

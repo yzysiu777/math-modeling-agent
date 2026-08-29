@@ -15,8 +15,11 @@
 |---|---|---|---|
 | 建模手 | [modeler.md](modeler.md) | 题面、附件、`case_brief.md` | 候选路线池、评估表、probe/full 规格 |
 | 编程手 | [engineer.md](engineer.md) | `specs/SPEC-*.md`、`input/` 数据 | 代码、结果数据、图、复算报告 |
-| 写作手 | [writer.md](writer.md) | `board.md`、`outputs/`、写作规范 | `paper/sections/*.tex`、`claim_map.md` |
-| 独立审核 | [reviewer/](reviewer/) | 精简审核包 | C1/C2/C3 报告 |
+| 写作手 | [writer.md](writer.md) | Champion 规格、`board.md`、`outputs/`、写作规范 | `paper/sections/*.tex`、`claim_map.md` |
+| 独立审核（横向机制） | [reviewer/](reviewer/) | 精简审核包 | C1/C2/C3 报告 |
+
+前三行是**生产角色**，靠契约接力。独立审核是**横切三者的机制**，不产出主解、不接管
+环节，只在 C1/C2/C3 由队员手动触发一次性挑战。
 
 契约规则见 [contracts/](contracts/)，字段模板在 `templates/`。
 

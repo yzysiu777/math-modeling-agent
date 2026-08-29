@@ -1,19 +1,19 @@
-% run_EXP_HYB_003.m
-% EXP-ID:  EXP-HYB-003
+% run_EXP_HYB_001.m
+% EXP-ID:  EXP-HYB-001
 % spec_id: SPEC-P2-M01
 % 说明：预测驱动的库存决策，MATLAB 主实现。
 %
 % 本文件演示跨语言契约：MATLAB 负责求解并按约定格式导出 CSV/JSON，
-% Python 侧的 recompute_EXP_HYB_003.py 读入后独立复算并写复算报告。
+% Python 侧的 recompute_EXP_HYB_001.py 读入后独立复算并写复算报告。
 % 阶段检查与 CI 只能运行 Python，因此 MATLAB 侧不写复算报告。
 %
-% 运行：在本目录下执行 run_EXP_HYB_003
+% 运行：在本目录下执行 run_EXP_HYB_001
 
-function run_EXP_HYB_003()
+function run_EXP_HYB_001()
     SEED = 42;
     rng(SEED, 'twister');
 
-    EXP_ID  = 'EXP-HYB-003';
+    EXP_ID  = 'EXP-HYB-001';
     SPEC_ID = 'SPEC-P2-M01';
 
     % 规格第 3 段的参数
@@ -61,7 +61,7 @@ function run_EXP_HYB_003()
     fclose(fid);
 
     fprintf('WROTE %s\n', fullfile(dataDir, [EXP_ID '_solution.csv']));
-    fprintf('下一步：python ../python/recompute_EXP_HYB_003.py 做独立复算\n');
+    fprintf('下一步：python ../python/recompute_EXP_HYB_001.py 做独立复算\n');
 end
 
 
