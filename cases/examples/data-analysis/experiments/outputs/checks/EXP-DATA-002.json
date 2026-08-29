@@ -1,0 +1,19 @@
+{
+  "exp_id": "EXP-DATA-002",
+  "spec_id": "SPEC-P1-M02",
+  "passed": true,
+  "checks": [
+    {
+      "name": "时间序切分无重叠且无泄漏",
+      "kind": "split_overlap",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "泄漏反例能被检出",
+      "kind": "leakage",
+      "passed": true,
+      "detail": "test contains duplicate id values"
+    }
+  ]
+}

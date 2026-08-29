@@ -1,0 +1,18 @@
+{
+  "exp_id": "EXP-OPT-002",
+  "spec_id": "SPEC-P1-M02",
+  "language": "python",
+  "seed": null,
+  "instances": {
+    "base": {
+      "objective": 4.0,
+      "feasible": true,
+      "baseline_objective": 4
+    },
+    "capacity_edge": {
+      "objective": 4.0,
+      "feasible": true,
+      "baseline_objective": 4
+    }
+  }
+}

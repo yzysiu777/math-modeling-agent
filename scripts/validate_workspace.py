@@ -32,22 +32,44 @@ REQUIRED_FILES = (
     "templates/case_brief.md", "templates/checkpoint.yaml", "templates/model_candidate.md",
     "templates/model_comparison.md", "templates/experiment_board.md",
     "templates/decision_log.md", "templates/independent_review_packet.md",
-    "templates/final_checklist.md", "scripts/router.py", "scripts/create_case.py",
-    "scripts/model_checks.py", "scripts/model_pool.py", "scripts/experiment_board.py", "scripts/check_case.py", "scripts/run_demos.py",
-    ".agents/skills/industrial-mathematical-modeling/references/optimization-method-cards.md",
-    ".agents/skills/industrial-mathematical-modeling/references/data-analysis-method-cards.md",
-    ".agents/skills/industrial-mathematical-modeling/references/hybrid-method-cards.md",
+    "templates/final_checklist.md", "templates/spec.md", "templates/spec_probe.md",
+    "templates/spec_questions.md", "templates/figure_manifest.md", "templates/claim_map.md",
+    "scripts/router.py", "scripts/create_case.py",
+    "scripts/model_checks.py", "scripts/model_pool.py", "scripts/experiment_board.py",
+    "scripts/check_case.py", "scripts/check_spec.py", "scripts/make_review_packet.py",
+    "scripts/case_paths.py",
+    "scripts/run_demos.py",
+    ".agents/skills/competition-modeling/references/optimization-method-cards.md",
+    ".agents/skills/competition-modeling/references/data-analysis-method-cards.md",
+    ".agents/skills/competition-modeling/references/hybrid-method-cards.md",
+    ".agents/skills/competition-modeling/references/brainstorming.md",
+    ".agents/skills/competition-modeling/references/route-evaluation.md",
+    ".agents/skills/competition-modeling/references/spec-writing.md",
+    ".agents/skills/competition-engineering/references/language-choice.md",
+    ".agents/skills/competition-engineering/references/python-conventions.md",
+    ".agents/skills/competition-engineering/references/matlab-conventions.md",
+    ".agents/skills/competition-engineering/references/figure-standards.md",
+    ".agents/skills/competition-engineering/references/recompute-recipes.md",
     "paper/main.tex", "paper/official/2025/manifest.yaml", "paper/official/2026/manifest.yaml",
 )
 REQUIRED_SKILLS = (
-    ".agents/skills/industrial-mathematical-modeling/SKILL.md",
-    ".agents/skills/model-race/SKILL.md",
+    ".agents/skills/competition-modeling/SKILL.md",
+    ".agents/skills/competition-engineering/SKILL.md",
     ".agents/skills/competition-paper-writing/SKILL.md",
 )
 REQUIRED_PROMPTS = (
-    "prompts/codex-start.md", "prompts/reviewer/C1_problem_challenge.md",
+    "prompts/README.md", "prompts/modeler.md", "prompts/engineer.md", "prompts/writer.md",
+    "prompts/contracts/README.md", "prompts/contracts/spec.md",
+    "prompts/contracts/results.md", "prompts/contracts/questions.md",
+    "prompts/reviewer/C1_problem_challenge.md",
     "prompts/reviewer/C2_model_challenge.md", "prompts/reviewer/C3_results_challenge.md",
     "prompts/reviewer/README.md",
+)
+#: Paths retired by the three-role refactor.  Keeping a second live copy of the
+#: rules would let an agent load two conflicting protocols; history stays in Git.
+RETIRED_PATHS = (
+    "prompts/codex-start.md", "roles",
+    ".agents/skills/industrial-mathematical-modeling", ".agents/skills/model-race",
 )
 RETIRED_REVIEWER_PATHS = (
     "CLAUDE.md", "prompts/claude", "templates/claude_review_packet.md",
@@ -62,17 +84,17 @@ REQUIRED_EXAMPLES = (
     "cases/examples/optimization/models/candidates.md",
     "cases/examples/optimization/models/comparison.md",
     "cases/examples/optimization/experiments/board.md",
-    "cases/examples/optimization/experiments/code/run_demo.py",
+    "cases/examples/optimization/experiments/code/python/run_demo.py",
     "cases/examples/data-analysis/case_brief.md",
     "cases/examples/data-analysis/models/candidates.md",
     "cases/examples/data-analysis/models/comparison.md",
     "cases/examples/data-analysis/experiments/board.md",
-    "cases/examples/data-analysis/experiments/code/run_demo.py",
+    "cases/examples/data-analysis/experiments/code/python/run_demo.py",
     "cases/examples/hybrid/case_brief.md",
     "cases/examples/hybrid/models/candidates.md",
     "cases/examples/hybrid/models/comparison.md",
     "cases/examples/hybrid/experiments/board.md",
-    "cases/examples/hybrid/experiments/code/run_demo.py",
+    "cases/examples/hybrid/experiments/code/python/run_demo.py",
 )
 def _missing(paths: Iterable[str]) -> List[str]:
     return [relative for relative in paths if not (ROOT / relative).exists()]
@@ -127,6 +149,9 @@ def validate_examples() -> List[str]:
 
 def validate_static_contract() -> List[str]:
     errors = [f"missing required file: {path}" for path in _missing(REQUIRED_FILES + REQUIRED_SKILLS + REQUIRED_PROMPTS)]
+    for relative in RETIRED_PATHS:
+        if (ROOT / relative).exists():
+            errors.append(f"retired path is still active: {relative}")
     for relative in RETIRED_REVIEWER_PATHS:
         if (ROOT / relative).exists():
             errors.append(f"retired reviewer path is still active: {relative}")

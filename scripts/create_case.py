@@ -39,9 +39,13 @@ def create_case(case_id: str, route: str, cases_root: Path = ROOT / "cases") -> 
     if case_dir.exists():
         raise FileExistsError(f"case already exists: {case_dir}")
     for relative in (
-        "input", "models", "experiments/code", "experiments/outputs", "reviews", "paper",
+        "input", "models", "specs",
+        "experiments/code/python", "experiments/code/matlab",
+        "experiments/outputs/data", "experiments/outputs/figures",
+        "experiments/outputs/checks", "experiments/outputs/logs",
+        "reviews/packets", "paper",
     ):
-        (case_dir / relative).mkdir(parents=True, exist_ok=False)
+        (case_dir / relative).mkdir(parents=True, exist_ok=True)
     brief = (TEMPLATES / "case_brief.md").read_text(encoding="utf-8")
     brief = brief.replace("# 案例简报：<案例名称>", f"# 案例简报：{case_id}")
     brief = brief.replace("- 案例 ID：", f"- 案例 ID：{case_id}")
@@ -60,6 +64,26 @@ def create_case(case_id: str, route: str, cases_root: Path = ROOT / "cases") -> 
         encoding="utf-8",
     )
     (case_dir / "paper/README.md").write_text("# 案例论文\n\n在这里记录本案例与根 `paper/` 工程的章节、图表和引用对应关系。\n", encoding="utf-8")
+    (case_dir / "paper/claim_map.md").write_text((TEMPLATES / "claim_map.md").read_text(encoding="utf-8"), encoding="utf-8")
+    (case_dir / "specs/README.md").write_text(
+        "# 实现规格\n\n"
+        "建模手写给编程手的交接契约。一条候选路线一份规格，先 probe 后 full。\n\n"
+        "- 模板：`templates/spec.md`、`templates/spec_probe.md`\n"
+        "- 回问：`SPEC-<...>.questions.md`，模板 `templates/spec_questions.md`\n"
+        "- 契约规则：`prompts/contracts/spec.md`\n"
+        "- 检查：`make spec-check CASE=cases/<case_id>`\n",
+        encoding="utf-8",
+    )
+    (case_dir / "experiments/outputs/figures/manifest.md").write_text(
+        (TEMPLATES / "figure_manifest.md").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (case_dir / "experiments/outputs/checks/README.md").write_text(
+        "# 复算报告\n\n"
+        "由 `scripts/model_checks.py:write_check_report` 生成，每个实验一份 `<EXP-ID>.json`。\n"
+        "`scripts/check_case.py` 会自动读取这里的失败项并点亮确定性风险标志，因此复算失败\n"
+        "必须照实写入，不要为了让检查变绿而省略。\n",
+        encoding="utf-8",
+    )
     (case_dir / "input/README.md").write_text("# 原始输入\n\n把题面和附件放在这里并保持只读，记录来源和字段说明。\n", encoding="utf-8")
     return case_dir
 

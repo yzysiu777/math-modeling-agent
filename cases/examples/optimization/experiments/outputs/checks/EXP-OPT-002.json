@@ -1,0 +1,31 @@
+{
+  "exp_id": "EXP-OPT-002",
+  "spec_id": "SPEC-P1-M02",
+  "passed": true,
+  "checks": [
+    {
+      "name": "base 全部约束",
+      "kind": "constraint",
+      "passed": true,
+      "detail": "逐条检查 4 条"
+    },
+    {
+      "name": "base 目标值独立重算",
+      "kind": "objective_mismatch",
+      "passed": true,
+      "detail": "recomputed=4.0, reported=4"
+    },
+    {
+      "name": "capacity_edge 全部约束",
+      "kind": "constraint",
+      "passed": true,
+      "detail": "逐条检查 4 条"
+    },
+    {
+      "name": "capacity_edge 目标值独立重算",
+      "kind": "objective_mismatch",
+      "passed": true,
+      "detail": "recomputed=4.0, reported=4"
+    }
+  ]
+}

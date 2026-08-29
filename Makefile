@@ -2,7 +2,7 @@ PAPER_DIR := paper
 PAPER_BUILD := $(PAPER_DIR)/build
 PYTHON ?= python3
 
-.PHONY: paper paper-ci qa clean test validate demos case-check final-check
+.PHONY: paper paper-ci qa clean test validate demos case-check spec-check review-packet final-check
 
 paper:
 	mkdir -p $(PAPER_BUILD)
@@ -29,10 +29,20 @@ case-check:
 	@test -n "$(STAGE)" || (echo "STAGE is required"; exit 2)
 	$(PYTHON) scripts/check_case.py --case-dir "$(CASE)" --stage "$(STAGE)"
 
+spec-check:
+	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
+	$(PYTHON) scripts/check_spec.py --case-dir "$(CASE)"
+
+review-packet:
+	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
+	@test -n "$(NODE)" || (echo "NODE is required (C1, C2 or C3)"; exit 2)
+	$(PYTHON) scripts/make_review_packet.py --case-dir "$(CASE)" --node "$(NODE)"
+
 final-check:
 	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
 	@status=0; \
 	$(PYTHON) scripts/check_case.py --case-dir "$(CASE)" --stage final || status=$$?; \
+	$(PYTHON) scripts/check_spec.py --case-dir "$(CASE)" || status=$$?; \
 	$(MAKE) PYTHON="$(PYTHON)" paper-ci || status=$$?; \
 	if [ -f $(PAPER_BUILD)/main.pdf ]; then sh writing/checks/check_pdf.sh $(PAPER_BUILD)/main.pdf || status=$$?; fi; \
 	exit $$status

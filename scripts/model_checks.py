@@ -8,13 +8,23 @@ the result remains part of the modeling work.
 
 from __future__ import annotations
 
+import csv
+import json
 from dataclasses import dataclass
 from math import isclose
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
 
 Constraint = Callable[[Mapping[str, Any]], Any]
 Objective = Callable[[Mapping[str, Any]], float]
+
+#: Risk kinds understood by ``scripts/check_case.py``.  ``constraint`` records an
+#: ordinary per-constraint result; the other four map onto the deterministic risk
+#: flags in ``checkpoint.yaml``.
+CHECK_KINDS = frozenset(
+    {"constraint", "infeasible", "objective_mismatch", "leakage", "split_overlap"}
+)
 
 
 @dataclass(frozen=True)
@@ -148,6 +158,78 @@ def compare_model_results(
         "champion": champion,
         "challenger": challenger,
     }
+
+
+def load_result(path: Union[str, Path]) -> Any:
+    """Read a result file written by either the Python or the MATLAB side.
+
+    ``.csv`` returns a list of row mappings and ``.json`` returns the decoded
+    document, so a recomputation script does not care which language produced
+    the file.  Empty CSV fields become ``None`` to match the shared convention
+    that a missing value is written as an empty field.
+    """
+
+    file_path = Path(path)
+    suffix = file_path.suffix.lower()
+    if suffix == ".json":
+        return json.loads(file_path.read_text(encoding="utf-8"))
+    if suffix != ".csv":
+        raise ValueError(f"unsupported result format: {file_path.name}")
+    with file_path.open(encoding="utf-8-sig", newline="") as handle:
+        return [
+            {key: (None if value == "" else value) for key, value in row.items()}
+            for row in csv.DictReader(handle)
+        ]
+
+
+def write_check_report(
+    checks_dir: Union[str, Path],
+    exp_id: str,
+    spec_id: str,
+    checks: Sequence[Mapping[str, Any]],
+) -> Path:
+    """Write one recomputation report that ``check_case.py`` can read.
+
+    Each check needs ``name``, ``kind`` and ``passed``; ``detail`` is optional.
+    A failing check raises the matching deterministic risk flag during stage
+    checks, so failures must be recorded honestly rather than omitted.
+    """
+
+    if not str(exp_id).strip():
+        raise ValueError("exp_id is required")
+    if not checks:
+        raise ValueError("a report needs at least one check")
+
+    normalized: List[Dict[str, Any]] = []
+    for index, check in enumerate(checks):
+        name = str(check.get("name", "")).strip()
+        kind = str(check.get("kind", "")).strip()
+        if not name:
+            raise ValueError(f"check #{index} is missing a name")
+        if kind not in CHECK_KINDS:
+            raise ValueError(f"check {name!r} has unknown kind {kind!r}; use one of {sorted(CHECK_KINDS)}")
+        if "passed" not in check:
+            raise ValueError(f"check {name!r} is missing 'passed'")
+        normalized.append(
+            {
+                "name": name,
+                "kind": kind,
+                "passed": bool(check["passed"]),
+                "detail": str(check.get("detail", "")),
+            }
+        )
+
+    target_dir = Path(checks_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    report = {
+        "exp_id": str(exp_id).strip(),
+        "spec_id": str(spec_id).strip(),
+        "passed": all(item["passed"] for item in normalized),
+        "checks": normalized,
+    }
+    target = target_dir / f"{report['exp_id']}.json"
+    target.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return target
 
 
 def validate_hybrid_interface(

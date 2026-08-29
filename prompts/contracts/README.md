@@ -1,0 +1,42 @@
+# 三段交接契约
+
+三个角色在**各自独立的会话**中工作，只通过落盘文件接力。契约的作用是让「忠实实现」
+成为结构保证，而不是靠自觉。
+
+```text
+建模手 Modeler ──SPEC──▶ 编程手 Engineer ──结果+图──▶ 写作手 Writer
+     ▲                        │                        │
+     └──── questions ◀────────┴──── questions ◀────────┘
+```
+
+| 契约 | 文件 | 上游 | 下游 |
+|---|---|---|---|
+| [SPEC](spec.md) | `cases/<id>/specs/SPEC-*.md` | 建模手 | 编程手 |
+| [结果回传](results.md) | `experiments/outputs/` + `figures/manifest.md` + `board.md` | 编程手 | 写作手 |
+| [回问](questions.md) | `specs/SPEC-*.questions.md` | 下游发起 | 上游答复 |
+
+字段定义在 `templates/spec.md`、`templates/spec_probe.md`、
+`templates/figure_manifest.md`、`templates/claim_map.md`、`templates/spec_questions.md`。
+本目录只写**双方共同遵守、不能各自解释**的规则。
+
+## 三条总纪律
+
+**一、下游不读上游的会话。** 编程手不看建模手的推理过程，写作手不看编程手的调试过程。
+理由不是保密，是防止下游用「我猜上游是这个意思」替代「规格里写了什么」。上游想让下游
+知道的事，必须写进契约文件。
+
+**二、契约没写到的建模决策，下游一律回问，不得自行发明。** 判断标准见
+[questions.md](questions.md)。工程决策自主，建模决策回问。
+
+**三、下游不得反向修改上游产物。** 编程手不改 `models/candidates.md` 的路线定义，
+写作手不改 `outputs/data/` 里的任何数值。要改，回问上游。
+
+## 违约信号
+
+出现下列情况说明契约被绕过了，应当停下来修契约，而不是继续往前推：
+
+- 编程手实现出来的东西，规格里找不到对应段落；
+- 论文里的数字，`claim_map.md` 里追不到 EXP-ID；
+- 图的数据来源指向一个已经被重跑覆盖的文件；
+- `questions.md` 里写的是「用哪个 Python 库」这类工程问题；
+- 规格的「未决问题」是空的，但下游一路顺畅没有任何回问 —— 通常意味着下游在替上游做决定。

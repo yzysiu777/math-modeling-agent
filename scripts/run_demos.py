@@ -17,14 +17,14 @@ from scripts.model_pool import validate_candidate_pool  # noqa: E402
 
 
 DEMO_SCRIPTS = (
-    ROOT / "cases/examples/optimization/experiments/code/run_demo.py",
-    ROOT / "cases/examples/data-analysis/experiments/code/run_demo.py",
-    ROOT / "cases/examples/hybrid/experiments/code/run_demo.py",
+    ROOT / "cases/examples/optimization/experiments/code/python/run_demo.py",
+    ROOT / "cases/examples/data-analysis/experiments/code/python/run_demo.py",
+    ROOT / "cases/examples/hybrid/experiments/code/python/run_demo.py",
 )
 DEMO_CASES = (
-    ("optimization", DEMO_SCRIPTS[0].parents[2] / "models/candidates.md", DEMO_SCRIPTS[0].parents[2] / "experiments/board.md", DEMO_SCRIPTS[0]),
-    ("data-analysis", DEMO_SCRIPTS[1].parents[2] / "models/candidates.md", DEMO_SCRIPTS[1].parents[2] / "experiments/board.md", DEMO_SCRIPTS[1]),
-    ("hybrid", DEMO_SCRIPTS[2].parents[2] / "models/candidates.md", DEMO_SCRIPTS[2].parents[2] / "experiments/board.md", DEMO_SCRIPTS[2]),
+    ("optimization", DEMO_SCRIPTS[0].parents[3] / "models/candidates.md", DEMO_SCRIPTS[0].parents[3] / "experiments/board.md", DEMO_SCRIPTS[0]),
+    ("data-analysis", DEMO_SCRIPTS[1].parents[3] / "models/candidates.md", DEMO_SCRIPTS[1].parents[3] / "experiments/board.md", DEMO_SCRIPTS[1]),
+    ("hybrid", DEMO_SCRIPTS[2].parents[3] / "models/candidates.md", DEMO_SCRIPTS[2].parents[3] / "experiments/board.md", DEMO_SCRIPTS[2]),
 )
 
 
@@ -53,7 +53,7 @@ def main() -> int:
     parser.parse_args()
     failed = False
     for script, code, stdout, stderr in run_all():
-        print(f"=== {script.parent.parent.parent.name} ===")
+        print(f"=== {script.parents[3].name} ===")
         print(stdout, end="")
         if stderr:
             print(stderr, end="", file=sys.stderr)

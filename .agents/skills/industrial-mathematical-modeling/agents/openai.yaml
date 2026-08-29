@@ -1,7 +1,0 @@
-interface:
-  display_name: "Industrial Math Modeling"
-  short_description: "Fast candidate-model and experiment workflow"
-  default_prompt: "Use $industrial-mathematical-modeling to route a case, build diverse candidate models, run a baseline and plan the cheapest discriminating experiments."
-
-policy:
-  allow_implicit_invocation: true

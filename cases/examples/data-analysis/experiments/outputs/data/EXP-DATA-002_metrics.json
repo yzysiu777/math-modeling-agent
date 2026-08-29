@@ -1,0 +1,14 @@
+{
+  "exp_id": "EXP-DATA-002",
+  "spec_id": "SPEC-P1-M02",
+  "language": "python",
+  "seed": null,
+  "split": {
+    "train": 5,
+    "validation": 2,
+    "test": 2
+  },
+  "baseline_test_mae": 10.9,
+  "linear_test_mae": 0.5,
+  "feasible": true
+}

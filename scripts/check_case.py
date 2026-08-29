@@ -9,6 +9,7 @@ the corresponding stage.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -24,6 +25,15 @@ try:
     from .experiment_board import parse_markdown_table
 except ImportError:  # pragma: no cover - direct script execution
     from experiment_board import parse_markdown_table
+
+try:
+    from .case_paths import clean_reference, is_traversal, resolve_in_case
+    from .claim_evidence import (board_experiment_ids, describe_missing_source,
+                                 parse_source_experiment, validate_check_report)
+except ImportError:  # pragma: no cover - direct script execution
+    from case_paths import clean_reference, is_traversal, resolve_in_case
+    from claim_evidence import (board_experiment_ids, describe_missing_source,
+                                parse_source_experiment, validate_check_report)
 
 
 ROUTES = frozenset({"optimization", "data_analysis", "hybrid", "insufficient_information"})
@@ -99,6 +109,19 @@ _REVIEW_METADATA_LINE = re.compile(
     + r")\s*[:：]\s*(?P<value>.*?)\s*$",
     re.IGNORECASE,
 )
+
+
+_SPEC_FM_LINE = re.compile(r"^(?P<key>[A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?P<value>.*?)\s*$")
+_SPEC_ROUTE_HEADING = re.compile(
+    r"^\s*#{2,4}\s+(?P<route>M-[A-Za-z0-9][A-Za-z0-9_-]*)(?:\s*.*)?\s*$", re.IGNORECASE
+)
+_SPEC_SELECTED_STATUS = re.compile(r"`?(?P<role>champion|challenger)`?", re.IGNORECASE)
+_SPEC_ROUTE_ID = re.compile(r"M-[A-Za-z0-9][A-Za-z0-9_-]*", re.IGNORECASE)
+_SPEC_CLAIM_ID = re.compile(r"^`?CLM-[A-Za-z0-9_-]+`?$", re.IGNORECASE)
+_SPEC_EXP_ID = re.compile(r"EXP-[A-Za-z0-9][A-Za-z0-9_-]*", re.IGNORECASE)
+_TEMPLATE_TOKEN = re.compile(r"<[^<>]{1,80}>")
+_SPEC_FIGURE_ID = re.compile(r"(?:FIG|TAB)-[A-Za-z0-9][A-Za-z0-9_-]*", re.IGNORECASE)
+_MARKDOWN_HEADING = re.compile(r"^\s*#{1,6}\s+\S")
 
 
 @dataclass(frozen=True)
@@ -405,6 +428,58 @@ def _routing_findings(
     ], suggested
 
 
+def _comparison_selection(case_dir: Path) -> dict[str, str]:
+    """Read the Champion/Challenger named in the comparison table."""
+
+    path = case_dir / "models/comparison.md"
+    if not path.is_file():
+        return {}
+    text = path.read_text(encoding="utf-8")
+    chosen: dict[str, str] = {}
+    for label in ("Champion", "Challenger"):
+        pattern = re.compile(
+            rf"(?:^|[|;；])\s*(?:[-*]\s*)?(?:当前\s*)?{label}\s*[：:]\s*([^|;；\n]*)",
+            re.IGNORECASE | re.MULTILINE,
+        )
+        match = pattern.search(text)
+        if match and _has_value(match.group(1)):
+            route = _SPEC_ROUTE_ID.search(match.group(1))
+            if route is not None:
+                chosen[label.casefold()] = route.group(0).upper()
+    return chosen
+
+
+def _selection_conflicts(case_dir: Path) -> list[Finding]:
+    """Report disagreement between the two places that record route selection.
+
+    ``models/candidates.md`` is the authority: it carries each route's status.
+    ``models/comparison.md`` restates the choice in prose, and the two drifting
+    apart is a real and easy mistake -- it happened once while building the
+    example cases.
+    """
+
+    stated = _comparison_selection(case_dir)
+    if not stated:
+        return []
+    actual: dict[str, str] = {}
+    for route, role in _selected_route_roles(case_dir).items():
+        actual.setdefault(role, route.upper())
+    findings: list[Finding] = []
+    for role in ("champion", "challenger"):
+        left, right = stated.get(role), actual.get(role)
+        if left and right and left != right:
+            findings.append(
+                _finding(
+                    "REMINDER", "SELECTION_CONFLICT",
+                    f"{role.capitalize()} 记录不一致：models/comparison.md 写 {left}，"
+                    f"models/candidates.md 的状态字段是 {right}；"
+                    "以 candidates.md 的状态为准，请修正另一处",
+                    "MODELER", "HUMAN",
+                )
+            )
+    return findings
+
+
 def _comparison_missing(case_dir: Path) -> list[str]:
     path = case_dir / "models/comparison.md"
     if not path.is_file():
@@ -449,7 +524,48 @@ def _failure_findings(case_dir: Path) -> list[Finding]:
     ]
 
 
-def _risk_findings(checkpoint: Mapping[str, Any], stage: str) -> list[Finding]:
+def _recomputed_risks(case_dir: Path) -> dict[str, list[str]]:
+    """Collect failed recomputation checks written by the engineer.
+
+    ``scripts/model_checks.py:write_check_report`` lands one JSON file per
+    experiment.  Reading them here means a real deterministic failure raises its
+    flag on its own, instead of waiting for somebody to remember to edit
+    ``checkpoint.yaml`` during a competition.
+    """
+
+    checks_dir = case_dir / "experiments/outputs/checks"
+    if not checks_dir.is_dir():
+        return {}
+    detected: dict[str, list[str]] = {}
+    for path in sorted(checks_dir.glob("*.json")):
+        try:
+            report = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            # An unreadable report is reported separately; it must not be read
+            # as "no risk found".
+            detected.setdefault("unreadable", []).append(path.name)
+            continue
+        if not isinstance(report, Mapping):
+            detected.setdefault("unreadable", []).append(path.name)
+            continue
+        exp_id = str(report.get("exp_id", "") or path.stem).strip()
+        checks = report.get("checks")
+        if not isinstance(checks, list):
+            detected.setdefault("unreadable", []).append(path.name)
+            continue
+        for check in checks:
+            if not isinstance(check, Mapping) or check.get("passed", True):
+                continue
+            kind = str(check.get("kind", "")).strip()
+            key = kind if kind in RISK_LABELS else "infeasible" if kind == "constraint" else ""
+            if not key:
+                continue
+            name = str(check.get("name", "")).strip() or "unnamed"
+            detected.setdefault(key, []).append(f"{exp_id}:{name}")
+    return detected
+
+
+def _risk_findings(checkpoint: Mapping[str, Any], stage: str, case_dir: Path) -> list[Finding]:
     findings: list[Finding] = []
     if _is_true(checkpoint.get("performance_concern")):
         findings.append(
@@ -460,8 +576,32 @@ def _risk_findings(checkpoint: Mapping[str, Any], stage: str) -> list[Finding]:
             )
         )
     risks = _mapping(checkpoint.get("deterministic_risks"))
+    recomputed = _recomputed_risks(case_dir)
+    if "unreadable" in recomputed:
+        # 早期允许快速试跑留下半成品报告；写强结论或提交时，无法读取的复算报告
+        # 与没有复算等价，不能让论文建立在读不出来的证据上。
+        level = "BLOCK" if stage in {"paper_claims", "final"} else "REMINDER"
+        findings.append(
+            _finding(
+                level, "CHECK_REPORT_UNREADABLE",
+                "复算报告无法解析：" + "、".join(recomputed.pop("unreadable"))
+                + "；不能把无法读取当成检查通过。请重跑对应实验的复算，"
+                "或删除这份损坏的报告后重新生成",
+                "ENGINEER", "C3",
+            )
+        )
     for key, (label, node) in RISK_LABELS.items():
-        if _is_true(risks.get(key)):
+        if key in recomputed:
+            level = "BLOCK" if stage in {"paper_claims", "final"} else "REMINDER"
+            findings.append(
+                _finding(
+                    level, "DETERMINISTIC_ERROR_BLOCK",
+                    f"{label}（复算报告：" + "、".join(recomputed[key]) + "）"
+                    "；在写入强结论或最终提交前必须修复、复算或由队员明确处理",
+                    "ENGINEER", node,
+                )
+            )
+        elif _is_true(risks.get(key)):
             level = "BLOCK" if stage in {"paper_claims", "final"} else "REMINDER"
             findings.append(
                 _finding(
@@ -470,6 +610,459 @@ def _risk_findings(checkpoint: Mapping[str, Any], stage: str) -> list[Finding]:
                     "HUMAN", node,
                 )
             )
+    return findings
+
+
+def _spec_front_matter(path: Path) -> dict[str, str]:
+    """Read the small YAML header of one spec without requiring a YAML parser."""
+
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return {}
+    if not lines or lines[0].strip() != "---":
+        return {}
+    fields: dict[str, str] = {}
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        match = _SPEC_FM_LINE.match(line)
+        if match is not None:
+            fields[match.group("key").casefold()] = match.group("value").strip().strip("`'\"")
+    return fields
+
+
+def _specs_by_route(case_dir: Path) -> dict[str, list[dict[str, str]]]:
+    """Map route IDs to the front matter of every spec written for them."""
+
+    specs_dir = case_dir / "specs"
+    if not specs_dir.is_dir():
+        return {}
+    routes: dict[str, list[dict[str, str]]] = {}
+    for path in sorted(specs_dir.glob("SPEC-*.md")):
+        if path.name.endswith(".questions.md"):
+            continue
+        fields = _spec_front_matter(path)
+        route = fields.get("route_id", "").strip().casefold()
+        if route and fields.get("status", "").strip().casefold():
+            fields["_name"] = path.name
+            routes.setdefault(route, []).append(fields)
+    return routes
+
+
+def _specs_by_status(case_dir: Path) -> dict[str, set[str]]:
+    """Map route IDs to the spec statuses they already have."""
+
+    return {
+        route: {fields.get("status", "").strip().casefold() for fields in entries}
+        for route, entries in _specs_by_route(case_dir).items()
+    }
+
+
+def _selected_route_roles(case_dir: Path) -> dict[str, str]:
+    """Map route ID -> champion/challenger, from the authoritative candidate pool."""
+
+    path = case_dir / "models/candidates.md"
+    if not path.is_file():
+        return {}
+    text = path.read_text(encoding="utf-8")
+    roles: dict[str, str] = {}
+    current = ""
+    for line in text.splitlines():
+        if _MARKDOWN_HEADING.match(line):
+            heading = _SPEC_ROUTE_HEADING.match(line)
+            current = heading.group("route").strip().casefold() if heading else ""
+            continue
+        if not current:
+            continue
+        match = _SPEC_SELECTED_STATUS.search(line)
+        if match is not None:
+            roles[current] = match.group("role").casefold()
+    return roles
+
+
+def _selected_routes(case_dir: Path) -> set[str]:
+    """Find routes already marked champion or challenger in the candidate pool."""
+
+    path = case_dir / "models/candidates.md"
+    if not path.is_file():
+        return set()
+    text = path.read_text(encoding="utf-8")
+    selected: set[str] = set()
+    current = ""
+    for line in text.splitlines():
+        # Any heading ends the previous route section.  Without this, prose after
+        # the last route card (for example a section explaining why M-01 is the
+        # Challenger) would be attributed to whichever route came before it.
+        if _MARKDOWN_HEADING.match(line):
+            heading = _SPEC_ROUTE_HEADING.match(line)
+            current = heading.group("route").strip().casefold() if heading else ""
+            continue
+        if current and _SPEC_SELECTED_STATUS.search(line):
+            selected.add(current)
+    return selected
+
+
+def _spec_findings(case_dir: Path, stage: str) -> list[Finding]:
+    """Remind about missing specs and about full specs that skipped their probe.
+
+    These are reminders at every stage.  A spec is a handoff aid, not a gate:
+    blocking on it would turn the lightweight contract into the heavyweight
+    pipeline this workspace deliberately moved away from.
+    """
+
+    if stage == "exploration":
+        return []
+    findings: list[Finding] = []
+    specs = _specs_by_status(case_dir)
+    for route in sorted(_selected_routes(case_dir)):
+        statuses = specs.get(route, set())
+        if "full" not in statuses:
+            findings.append(
+                _finding(
+                    "REMINDER", "SPEC_MISSING",
+                    f"路线 {route.upper()} 已选为 champion/challenger，但 specs/ 中没有 status: full 的实现规格；"
+                    "编程手需要规格才能忠实实现",
+                    "MODELER", "HUMAN",
+                )
+            )
+    for route, statuses in sorted(specs.items()):
+        if "full" in statuses and "probe" not in statuses:
+            findings.append(
+                _finding(
+                    "REMINDER", "PROBE_MISSING",
+                    f"路线 {route.upper()} 直接进入 full 规格，没有对应的 probe 规格；"
+                    "请确认这是题面指定方法，否则先用轻测试证伪",
+                    "MODELER", "HUMAN",
+                )
+            )
+    findings.extend(_probe_closure_findings(case_dir, stage))
+    return findings
+
+
+#: 实验板上表示「跑完了」的状态。其余状态（queued/running/failed/skipped）都不能闭环。
+_BOARD_DONE_STATUS = frozenset({"done"})
+#: 结果摘要中的明确判定。probe 是否通过由实验记录说了算，不由 full 规格自报。
+_VERDICT_PASS = re.compile(r"\bPASS\b|判定\s*[:：]?\s*通过|结论\s*[:：]?\s*通过|探针通过", re.IGNORECASE)
+_VERDICT_FAIL = re.compile(r"\bFAIL\b|判定\s*[:：]?\s*未通过|判定\s*[:：]?\s*失败|探针失败", re.IGNORECASE)
+
+
+def _board_rows(case_dir: Path) -> dict[str, dict[str, Any]]:
+    """Index the experiment board by experiment ID."""
+
+    board = case_dir / "experiments/board.md"
+    if not board.is_file():
+        return {}
+    rows: dict[str, dict[str, Any]] = {}
+    for row in parse_markdown_table(board.read_text(encoding="utf-8")):
+        exp_id = str(row.get("实验 ID", "")).strip().casefold()
+        if exp_id:
+            rows[exp_id] = row
+    return rows
+
+
+def _probe_closure_findings(case_dir: Path, stage: str) -> list[Finding]:
+    """Check that each full spec traces to a probe that actually ran and passed.
+
+    A probe file existing proves nothing, and neither does a full spec asserting
+    ``probe_result: PASS`` about itself.  The verdict has to come from the
+    experiment record: the referenced probe spec must exist and be a probe, it
+    must describe the same route, its experiment must be on the board, that
+    experiment must be finished, and its result summary must state PASS.
+
+    Early stages get a reminder so exploration keeps moving; a route may not
+    carry an unclosed probe into a route decision or a paper claim.
+    """
+
+    level = "BLOCK" if stage in {"paper_claims", "final"} else "REMINDER"
+    board_rows = _board_rows(case_dir)
+    specs_by_route = _specs_by_route(case_dir)
+    specs_by_id = {
+        fields.get("spec_id", "").strip().casefold(): fields
+        for entries in specs_by_route.values() for fields in entries
+        if fields.get("spec_id", "").strip()
+    }
+
+    findings: list[Finding] = []
+
+    def fail(reason: str) -> None:
+        findings.append(_finding(level, "PROBE_NOT_CLOSED", reason, "MODELER", "HUMAN"))
+
+    for route, entries in sorted(specs_by_route.items()):
+        for fields in entries:
+            if fields.get("status", "").strip().casefold() != "full":
+                continue
+            name = fields.get("_name", "SPEC")
+            result = fields.get("probe_result", "").strip().strip("`'\"").casefold()
+
+            if result == "waived":
+                if not _has_value(fields.get("probe_waiver_reason", "")):
+                    fail(f"{name} 以 WAIVED 跳过 probe，但没有写明豁免理由；"
+                         "人工豁免必须留下可复核的原因")
+                continue
+
+            if result != "pass":
+                fail(f"路线 {route.upper()} 的 {name} 是 full 规格，但 probe_result="
+                     f"{result or '未填写'}；正常情况下需要 probe 实际跑出 PASS 才能升级，"
+                     "确实要跳过时写 WAIVED 并说明理由")
+                continue
+
+            # probe 规格必须真实存在、确实是 probe、且描述同一条路线
+            probe_id = fields.get("probe_spec_id", "").strip().strip("`").casefold()
+            if not probe_id:
+                fail(f"{name} 声称 probe 通过，但没有填写 probe_spec_id")
+                continue
+            probe = specs_by_id.get(probe_id)
+            if probe is None:
+                fail(f"{name} 的 probe_spec_id={probe_id} 在 specs/ 中找不到对应文件；"
+                     "不能引用一份不存在的探针")
+                continue
+            if probe.get("status", "").strip().casefold() != "probe":
+                fail(f"{name} 的 probe_spec_id={probe_id} 指向的不是 probe 规格"
+                     f"（status={probe.get('status', '未填写')}）")
+                continue
+            for field, label in (("case_id", "案例"), ("route_id", "路线"), ("subproblem", "子问题")):
+                left = fields.get(field, "").strip().casefold()
+                right = probe.get(field, "").strip().casefold()
+                if left and right and left != right:
+                    fail(f"{name} 与其 probe 规格的 {label}不一致："
+                         f"{fields.get(field)} vs {probe.get(field)}")
+
+            # probe 实验必须在板上、跑完、且有明确 PASS 判定
+            exp_id = fields.get("probe_exp_id", "").strip().strip("`").casefold()
+            if not exp_id:
+                fail(f"{name} 声称 probe 通过，但没有填写 probe_exp_id")
+                continue
+            row = board_rows.get(exp_id)
+            if row is None:
+                detail = "实验板为空" if not board_rows else "实验板中没有这一行"
+                fail(f"{name} 的 probe_exp_id={exp_id.upper()} 在 experiments/board.md 中找不到"
+                     f"（{detail}）；probe 必须有实际运行记录，不能只在规格里声称通过")
+                continue
+            status = str(row.get("status", "")).strip().casefold()
+            if status not in _BOARD_DONE_STATUS:
+                fail(f"{name} 的 probe 实验 {exp_id.upper()} 在实验板上的状态是 "
+                     f"{status or '未填写'}，不是已完成；未跑完的探针不能作为升级依据")
+                continue
+            summary = " ".join(str(value) for value in row.values())
+            if _VERDICT_FAIL.search(summary):
+                fail(f"{name} 的 probe 实验 {exp_id.upper()} 的记录里写着未通过判定，"
+                     "这条路线不应被升级为 full 规格")
+            elif not _VERDICT_PASS.search(summary):
+                fail(f"{name} 的 probe 实验 {exp_id.upper()} 已完成，但结果摘要里没有明确的 "
+                     "PASS 判定；请在实验板该行写明「判定：PASS」，"
+                     "full 规格自报的 probe_result 不能替代实验记录")
+    return findings
+
+
+#: claim_map 表头 -> 归一化字段名。识别靠关键词，允许队员微调列名。
+_CLAIM_COLUMNS = (
+    ("claim_id", ("claim id", "claim", "主张 id", "主张编号")),
+    ("location", ("论文位置", "位置", "location", "section")),
+    ("statement", ("主张原文", "主张", "statement", "claim text")),
+    ("strength", ("强度", "strength")),
+    ("exp_id", ("exp-id", "exp id", "来源 exp-id", "实验 id", "experiment")),
+    ("data_file", ("数据文件", "data file", "data")),
+    ("figure_id", ("图/表 id", "图表 id", "figure", "fig")),
+    ("check_report", ("复算报告", "check report", "check")),
+    ("status", ("状态", "status")),
+)
+_VERIFIED_STATUS = re.compile(r"verified|已验证|已复核", re.IGNORECASE)
+
+
+def _claim_header_map(cells: list[str]) -> dict[str, int]:
+    """Map normalized field names onto column indexes of the claim-map header."""
+
+    mapping: dict[str, int] = {}
+    for index, cell in enumerate(cells):
+        normalized = " ".join(cell.casefold().split()).strip("`*")
+        for field, keywords in _CLAIM_COLUMNS:
+            if field in mapping:
+                continue
+            if any(keyword in normalized for keyword in keywords):
+                mapping[field] = index
+                break
+    return mapping
+
+
+def _cell(cells: list[str], header: dict[str, int], field: str) -> str:
+    index = header.get(field)
+    if index is None or index >= len(cells):
+        return ""
+    return _TEMPLATE_TOKEN.sub("", cells[index]).strip().strip("`")
+
+
+def _figure_states(case_dir: Path) -> dict[str, str]:
+    """Read FIG-ID -> status rows from the figure manifest."""
+
+    path = case_dir / "experiments/outputs/figures/manifest.md"
+    if not path.is_file():
+        return {}
+    states: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        cells = _split_pipe_row(line)
+        if not cells or _is_table_separator(cells):
+            continue
+        match = _SPEC_FIGURE_ID.search(cells[0])
+        if match is None:
+            continue
+        joined = " ".join(cells).casefold()
+        states[match.group(0).upper()] = "stale" if "stale" in joined else "ok"
+    return states
+
+
+def _claim_map_findings(case_dir: Path, stage: str) -> list[Finding]:
+    """Check that every paper claim resolves to evidence that actually exists.
+
+    This is structure, existence and recorded-status validation only.  It does
+    not verify that a number is mathematically right; it verifies that the paper
+    is not citing evidence which is missing, unreadable or already failing.
+    """
+
+    if stage not in {"paper_claims", "final"}:
+        return []
+    # 论文骨架尚未建立（没有 claim_map 或还没填任何主张）在 paper_claims 只提醒 ——
+    # 那是进度问题。但一条已经写下的主张引用了不存在、读不出或已失败的证据，
+    # 两个阶段都必须阻断：论文不能建立在指不到的证据上。
+    level = "BLOCK" if stage == "final" else "REMINDER"
+    evidence_level = "BLOCK"
+    path = case_dir / "paper/claim_map.md"
+    if not path.is_file():
+        return [
+            _finding(
+                level, "HUMAN_DECISION_REQUIRED",
+                "paper/claim_map.md 不存在；论文强主张必须能追溯到实验和数据文件",
+                "WRITER", "HUMAN",
+            )
+        ]
+
+    text = path.read_text(encoding="utf-8")
+    rows = [
+        cells for cells in (_split_pipe_row(line) for line in text.splitlines())
+        if cells and not _is_table_separator(cells)
+    ]
+    header: dict[str, int] = {}
+    for cells in rows:
+        candidate = _claim_header_map(cells)
+        if "claim_id" in candidate and "exp_id" in candidate:
+            header = candidate
+            break
+    if not header:
+        return [
+            _finding(
+                level, "CLAIM_MAP_HEADER_INVALID",
+                "paper/claim_map.md 缺少可识别的表头（至少需要 Claim ID 与 来源 EXP-ID 两列）；"
+                "请对照 templates/claim_map.md 修正表头",
+                "WRITER", "HUMAN",
+            )
+        ]
+
+    claims = [
+        cells for cells in rows
+        if _SPEC_CLAIM_ID.match(cells[0].strip())
+        and any(_has_value(_TEMPLATE_TOKEN.sub("", cell)) for cell in cells[1:])
+    ]
+    if not claims:
+        return [
+            _finding(
+                level, "HUMAN_DECISION_REQUIRED",
+                "paper/claim_map.md 没有任何已填写的 CLM- 记录；论文里的数字尚未建立溯源",
+                "WRITER", "HUMAN",
+            )
+        ]
+
+    known_experiments = board_experiment_ids(case_dir)
+    figures = _figure_states(case_dir)
+
+    # 写作性字段缺失是进度问题；证据性字段缺失是「这条主张没有依据」，等级不同。
+    incomplete: list[str] = []
+    missing_evidence_field: list[str] = []
+    dangling: list[str] = []
+    missing_data: list[str] = []
+    bad_reports: list[str] = []
+    bad_figures: list[str] = []
+    stale: list[str] = []
+    contradicted: list[str] = []
+
+    for cells in claims:
+        claim_id = cells[0].strip().strip("`")
+
+        for field, label in (("statement", "主张原文"), ("strength", "强度")):
+            if not _has_value(_cell(cells, header, field)):
+                incomplete.append(f"{claim_id}({label})")
+
+        # P1-2：来源实验只从 exp_id 单元格读，不扫整行 ——
+        # 数据文件名里的 EXP-ID 不得替来源列背书。
+        source = parse_source_experiment(_cell(cells, header, "exp_id"))
+        claim_exp = source.exp_id
+        if not source.ok:
+            missing_evidence_field.append(f"{claim_id}(来源 EXP-ID：{source.problem})")
+        elif claim_exp.casefold() not in known_experiments:
+            # 实验板读不出来不等于「来源实验存在」。空板、缺板和板上没这一行，
+            # 都同样无法证明这条主张有跑过的实验支撑。
+            dangling.append(f"{claim_id}->{describe_missing_source(case_dir, claim_exp)}")
+
+        # 数据文件只能落在 experiments/outputs/data/
+        data_reference = _cell(cells, header, "data_file")
+        if not _has_value(data_reference):
+            missing_evidence_field.append(f"{claim_id}(数据文件未填写)")
+        elif is_traversal(data_reference):
+            missing_data.append(f"{claim_id}->{data_reference}(路径非法)")
+        elif resolve_in_case(case_dir, data_reference, kind="data") is None:
+            missing_data.append(
+                f"{claim_id}->{data_reference}(不存在或不在 experiments/outputs/data/ 内)")
+
+        # 复算报告必须存在、可解析、且确属这条 claim 的实验
+        report_reference = _cell(cells, header, "check_report")
+        report_failed = False
+        if not _has_value(report_reference):
+            missing_evidence_field.append(f"{claim_id}(复算报告未填写)")
+        elif is_traversal(report_reference):
+            bad_reports.append(f"{claim_id}->{report_reference}(路径非法)")
+        else:
+            report_path = resolve_in_case(case_dir, report_reference, kind="checks")
+            if report_path is None:
+                bad_reports.append(
+                    f"{claim_id}->{report_reference}(不存在或不在 experiments/outputs/checks/ 内)")
+            else:
+                verdict = validate_check_report(report_path, claim_exp)
+                if not verdict.ok:
+                    bad_reports.append(f"{claim_id}->{report_reference}({verdict.problem})")
+                report_failed = verdict.has_failed_check
+
+        figure_reference = _cell(cells, header, "figure_id")
+        for match in _SPEC_FIGURE_ID.finditer(figure_reference):
+            figure_id = match.group(0).upper()
+            state = figures.get(figure_id)
+            if state is None:
+                bad_figures.append(f"{claim_id}->{figure_id}(不在 figures/manifest.md)")
+            elif state == "stale":
+                bad_figures.append(f"{claim_id}->{figure_id}(manifest 标记 stale)")
+
+        status = _cell(cells, header, "status")
+        joined = _TEMPLATE_TOKEN.sub("", " ".join(cells))
+        if "stale" in status.casefold() or "stale" in joined.casefold():
+            stale.append(claim_id)
+        if report_failed:
+            if _VERIFIED_STATUS.search(status):
+                contradicted.append(f"{claim_id}(状态 verified，但复算报告有未通过项)")
+            else:
+                contradicted.append(f"{claim_id}(绑定的复算报告有未通过项)")
+
+    findings: list[Finding] = []
+    for items, code, message, node, item_level in (
+        (incomplete, "CLAIM_MAP_INCOMPLETE", "claim_map 中以下写作字段为空或仍是模板占位：", "HUMAN", level),
+        (missing_evidence_field, "CLAIM_EVIDENCE_MISSING",
+         "claim_map 中以下主张缺少关键证据字段，不能作为论文主张：", "C3", evidence_level),
+        (dangling, "HUMAN_DECISION_REQUIRED", "claim_map 中以下主张无法追溯到实验板里的实验：", "C3", evidence_level),
+        (missing_data, "CLAIM_EVIDENCE_MISSING", "claim_map 引用的结果数据文件不可用：", "C3", evidence_level),
+        (bad_reports, "CLAIM_EVIDENCE_MISSING", "claim_map 的复算报告不可用：", "C3", evidence_level),
+        (bad_figures, "CLAIM_EVIDENCE_MISSING", "claim_map 引用的图在清单中缺失或已过期：", "C3", evidence_level),
+        (stale, "HUMAN_DECISION_REQUIRED", "claim_map 中以下主张仍标记为 stale，对应数字或图已过期：", "HUMAN", evidence_level),
+        (contradicted, "CLAIM_CONTRADICTS_CHECK", "claim_map 中以下主张绑定了未通过的确定性检查，不能作为论文强结论：", "C3", evidence_level),
+    ):
+        if items:
+            findings.append(_finding(item_level, code, message + "、".join(items), "WRITER", node))
     return findings
 
 
@@ -672,7 +1265,10 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
         )
 
     findings.extend(_failure_findings(case_dir))
-    findings.extend(_risk_findings(checkpoint, stage))
+    findings.extend(_risk_findings(checkpoint, stage, case_dir))
+    findings.extend(_spec_findings(case_dir, stage))
+    findings.extend(_selection_conflicts(case_dir))
+    findings.extend(_claim_map_findings(case_dir, stage))
 
     missing_comparison = _comparison_missing(case_dir)
     if missing_comparison:

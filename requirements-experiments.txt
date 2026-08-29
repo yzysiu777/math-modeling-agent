@@ -1,0 +1,4 @@
+# 实验与绘图依赖：只在本机运行实验时安装，不进 CI。
+# requirements-dev.txt 只保留确定性检查所需的最小集合，两者不要合并。
+matplotlib>=3.7
+numpy>=1.24
