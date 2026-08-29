@@ -83,7 +83,7 @@ class CaseCheckTests(unittest.TestCase):
             "# 实验赛马板\n\n"
             "| 实验 ID | 候选路线 | 要回答的问题 | 最小配置 | 数据/实例范围 | 指标 | 预计成本 | status | 结果摘要 | 是否继续 | 下一项信息价值最高的实验 |\n"
             "|---|---|---|---|---|---|---|---|---|---|---|\n"
-            f"| {exp_id} | M-01 | baseline 是否可行 | toy | toy instance | 成本 | low | done | 可行 | yes | 与枚举比较 |\n",
+            f"| {exp_id} | M-01 | baseline 是否可行 | toy | toy instance | 成本 | low | done | 判定：PASS；可行 | yes | 与枚举比较 |\n",
             encoding="utf-8",
         )
 
@@ -701,10 +701,10 @@ class CaseCheckTests(unittest.TestCase):
             for node in ("C1", "C2", "C3"):
                 self.add_decision(case, node)
             blocked = check_case(case, "final")
+        # P1-3：已写下的主张引用不存在的证据，paper_claims 与 final 都必须阻断
         self.assertTrue(any(f.code == "CLAIM_EVIDENCE_MISSING" and "数据文件" in f.reason
-                            for f in reminder.findings))
-        self.assertFalse(any(f.code == "CLAIM_EVIDENCE_MISSING" and f.blocks
-                             for f in reminder.findings))
+                            and f.blocks for f in reminder.findings))
+        self.assertEqual(reminder.exit_code, 1)
         self.assertTrue(any(f.code == "CLAIM_EVIDENCE_MISSING" and f.blocks
                             for f in blocked.findings))
         self.assertEqual(blocked.exit_code, 1)
@@ -715,7 +715,8 @@ class CaseCheckTests(unittest.TestCase):
             self._paper_claims_ready(case)
             self.set_claim_map(case, report_file="outputs/checks/nope.json")
             report = check_case(case, "paper_claims")
-        self.assertTrue(any("复算报告不存在" in f.reason for f in report.findings))
+        self.assertTrue(any(f.code == "CLAIM_EVIDENCE_MISSING" and "复算报告不可用" in f.reason
+                            and f.blocks for f in report.findings))
 
     def test_claim_pointing_at_an_unparsable_check_report_is_reported(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -815,12 +816,29 @@ class CaseCheckTests(unittest.TestCase):
 
     @staticmethod
     def write_spec(case, name, route="M-01", status="full", probe_result="PASS",
-                   probe_exp_id="EXP-001", waiver=""):
+                   probe_exp_id="EXP-001", waiver="", probe_spec_id=None,
+                   write_probe=True, probe_route=None, subproblem="问题1",
+                   probe_subproblem=None):
+        """Write a full spec and, unless told otherwise, the probe spec it names."""
+
         (case / "specs").mkdir(parents=True, exist_ok=True)
+        spec_id = name[:-3]
+        probe_spec_id = probe_spec_id if probe_spec_id is not None else f"{spec_id}-probe"
+        if write_probe:
+            (case / f"specs/{probe_spec_id}.md").write_text(
+                "---\n"
+                f"spec_id: {probe_spec_id}\ncase_id: {case.name}\n"
+                f"route_id: {probe_route or route}\n"
+                f"subproblem: {probe_subproblem or subproblem}\n"
+                "method_family: heuristic\nstatus: probe\nlanguage: python\n---\n",
+                encoding="utf-8",
+            )
         (case / f"specs/{name}").write_text(
             "---\n"
-            f"spec_id: {name[:-3]}\nroute_id: {route}\nstatus: {status}\nlanguage: python\n"
-            f"probe_spec_id: {name[:-3]}-probe\nprobe_exp_id: {probe_exp_id}\n"
+            f"spec_id: {spec_id}\ncase_id: {case.name}\nroute_id: {route}\n"
+            f"subproblem: {subproblem}\nmethod_family: heuristic\n"
+            f"status: {status}\nlanguage: python\n"
+            f"probe_spec_id: {probe_spec_id}\nprobe_exp_id: {probe_exp_id}\n"
             f"probe_result: {probe_result}\nprobe_waiver_reason: {waiver}\n"
             "---\n",
             encoding="utf-8",
@@ -859,7 +877,7 @@ class CaseCheckTests(unittest.TestCase):
             self.confirm(case)
             self.set_comparison(case)
             self.set_board_experiment(case, "EXP-001")
-            self.write_spec(case, "SPEC-A1-M01.md", probe_exp_id="EXP-999")
+            self.write_spec(case, "SPEC-A1-M01.md", probe_exp_id="EXP-999")  # 板上没有这一行
             report = check_case(case, "model_selection")
         self.assertTrue(any(f.code == "PROBE_NOT_CLOSED" and "EXP-999" in f.reason
                             for f in report.findings))

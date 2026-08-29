@@ -9,8 +9,12 @@ language: python
 depends_on: []
 
 # probe 闭环：full 规格必须能追溯到已经跑过并通过的 probe。
-# probe_result 取 PASS / FAIL / WAIVED。
-# 只有题面直接指定算法等特殊情况才写 WAIVED，且必须写明豁免理由。
+# probe_result 取 PASS / PENDING / FAIL / WAIVED：
+#   PASS    probe 已跑完且实验板该行写着「判定：PASS」——唯一的正常升级路径
+#   PENDING 规格还在起草、probe 尚未跑完。合法的中间状态，但**不代表已完成升级**：
+#           路线取舍与论文强结论阶段会阻断，必须先把 probe 跑完
+#   FAIL    probe 已被证伪，这条路线不应升级
+#   WAIVED  人工豁免（如题面直接指定算法），必须写明非占位的豁免理由
 probe_spec_id: SPEC-<子问题>-<路线 ID>-probe
 probe_exp_id: EXP-
 probe_result: PASS

@@ -31,6 +31,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List, Sequence
 
+try:
+    from .case_paths import clean_reference, is_traversal, resolve_in_case
+except ImportError:  # pragma: no cover - direct script execution
+    from case_paths import clean_reference, is_traversal, resolve_in_case
+
 NODES = ("C1", "C2", "C3")
 
 #: Per-file excerpt budget.  Large inputs are truncated and listed as
@@ -176,8 +181,38 @@ def _pipe_rows(text: str) -> list[list[str]]:
 # --------------------------------------------------------------------------- C1
 
 
+#: 文件名里出现这些词，才认为它自称是题面。刻意不靠扩展名判断 ——
+#: 一份 nodes.csv 是附件数据，不是题面。
+_STATEMENT_NAME = re.compile(r"题面|题目|原题|statement|problem", re.IGNORECASE)
+#: `input/README.md` 里同时出现文件名和这些词时，视为显式声明该文件是题面。
+_STATEMENT_ROLE = re.compile(r"题面|题目|原题|statement|problem", re.IGNORECASE)
+
+
+def _declared_statements(case_dir: Path) -> set[str]:
+    """Read file roles declared in ``input/README.md``."""
+
+    readme = case_dir / "input/README.md"
+    if not readme.is_file():
+        return set()
+    declared: set[str] = set()
+    for line in _read(readme).splitlines():
+        if not _STATEMENT_ROLE.search(line):
+            continue
+        for token in re.findall(r"[\w.\u4e00-\u9fff-]+\.[A-Za-z0-9]{1,8}", line):
+            declared.add(token.casefold())
+    return declared
+
+
 def _add_problem_evidence(packet: Packet, case_dir: Path) -> None:
-    """Give C1 the original statement, not only the Modeler's reading of it."""
+    """Give C1 the original statement, not only the Modeler's reading of it.
+
+    C1 exists to check that the case brief is faithful to the problem, so the
+    brief cannot be its own evidence.  Data attachments cannot stand in for the
+    statement either: a table of coordinates says nothing about what is being
+    asked, and deciding "is this CSV the statement?" from its extension would be
+    guessing.  A file counts as statement evidence only when it says so -- by
+    name, or by being declared in ``input/README.md``.
+    """
 
     input_dir = case_dir / "input"
     files = sorted(
@@ -192,26 +227,52 @@ def _add_problem_evidence(packet: Packet, case_dir: Path) -> None:
         )
         return
 
-    inventory = [
-        f"- `{path.relative_to(case_dir)}`（{path.stat().st_size} 字节）" for path in files
+    declared = _declared_statements(case_dir)
+    statements = [
+        path for path in files
+        if _STATEMENT_NAME.search(path.name) or path.name.casefold() in declared
     ]
-    packet.add("### 原始输入清单（`input/`）", "", *inventory, "")
+    attachments = [path for path in files if path not in statements]
+
+    packet.add("### 原始输入清单（`input/`）", "")
+    for path in files:
+        role = "题面依据" if path in statements else "数据附件"
+        packet.add(f"- `{path.relative_to(case_dir)}`（{role}，{path.stat().st_size} 字节）")
+    packet.add("")
+
+    if not statements:
+        packet.absent(
+            "`input/` 下只有数据附件，没有可识别的题面 —— 数据表不能替代题面，"
+            "C1 无法核对题意是否忠实于原题。请把题面文件放入 `input/`，"
+            "文件名含「题面/题目/statement」，或在 `input/README.md` 中标注它的角色"
+        )
 
     excerpted = False
-    for path in files:
+    for path in statements:
         if path.suffix.casefold() not in _TEXT_SUFFIXES:
-            packet.attach(f"`{path.relative_to(case_dir)}`（非文本，需随包一并提供）")
+            packet.attach(f"`{path.relative_to(case_dir)}`（题面，非文本格式，需随包一并提供）")
             continue
         text = _read(path)
         if not text:
             continue
         if len(text) > _INPUT_EXCERPT_CHARS:
-            packet.attach(f"`{path.relative_to(case_dir)}`（已截断，审核前请提供完整文件）")
+            packet.attach(f"`{path.relative_to(case_dir)}`（题面已截断，审核前请提供完整文件）")
         packet.section(f"原题材料：{path.name}", text, str(path.relative_to(case_dir)))
         excerpted = True
 
-    if not excerpted:
-        packet.absent("`input/` 中没有可直接摘录的文本题面，审核者必须另行拿到原题")
+    if statements and not excerpted:
+        packet.absent("题面文件不是可摘录的文本格式，审核者必须另行拿到原题")
+
+    for path in attachments[:5]:
+        if path.suffix.casefold() not in _TEXT_SUFFIXES:
+            packet.attach(f"`{path.relative_to(case_dir)}`（数据附件，需随包一并提供）")
+            continue
+        lines = _read(path).splitlines()
+        excerpt = "\n".join(lines[:_DATA_EXCERPT_LINES])
+        if len(lines) > _DATA_EXCERPT_LINES:
+            excerpt += f"\n[... 共 {len(lines)} 行，已摘录前 {_DATA_EXCERPT_LINES} 行 ...]"
+            packet.attach(f"`{path.relative_to(case_dir)}`（完整数据附件）")
+        packet.section(f"数据附件片段：{path.name}", excerpt, str(path.relative_to(case_dir)))
 
 
 # --------------------------------------------------------------------------- C2
@@ -296,108 +357,174 @@ def _claim_rows(case_dir: Path) -> tuple[list[str], list[list[str]]]:
     return header, claims
 
 
-def _add_claim_evidence(packet: Packet, case_dir: Path) -> None:
-    """Give C3 the claim text plus the rows, verdicts and figures behind it."""
+#: claim_map 表头 -> 归一化字段名，与 check_case.py 保持一致。
+_CLAIM_COLUMNS = (
+    ("claim_id", ("claim id", "claim", "主张 id")),
+    ("statement", ("主张原文", "主张", "statement")),
+    ("exp_id", ("exp-id", "exp id", "来源 exp-id", "实验 id")),
+    ("data_file", ("数据文件", "data file")),
+    ("figure_id", ("图/表 id", "图表 id", "figure", "fig")),
+    ("check_report", ("复算报告", "check report")),
+)
 
-    header, claims = _claim_rows(case_dir)
+
+def _claim_header(cells: list[str]) -> dict[str, int]:
+    mapping: dict[str, int] = {}
+    for index, cell in enumerate(cells):
+        normalized = " ".join(cell.casefold().split()).strip("`*")
+        for field, keywords in _CLAIM_COLUMNS:
+            if field not in mapping and any(keyword in normalized for keyword in keywords):
+                mapping[field] = index
+                break
+    return mapping
+
+
+def _claim_cell(cells: list[str], header: dict[str, int], field: str) -> str:
+    index = header.get(field)
+    if index is None or index >= len(cells):
+        return ""
+    return cells[index].strip().strip("`")
+
+
+def _add_claim_evidence(packet: Packet, case_dir: Path) -> None:
+    """Give C3 each claim together with the evidence that claim itself names.
+
+    Evidence is gathered per claim rather than per directory: an unrelated
+    recomputation report sitting in ``checks/`` says nothing about the claim in
+    front of the reviewer, so it must not make the packet look complete.
+    """
+
+    path = case_dir / "paper/claim_map.md"
+    rows = _pipe_rows(_read(path)) if path.is_file() else []
+    header: dict[str, int] = {}
+    for cells in rows:
+        candidate = _claim_header(cells)
+        if "claim_id" in candidate and "exp_id" in candidate:
+            header = candidate
+            break
+    claims = [
+        cells for cells in rows
+        if cells and re.fullmatch(r"`?CLM-[A-Za-z0-9_-]+`?", cells[0].strip(), re.IGNORECASE)
+        and any(_has_value(cell) for cell in cells[1:])
+    ] if header else []
+
     if not claims:
         packet.absent("`paper/claim_map.md` 没有已填写的强主张 —— C3 没有可抽查的对象")
         return
 
     packet.add("### 待审核的论文强主张（`paper/claim_map.md`）", "")
-    if header:
-        packet.add("| " + " | ".join(header) + " |", "|" + "---|" * len(header))
+    header_row = next((cells for cells in rows if _claim_header(cells) == header), None)
+    if header_row:
+        packet.add("| " + " | ".join(header_row) + " |", "|" + "---|" * len(header_row))
     for cells in claims:
         packet.add("| " + " | ".join(cells) + " |")
     packet.add("", "审核者请从中挑 3–5 条风险最高的抽查，不要求逐条复核。", "")
 
-    joined = " ".join(" ".join(cells) for cells in claims)
-    outputs = case_dir / "experiments/outputs"
+    manifest_rows = _pipe_rows(_read(case_dir / "experiments/outputs/figures/manifest.md")) \
+        if (case_dir / "experiments/outputs/figures/manifest.md").is_file() else []
 
-    # 数据片段：claim 引用到的结果文件，各摘录前若干行
-    referenced = sorted({
-        match.group(0) for match in re.finditer(r"[\w./-]+\.(?:csv|json)", joined)
-    })
-    shown = 0
-    for reference in referenced:
-        candidate = _resolve(case_dir, reference)
-        if candidate is None or not candidate.is_file():
-            packet.absent(f"claim 引用的结果文件不存在：`{reference}`")
-            continue
-        if "checks" in candidate.parts:
-            continue  # 复算报告单独成节
-        lines = _read(candidate).splitlines()
-        excerpt = "\n".join(lines[:_DATA_EXCERPT_LINES])
-        if len(lines) > _DATA_EXCERPT_LINES:
-            excerpt += f"\n[... 共 {len(lines)} 行，已摘录前 {_DATA_EXCERPT_LINES} 行 ...]"
-            packet.attach(f"`{reference}`（完整数据文件）")
-        packet.section(f"结果数据片段：{candidate.name}", excerpt, reference)
-        shown += 1
-    if referenced and not shown:
-        packet.absent("claim 引用的结果数据文件都无法读取，C3 只能看到主模型的转述")
+    for cells in claims:
+        claim_id = _claim_cell(cells, header, "claim_id") or cells[0].strip()
+        exp_id = _claim_cell(cells, header, "exp_id")
+        data_ref = _claim_cell(cells, header, "data_file")
+        report_ref = _claim_cell(cells, header, "check_report")
+        figure_ref = _claim_cell(cells, header, "figure_id")
 
-    # 复算报告摘要
-    checks_dir = outputs / "checks"
-    reports = sorted(checks_dir.glob("*.json")) if checks_dir.is_dir() else []
-    if not reports:
-        packet.absent("`experiments/outputs/checks/` 下没有复算报告，无法判断结论是否已被独立复算")
-    else:
-        summary: List[str] = []
-        for path in reports:
-            try:
-                payload = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-                summary.append(f"- `{path.name}`：**无法解析**，不能当作已通过")
-                packet.absent(f"复算报告无法解析：`{path.name}`")
-                continue
-            checks = payload.get("checks") if isinstance(payload, dict) else None
-            if not isinstance(checks, list):
-                summary.append(f"- `{path.name}`：格式不符合约定，不能当作已通过")
-                packet.absent(f"复算报告格式不符合约定：`{path.name}`")
-                continue
-            failed = [item for item in checks if isinstance(item, dict) and not item.get("passed", True)]
-            verdict = "全部通过" if not failed else f"**{len(failed)} 项未通过**"
-            summary.append(f"- `{path.name}`（{payload.get('exp_id', '?')}）：{len(checks)} 项检查，{verdict}")
-            for item in failed:
-                summary.append(f"  - {item.get('kind', '?')} / {item.get('name', '?')}：{item.get('detail', '')}")
-        packet.add("### 复算报告摘要（`experiments/outputs/checks/`）", "", *summary, "")
+        # --- 数据文件：必须由 claim 自己指名，且落在 outputs/data/ ---
+        if not _has_value(data_ref):
+            packet.absent(f"{claim_id} 没有填写数据文件，论文数字无处溯源")
+        elif is_traversal(data_ref):
+            packet.absent(f"{claim_id} 的数据文件引用非法（含 `..` 或绝对路径）：`{data_ref}`")
+        else:
+            resolved = resolve_in_case(case_dir, data_ref, kind="data")
+            if resolved is None:
+                packet.absent(
+                    f"{claim_id} 的数据文件不存在或不在 `experiments/outputs/data/` 内："
+                    f"`{data_ref}`")
+            else:
+                lines = _read(resolved).splitlines()
+                excerpt = "\n".join(lines[:_DATA_EXCERPT_LINES])
+                if len(lines) > _DATA_EXCERPT_LINES:
+                    excerpt += f"\n[... 共 {len(lines)} 行，已摘录前 {_DATA_EXCERPT_LINES} 行 ...]"
+                    packet.attach(f"`{data_ref}`（{claim_id} 的完整数据文件）")
+                packet.section(f"{claim_id} 的结果数据片段：{resolved.name}", excerpt, data_ref)
 
-    # 图表清单条目
-    manifest = outputs / "figures/manifest.md"
-    if not manifest.is_file():
-        packet.absent("没有 `figures/manifest.md`，无法核对论文引用的图来自哪个实验")
-    else:
-        figure_ids = sorted({match.group(0) for match in re.finditer(r"FIG-[A-Za-z0-9_-]+", joined)})
-        rows = [cells for cells in _pipe_rows(_read(manifest))
-                if cells and any(fid.casefold() in cells[0].casefold() for fid in figure_ids)]
-        if figure_ids and not rows:
-            packet.absent("claim 引用的 Figure ID 在 `figures/manifest.md` 中找不到对应条目")
-        elif rows:
-            packet.add("### 图表清单条目（`experiments/outputs/figures/manifest.md`）", "")
-            for cells in rows:
-                packet.add("| " + " | ".join(cells) + " |")
-            packet.add("")
-            for fid in figure_ids:
+        # --- 复算报告：必须存在、可解析、且 exp_id 与 claim 一致 ---
+        if not _has_value(report_ref):
+            packet.absent(f"{claim_id} 没有填写复算报告，无法判断该结论是否被独立复算")
+        elif is_traversal(report_ref):
+            packet.absent(f"{claim_id} 的复算报告引用非法（含 `..` 或绝对路径）：`{report_ref}`")
+        else:
+            resolved = resolve_in_case(case_dir, report_ref, kind="checks")
+            if resolved is None:
+                packet.absent(
+                    f"{claim_id} 的复算报告不存在或不在 `experiments/outputs/checks/` 内："
+                    f"`{report_ref}`")
+            else:
+                summary = _check_report_summary(resolved, claim_id, exp_id, packet)
+                if summary:
+                    packet.add(f"### {claim_id} 的复算报告（`{report_ref}`）", "", *summary, "")
+
+        # --- 图：claim 填了才要求 ---
+        if _has_value(figure_ref):
+            matched = [row for row in manifest_rows
+                       if row and figure_ref.casefold() in row[0].casefold()]
+            if not matched:
+                packet.absent(f"{claim_id} 引用的图 `{figure_ref}` 不在 `figures/manifest.md` 中")
+            else:
+                packet.add(f"### {claim_id} 的图表清单条目（`{figure_ref}`）", "")
+                for row in matched:
+                    packet.add("| " + " | ".join(row) + " |")
+                packet.add("")
                 for ext in ("pdf", "png"):
-                    candidate = outputs / f"figures/{fid}.{ext}"
-                    if candidate.is_file():
-                        packet.attach(f"`{candidate.relative_to(case_dir)}`（图，需随包一并提供）")
+                    candidate = resolve_in_case(
+                        case_dir, f"{clean_reference(figure_ref)}.{ext}", kind="figures")
+                    if candidate is not None:
+                        packet.attach(
+                            f"`{candidate.relative_to(case_dir.resolve())}`（图，需随包一并提供）")
 
 
-def _resolve(case_dir: Path, reference: str) -> Path | None:
-    """Map a claim-map path reference onto a real file inside the case."""
+def _check_report_summary(path: Path, claim_id: str, exp_id: str, packet: Packet) -> List[str]:
+    """Summarize one recomputation report, refusing to treat it as evidence when it does not match."""
 
-    reference = reference.strip("`").lstrip("./")
-    for base in (case_dir, case_dir / "experiments"):
-        candidate = base / reference
-        try:
-            candidate.relative_to(case_dir)
-        except ValueError:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        packet.absent(f"{claim_id} 的复算报告无法解析：`{path.name}`")
+        return []
+    if not isinstance(payload, dict):
+        packet.absent(f"{claim_id} 的复算报告格式不符合约定：`{path.name}`")
+        return []
+
+    report_exp = str(payload.get("exp_id", "")).strip()
+    if exp_id and report_exp and report_exp.casefold() != clean_reference(exp_id).casefold():
+        packet.absent(
+            f"{claim_id} 的复算报告属于 {report_exp}，与 claim 的 {exp_id} 不一致；"
+            "别的实验的复算结果不能替这条主张背书")
+        return []
+
+    checks = payload.get("checks")
+    if not isinstance(checks, list) or not checks:
+        packet.absent(f"{claim_id} 的复算报告没有任何检查项：`{path.name}`")
+        return []
+
+    lines: List[str] = []
+    failed = 0
+    malformed = 0
+    for item in checks:
+        if not isinstance(item, dict) or not isinstance(item.get("passed"), bool):
+            malformed += 1
             continue
-        if candidate.is_file():
-            return candidate
-    matches = list((case_dir / "experiments/outputs").rglob(Path(reference).name))
-    return matches[0] if len(matches) == 1 else None
+        if not item["passed"]:
+            failed += 1
+            lines.append(f"- **未通过** {item.get('kind', '?')} / {item.get('name', '?')}："
+                         f"{item.get('detail', '')}")
+    if malformed:
+        packet.absent(
+            f"{claim_id} 的复算报告有 {malformed} 项的 passed 不是布尔值，不能当作已通过")
+    header = [f"- 共 {len(checks)} 项检查，" +
+              ("全部通过" if not failed and not malformed else f"**{failed} 项未通过**")]
+    return header + lines
 
 
 # --------------------------------------------------------------------------- 组装
@@ -464,7 +591,15 @@ def build_packet(case_dir: Path, node: str, review_id: str | None = None) -> str
             "",
         ]
     else:
-        header += ["## 审核包完整性", "", "本节点所需的关键证据均已包含。", ""]
+        header += [
+            "## 审核包完整性",
+            "",
+            "本节点所需的材料均已包含且与各条 Claim 对应。",
+            "",
+            "> `packet_complete: true` 只表示**该节点要求的文件存在且互相指得通**，"
+            "不表示证据充分、模型正确或审核通过。判断证据够不够，是审核者的工作。",
+            "",
+        ]
 
     header += [
         "## 包信息",
@@ -547,9 +682,17 @@ def main() -> int:
     parser.add_argument("--case-dir", type=Path, required=True)
     parser.add_argument("--node", choices=NODES, required=True)
     parser.add_argument("--out", type=Path, help="output file; defaults to <case>/reviews/packets/")
+    parser.add_argument(
+        "--force", action="store_true",
+        help="overwrite the file named by --out; without it an existing file is an error",
+    )
     args = parser.parse_args()
 
     if args.out is not None:
+        if args.out.exists() and not args.force:
+            print(f"FAIL 目标文件已存在：{args.out}")
+            print("审核包不静默覆盖。换一个 --out 路径，或明确加 --force。")
+            return 1
         target, review_id = args.out, _review_id(args.node)
     else:
         directory = args.case_dir / "reviews" / "packets"

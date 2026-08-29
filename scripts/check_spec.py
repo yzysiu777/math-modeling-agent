@@ -16,9 +16,10 @@ from typing import Dict, List, Sequence
 
 VALID_STATUS = frozenset({"probe", "full"})
 VALID_LANGUAGE = frozenset({"python", "matlab"})
-#: probe -> full 闭环的判定值。``PENDING`` 表示规格已写但探针尚未跑完 ——
-#: 这是合法的中间状态，早期不阻断，但不能带着它进入路线结论或论文强结论。
-#: ``WAIVED`` 是人工豁免，必须写明理由。
+#: probe -> full 闭环的判定值。
+#: ``PENDING`` 表示 full 规格仍在起草、探针尚未跑完：合法的中间状态，**不代表已完成
+#: 升级**，`scripts/check_case.py` 会在路线取舍阶段提醒、在论文强结论阶段阻断。
+#: ``WAIVED`` 是人工豁免，必须写明非占位理由。
 VALID_PROBE_RESULT = frozenset({"pass", "fail", "pending", "waived"})
 #: 闭环已成立的取值；其余取值在强结论阶段会被 check_case.py 阻断。
 CLOSED_PROBE_RESULT = frozenset({"pass", "waived"})

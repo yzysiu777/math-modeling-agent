@@ -79,8 +79,8 @@ AGENTS.md ── agent.md（三角色共同协议）
 
 | 检查 | 防什么 | 阶段行为 |
 |---|---|---|
-| probe → full 闭环 | full 规格声称 probe 通过，但探针从没跑过 | 早期提醒，强结论阶段阻断 |
-| claim_map 证据存在性 | 论文数字指向不存在的 CSV / 复算报告 / 图 | `paper_claims` 提醒，`final` 阻断 |
+| probe → full 闭环 | full 规格自报 probe 通过，但探针规格不存在、实验不在板上、状态不是 done，或记录里没有明确 PASS 判定 | 早期提醒，强结论阶段阻断 |
+| claim_map 证据存在性 | 论文数字指向不存在、越界、读不出或属于别的实验的证据 | 已写下的主张引用无效证据时，`paper_claims` 与 `final` **均阻断**；论文骨架尚未建立只在 `paper_claims` 提醒 |
 | 复算报告可读性 | 损坏的 JSON 被当成「检查通过」 | 早期提醒，强结论阶段阻断 |
 
 三者都只做结构、存在性和已记录状态校验，不做数值证明，也不做文件哈希。
@@ -114,8 +114,14 @@ AGENTS.md ── agent.md（三角色共同协议）
   MIP 的 arc-flow、path-flow、time-indexed 是否构成独立路线，仍由 C2 与队员判断。
 - `scripts/check_case.py` 只确认可见记录存在并互相指得通，不做题意、数学或语义审核。
   它能发现「claim 指向的文件不存在」，发现不了「文件里的数字是错的」。
-- `scripts/make_review_packet.py` 摘录可见证据并标注 `packet_complete`；它无法判断
-  摘录是否足以支撑该节点的审核，`packet_complete: true` 只表示所需文件都在。
+- `scripts/make_review_packet.py` 摘录可见证据并标注 `packet_complete`。
+  `packet_complete: true` 只表示**该节点要求的文件存在且与各条 Claim 对应**，
+  不表示证据充分、模型正确或审核通过。C1 的题面依据靠文件名或 `input/README.md` 的
+  显式声明识别 —— 一份数据 CSV 不会被当成题面；C3 的证据逐条按 Claim 自己填写的引用
+  收集，无关实验的复算报告不能填补缺口。
+- 证据路径解析集中在 `scripts/case_paths.py`：含 `..` 或绝对路径的引用直接拒绝而不
+  规范化，解析走真实路径（跟随符号链接）并必须落在案例目录内，且每类证据只能落在
+  它自己的目录（数据在 `outputs/data/`、复算报告在 `outputs/checks/`）。
 - `scripts/router.py` 是关键词种类计数。三个词表有重叠（「分配」「资源」同时出现在
   优化与决策表），长题面必然饱和，实际结果多为 `hybrid`。**它是交叉参考，不是路由
   决定**；路由由建模手读题面判断，并由队员在 `checkpoint.yaml` 确认一次。

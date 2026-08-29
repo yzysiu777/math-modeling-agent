@@ -332,7 +332,7 @@ class ReviewPacketTests(unittest.TestCase):
             packet = build_packet(case, "C3")
         self.assertIn("全部算例均可行", packet)              # 强结论原文
         self.assertIn("结果数据片段", packet)                # 实际数据摘录
-        self.assertIn("复算报告摘要", packet)
+        self.assertIn("CLM-001 的复算报告", packet)
         self.assertIn("**1 项未通过**", packet)              # 未通过项必须出现在包里
         self.assertIn("超容量 2", packet)
 

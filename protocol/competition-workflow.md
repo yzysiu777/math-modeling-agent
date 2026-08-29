@@ -60,8 +60,11 @@ time-indexed 表述是否足够独立，不能由这个语法检查器自动决�
 结果 —— 一分钟换掉一条错路。
 
 probe 通过后才写 full 规格（`templates/spec.md`）。full 规格的 front matter 要写清
-`probe_spec_id`、`probe_exp_id` 和 `probe_result`（`PASS` / `PENDING` / `WAIVED`），
-使闭环可追溯 —— probe 文件存在不等于 probe 跑过。确实要跳过时写 `WAIVED` 并说明理由。
+`probe_spec_id`、`probe_exp_id` 和 `probe_result`，使闭环可追溯。
+`PASS` 还要求：probe 规格真实存在且确为 probe、与 full 规格描述同一条路线、对应实验在
+实验板上且状态为 `done`、该行结果摘要里写着明确的「判定：PASS」——
+**规格自报不能替代实验记录**。`PENDING` 是起草中的合法中间态，但不代表已完成升级，
+强结论阶段会阻断。确实要跳过时写 `WAIVED` 并说明非占位理由。
 正文八段齐全：目标与判据、数学表述、
 数据契约、算法、输出契约、复算要求、明确不做、未决问题。写完自检：看不到本会话的
 编程手，只读这份文件能不能唯一确定实现？

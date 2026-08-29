@@ -37,6 +37,7 @@ REQUIRED_FILES = (
     "scripts/router.py", "scripts/create_case.py",
     "scripts/model_checks.py", "scripts/model_pool.py", "scripts/experiment_board.py",
     "scripts/check_case.py", "scripts/check_spec.py", "scripts/make_review_packet.py",
+    "scripts/case_paths.py",
     "scripts/run_demos.py",
     ".agents/skills/competition-modeling/references/optimization-method-cards.md",
     ".agents/skills/competition-modeling/references/data-analysis-method-cards.md",
