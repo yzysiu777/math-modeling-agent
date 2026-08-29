@@ -21,6 +21,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+try:
+    from .experiment_board import parse_markdown_table
+except ImportError:  # pragma: no cover - direct script execution
+    from experiment_board import parse_markdown_table
+
 #: A canonical experiment ID.  Anchored so ``EXP-001_solution`` is not accepted
 #: as if it were ``EXP-001``: a filename fragment must never pass as a source ID.
 EXP_ID = re.compile(r"EXP-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*", re.IGNORECASE)
@@ -112,6 +117,39 @@ def validate_check_report(path: Path, claim_exp: Optional[str]) -> ReportVerdict
             return ReportVerdict(
                 problem=f"检查项 {item.get('name', '?')} 的 passed 不是布尔值")
     return ReportVerdict(has_failed_check=any(not item["passed"] for item in checks))
+
+
+def board_experiment_ids(case_dir: Path) -> set[str]:
+    """Return the experiment IDs recorded on the case's experiment board.
+
+    Shared by the case checker and the packet generator so "which experiments
+    exist" has one answer.  An unreadable, missing or empty board yields an
+    empty set -- callers must treat that as *no experiment is known to exist*,
+    never as *every experiment is fine*.
+    """
+
+    board = case_dir / "experiments/board.md"
+    try:
+        text = board.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return set()
+    found: set[str] = set()
+    for row in parse_markdown_table(text):
+        exp_id = str(row.get("实验 ID", "") or "").strip().strip("`")
+        if exp_id and _EXACT_EXP_ID.match(exp_id):
+            found.add(exp_id.casefold())
+    return found
+
+
+def describe_missing_source(case_dir: Path, claim_exp: str) -> str:
+    """Explain why a claim's source experiment cannot be shown to exist."""
+
+    board = case_dir / "experiments/board.md"
+    if not board.is_file():
+        return f"{claim_exp}（experiments/board.md 不存在，无法证明该实验跑过）"
+    if not board_experiment_ids(case_dir):
+        return f"{claim_exp}（experiments/board.md 没有任何实验行）"
+    return f"{claim_exp}（experiments/board.md 中没有这一行）"
 
 
 def failed_checks(path: Path) -> list[dict]:

@@ -28,10 +28,12 @@ except ImportError:  # pragma: no cover - direct script execution
 
 try:
     from .case_paths import clean_reference, is_traversal, resolve_in_case
-    from .claim_evidence import parse_source_experiment, validate_check_report
+    from .claim_evidence import (board_experiment_ids, describe_missing_source,
+                                 parse_source_experiment, validate_check_report)
 except ImportError:  # pragma: no cover - direct script execution
     from case_paths import clean_reference, is_traversal, resolve_in_case
-    from claim_evidence import parse_source_experiment, validate_check_report
+    from claim_evidence import (board_experiment_ids, describe_missing_source,
+                                parse_source_experiment, validate_check_report)
 
 
 ROUTES = frozenset({"optimization", "data_analysis", "hybrid", "insufficient_information"})
@@ -969,13 +971,7 @@ def _claim_map_findings(case_dir: Path, stage: str) -> list[Finding]:
             )
         ]
 
-    board = case_dir / "experiments/board.md"
-    known_experiments: set[str] = set()
-    if board.is_file():
-        for row in parse_markdown_table(board.read_text(encoding="utf-8")):
-            exp_id = str(row.get("实验 ID", "")).strip().casefold()
-            if exp_id:
-                known_experiments.add(exp_id)
+    known_experiments = board_experiment_ids(case_dir)
     figures = _figure_states(case_dir)
 
     # 写作性字段缺失是进度问题；证据性字段缺失是「这条主张没有依据」，等级不同。
@@ -1001,8 +997,10 @@ def _claim_map_findings(case_dir: Path, stage: str) -> list[Finding]:
         claim_exp = source.exp_id
         if not source.ok:
             missing_evidence_field.append(f"{claim_id}(来源 EXP-ID：{source.problem})")
-        elif known_experiments and claim_exp.casefold() not in known_experiments:
-            dangling.append(f"{claim_id}->{claim_exp}")
+        elif claim_exp.casefold() not in known_experiments:
+            # 实验板读不出来不等于「来源实验存在」。空板、缺板和板上没这一行，
+            # 都同样无法证明这条主张有跑过的实验支撑。
+            dangling.append(f"{claim_id}->{describe_missing_source(case_dir, claim_exp)}")
 
         # 数据文件只能落在 experiments/outputs/data/
         data_reference = _cell(cells, header, "data_file")

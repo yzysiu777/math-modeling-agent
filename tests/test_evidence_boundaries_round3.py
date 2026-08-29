@@ -32,8 +32,8 @@ HEADER = (
 )
 
 
-class Round3Tests(unittest.TestCase):
-    # ------------------------------------------------------------------ 夹具
+class CaseFixture:
+    """两个测试类共用的案例夹具。本身不是 TestCase，不会被单独收集执行。"""
 
     def case(self, directory, case_id="r3case"):
         case = create_case(case_id, "optimization", Path(directory))
@@ -81,6 +81,8 @@ class Round3Tests(unittest.TestCase):
         return [f for f in report.findings
                 if f.code.startswith("CLAIM") or "claim_map" in f.reason]
 
+
+class Round3Tests(CaseFixture, unittest.TestCase):
     # ---------------------------------------- P1-1 C1 input/ 符号链接边界
 
     def test_r3_p1_1_statement_symlink_out_of_the_case_is_refused(self):
@@ -278,6 +280,87 @@ class Round3Tests(unittest.TestCase):
         incomplete = [f for f in claiming.findings if f.code == "CLAIM_MAP_INCOMPLETE"]
         self.assertTrue(incomplete)
         self.assertFalse(any(f.blocks for f in incomplete))
+
+
+class Round4SourceExistenceTests(CaseFixture, unittest.TestCase):
+    """MMAG-006 第四轮：实验板读不出来不等于「来源实验存在」。"""
+
+    def empty_board(self, case):
+        (case / "experiments/board.md").write_text(
+            "# 实验赛马板\n\n"
+            "| 实验 ID | 候选路线 | 要回答的问题 | 最小配置 | 数据/实例范围 | 指标 | 预计成本 | status | 结果摘要 | 是否继续 | 下一项信息价值最高的实验 |\n"
+            "|---|---|---|---|---|---|---|---|---|---|---|\n",
+            encoding="utf-8")
+
+    def test_r4_claim_source_must_exist_even_when_board_is_empty(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.case(directory)
+            self.empty_board(case)
+            self.evidence(case)          # 数据文件与复算报告都齐全且对应
+            self.claim(case)
+            claiming = check_case(case, "paper_claims")
+            final = check_case(case, "final")
+        hit = [f for f in claiming.findings if "无法追溯到实验板" in f.reason]
+        self.assertTrue(hit, "空实验板不能证明来源实验存在")
+        self.assertIn("EXP-001", hit[0].reason)
+        self.assertTrue(hit[0].blocks)
+        self.assertEqual(claiming.exit_code, 1)
+        self.assertTrue(any("无法追溯到实验板" in f.reason and f.blocks for f in final.findings))
+        self.assertEqual(final.exit_code, 1)
+
+    def test_r4_claim_source_must_exist_when_the_board_file_is_absent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.case(directory)
+            (case / "experiments/board.md").unlink()
+            self.evidence(case)
+            self.claim(case)
+            claiming = check_case(case, "paper_claims")
+        hit = [f for f in claiming.findings if "无法追溯到实验板" in f.reason]
+        self.assertTrue(hit)
+        self.assertIn("不存在", hit[0].reason)
+        self.assertTrue(hit[0].blocks)
+
+    def test_r4_c3_packet_is_incomplete_when_claim_source_is_not_on_board(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.case(directory)
+            self.empty_board(case)
+            self.evidence(case)
+            self.claim(case)
+            packet = build_packet(case, "C3")
+        self.assertIn("packet_complete: false", packet)
+        self.assertIn("来源实验不在实验板上", packet)
+        self.assertIn("EXP-001", packet)
+
+    def test_r4_populated_board_still_passes_both_checks(self):
+        """实验板含对应 EXP-ID 时，检查与 C3 包继续通过。"""
+
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.case(directory)   # 夹具默认板含 EXP-001
+            self.evidence(case)
+            self.claim(case)
+            claiming = check_case(case, "paper_claims")
+            packet = build_packet(case, "C3")
+        self.assertFalse(self.claim_findings(claiming))
+        self.assertEqual(claiming.exit_code, 0)
+        self.assertIn("packet_complete: true", packet)
+
+    def test_r4_board_ids_are_shared_between_checker_and_packet(self):
+        """两处必须用同一个实验板解析，不得各建一套。"""
+
+        import scripts.check_case as check_case_module
+        import scripts.make_review_packet as packet_module
+        from scripts.claim_evidence import board_experiment_ids
+
+        self.assertIs(check_case_module.board_experiment_ids, board_experiment_ids)
+        self.assertIs(packet_module.board_experiment_ids, board_experiment_ids)
+
+        with tempfile.TemporaryDirectory() as directory:
+            case = self.case(directory)
+            self.assertEqual(board_experiment_ids(case), {"exp-001"})
+            self.empty_board(case)
+            self.assertEqual(board_experiment_ids(case), set())
+            (case / "experiments/board.md").unlink()
+            self.assertEqual(board_experiment_ids(case), set())
 
 
 class WorkingTreeSideEffectTests(unittest.TestCase):

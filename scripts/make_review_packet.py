@@ -33,10 +33,14 @@ from typing import Iterable, List, Sequence
 
 try:
     from .case_paths import clean_reference, contained_in, is_traversal, resolve_in_case
-    from .claim_evidence import failed_checks, parse_source_experiment, validate_check_report
+    from .claim_evidence import (board_experiment_ids, describe_missing_source,
+                                 failed_checks, parse_source_experiment,
+                                 validate_check_report)
 except ImportError:  # pragma: no cover - direct script execution
     from case_paths import clean_reference, contained_in, is_traversal, resolve_in_case
-    from claim_evidence import failed_checks, parse_source_experiment, validate_check_report
+    from claim_evidence import (board_experiment_ids, describe_missing_source,
+                                failed_checks, parse_source_experiment,
+                                validate_check_report)
 
 NODES = ("C1", "C2", "C3")
 
@@ -439,6 +443,7 @@ def _add_claim_evidence(packet: Packet, case_dir: Path) -> None:
 
     manifest_rows = _pipe_rows(_read(case_dir / "experiments/outputs/figures/manifest.md")) \
         if (case_dir / "experiments/outputs/figures/manifest.md").is_file() else []
+    known_experiments = board_experiment_ids(case_dir)
 
     for cells in claims:
         claim_id = _claim_cell(cells, header, "claim_id") or cells[0].strip()
@@ -446,6 +451,11 @@ def _add_claim_evidence(packet: Packet, case_dir: Path) -> None:
         exp_id = source.exp_id or ""
         if not source.ok:
             packet.absent(f"{claim_id} 的来源 EXP-ID 无法唯一解析：{source.problem}")
+        elif exp_id.casefold() not in known_experiments:
+            packet.absent(
+                f"{claim_id} 的来源实验不在实验板上："
+                f"{describe_missing_source(case_dir, exp_id)}；"
+                "审核者无法确认这条主张背后的实验真的跑过")
         data_ref = _claim_cell(cells, header, "data_file")
         report_ref = _claim_cell(cells, header, "check_report")
         figure_ref = _claim_cell(cells, header, "figure_id")
