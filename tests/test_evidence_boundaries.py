@@ -175,7 +175,7 @@ class EvidenceBoundaryTests(unittest.TestCase):
             self.claim(case, report="", status="verified")
             report = check_case(case, "paper_claims")
         hit = self.codes(report, "CLAIM_EVIDENCE_MISSING")
-        self.assertTrue(any("未填写复算报告" in f.reason for f in hit))
+        self.assertTrue(any("复算报告未填写" in f.reason for f in hit))
         self.assertTrue(all(f.blocks for f in hit))
 
     def test_p1_2_report_for_another_experiment_is_refused(self):

@@ -64,7 +64,11 @@ MATLAB 主实现
 }
 ```
 
-`objective`、`feasible`、`runtime_sec` 是最低要求，其余按规格补。
+`objective` 与 `feasible` 是最低要求，其余按规格补。
+
+**运行时间、时间戳等每次都会变的字段不要写进 `outputs/data/`。** 它们会让每次
+重跑都产生版本控制差异，真正的结果变更就淹没在时序噪声里。写进
+`outputs/logs/`（已被 gitignore）。
 
 ## 环境记录
 

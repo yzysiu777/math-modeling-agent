@@ -32,9 +32,11 @@ from pathlib import Path
 from typing import Iterable, List, Sequence
 
 try:
-    from .case_paths import clean_reference, is_traversal, resolve_in_case
+    from .case_paths import clean_reference, contained_in, is_traversal, resolve_in_case
+    from .claim_evidence import failed_checks, parse_source_experiment, validate_check_report
 except ImportError:  # pragma: no cover - direct script execution
-    from case_paths import clean_reference, is_traversal, resolve_in_case
+    from case_paths import clean_reference, contained_in, is_traversal, resolve_in_case
+    from claim_evidence import failed_checks, parse_source_experiment, validate_check_report
 
 NODES = ("C1", "C2", "C3")
 
@@ -215,10 +217,23 @@ def _add_problem_evidence(packet: Packet, case_dir: Path) -> None:
     """
 
     input_dir = case_dir / "input"
-    files = sorted(
-        (path for path in input_dir.rglob("*") if path.is_file() and path.name != "README.md"),
-        key=lambda path: path.name,
-    ) if input_dir.is_dir() else []
+    files: list[Path] = []
+    rejected: list[Path] = []
+    if input_dir.is_dir():
+        for path in sorted(input_dir.rglob("*"), key=lambda item: item.name):
+            if path.name == "README.md":
+                continue
+            # 目录项是发现来的而不是填写的，符号链接同样不得把案例外内容带进包里
+            if contained_in(input_dir, path) is None or not path.is_file():
+                if path.is_symlink() or path.is_file():
+                    rejected.append(path)
+                continue
+            files.append(path)
+
+    for path in rejected:
+        packet.absent(
+            f"`input/{path.relative_to(input_dir)}` 指向案例目录之外（符号链接越界），"
+            "已拒绝读取；请改为放入真实文件或在包外另行提供")
 
     if not files:
         packet.absent(
@@ -238,6 +253,8 @@ def _add_problem_evidence(packet: Packet, case_dir: Path) -> None:
     for path in files:
         role = "题面依据" if path in statements else "数据附件"
         packet.add(f"- `{path.relative_to(case_dir)}`（{role}，{path.stat().st_size} 字节）")
+    for path in rejected:
+        packet.add(f"- `input/{path.relative_to(input_dir)}`（**已拒绝：指向案例目录之外**）")
     packet.add("")
 
     if not statements:
@@ -425,7 +442,10 @@ def _add_claim_evidence(packet: Packet, case_dir: Path) -> None:
 
     for cells in claims:
         claim_id = _claim_cell(cells, header, "claim_id") or cells[0].strip()
-        exp_id = _claim_cell(cells, header, "exp_id")
+        source = parse_source_experiment(_claim_cell(cells, header, "exp_id"))
+        exp_id = source.exp_id or ""
+        if not source.ok:
+            packet.absent(f"{claim_id} 的来源 EXP-ID 无法唯一解析：{source.problem}")
         data_ref = _claim_cell(cells, header, "data_file")
         report_ref = _claim_cell(cells, header, "check_report")
         figure_ref = _claim_cell(cells, header, "figure_id")
@@ -485,46 +505,26 @@ def _add_claim_evidence(packet: Packet, case_dir: Path) -> None:
 
 
 def _check_report_summary(path: Path, claim_id: str, exp_id: str, packet: Packet) -> List[str]:
-    """Summarize one recomputation report, refusing to treat it as evidence when it does not match."""
+    """Summarize one recomputation report, refusing it when it does not back this claim.
 
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        packet.absent(f"{claim_id} 的复算报告无法解析：`{path.name}`")
-        return []
-    if not isinstance(payload, dict):
-        packet.absent(f"{claim_id} 的复算报告格式不符合约定：`{path.name}`")
-        return []
+    Shares :func:`scripts.claim_evidence.validate_check_report` with the case
+    checker so the two cannot drift apart again.
+    """
 
-    report_exp = str(payload.get("exp_id", "")).strip()
-    if exp_id and report_exp and report_exp.casefold() != clean_reference(exp_id).casefold():
+    verdict = validate_check_report(path, exp_id or None)
+    if not verdict.ok:
         packet.absent(
-            f"{claim_id} 的复算报告属于 {report_exp}，与 claim 的 {exp_id} 不一致；"
-            "别的实验的复算结果不能替这条主张背书")
+            f"{claim_id} 的复算报告不能作为证据：{verdict.problem}（`{path.name}`）"
+            + ("；别的实验的复算结果不能替这条主张背书" if "不一致" in verdict.problem else ""))
         return []
 
-    checks = payload.get("checks")
-    if not isinstance(checks, list) or not checks:
-        packet.absent(f"{claim_id} 的复算报告没有任何检查项：`{path.name}`")
-        return []
-
-    lines: List[str] = []
-    failed = 0
-    malformed = 0
-    for item in checks:
-        if not isinstance(item, dict) or not isinstance(item.get("passed"), bool):
-            malformed += 1
-            continue
-        if not item["passed"]:
-            failed += 1
-            lines.append(f"- **未通过** {item.get('kind', '?')} / {item.get('name', '?')}："
-                         f"{item.get('detail', '')}")
-    if malformed:
-        packet.absent(
-            f"{claim_id} 的复算报告有 {malformed} 项的 passed 不是布尔值，不能当作已通过")
-    header = [f"- 共 {len(checks)} 项检查，" +
-              ("全部通过" if not failed and not malformed else f"**{failed} 项未通过**")]
-    return header + lines
+    failed = failed_checks(path)
+    lines = [f"- 共 {len(json.loads(path.read_text(encoding='utf-8'))['checks'])} 项检查，"
+             + ("全部通过" if not failed else f"**{len(failed)} 项未通过**")]
+    for item in failed:
+        lines.append(f"- **未通过** {item.get('kind', '?')} / {item.get('name', '?')}："
+                     f"{item.get('detail', '')}")
+    return lines
 
 
 # --------------------------------------------------------------------------- 组装

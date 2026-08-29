@@ -49,6 +49,10 @@ paper/output/
 build/
 dist/
 
+# Run logs carry wall-clock timings that differ on every run; keeping them out of
+# version control is what lets `make test` and `make demos` leave the tree clean.
+cases/**/experiments/outputs/logs/
+
 # Competition case data and private review bundles are opt-in
 cases/**/input/
 cases/**/runs/raw/

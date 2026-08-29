@@ -85,7 +85,8 @@ probe（`SPEC-P1-M02-probe`）已通过：枚举在 1 s 内给出与手算一致
 | 文件 | 格式 | 列名与单位 | 说明 |
 |---|---|---|---|
 | `experiments/outputs/data/EXP-OPT-002_solution.csv` | CSV UTF-8 | `instance`（实例名）、`demand_id`、`facility_id`、`cost_yuan`（成本单位） | 每个实例的最优分配 |
-| `experiments/outputs/data/EXP-OPT-002_metrics.json` | JSON | 见共享格式 | 含每个实例的 `objective`、`feasible`、`runtime_sec` |
+| `experiments/outputs/data/EXP-OPT-002_metrics.json` | JSON | 见共享格式 | 含每个实例的 `objective`、`feasible`；**不含运行时间** |
+| `experiments/outputs/logs/EXP-OPT-002_runtime.json` | JSON | `exp_id`、`runtime_sec` | 时序数据，每次运行都不同，不入版本控制 |
 
 ### 图表产物
 

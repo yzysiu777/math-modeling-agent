@@ -78,6 +78,16 @@ def exact(capacity):
     return min(feasible, key=lambda item: item[0])[1] if feasible else None
 
 
+def write_runtime_log(runtime_sec):
+    """Record wall-clock time outside the tracked result files."""
+
+    logs = OUT / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    (logs / f"{EXP_ID}_runtime.json").write_text(
+        json.dumps({"exp_id": EXP_ID, "runtime_sec": runtime_sec}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8")
+
+
 def write_outputs(rows, metrics):
     (OUT / "data").mkdir(parents=True, exist_ok=True)
     with (OUT / f"data/{EXP_ID}_solution.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -137,8 +147,11 @@ def main():
             "audit_passed": audit["passed"],
         }
 
-    metrics["runtime_sec"] = round(time.perf_counter() - started, 6)
+    # 运行时间每次都不同。把它写进已跟踪的结果文件，会让 `make test` / `make demos`
+    # 每跑一次就弄脏工作树，逼人提交无意义的时序差异 —— 于是真正的结果变更也淹没在
+    # 噪声里。时序进被忽略的日志，确定性结果留在 metrics.json。
     write_outputs(rows, metrics)
+    write_runtime_log(round(time.perf_counter() - started, 6))
     write_check_report(OUT / "checks", EXP_ID, SPEC_ID, checks)
 
     result["candidate_routes"] = [

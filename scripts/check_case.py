@@ -28,8 +28,10 @@ except ImportError:  # pragma: no cover - direct script execution
 
 try:
     from .case_paths import clean_reference, is_traversal, resolve_in_case
+    from .claim_evidence import parse_source_experiment, validate_check_report
 except ImportError:  # pragma: no cover - direct script execution
     from case_paths import clean_reference, is_traversal, resolve_in_case
+    from claim_evidence import parse_source_experiment, validate_check_report
 
 
 ROUTES = frozenset({"optimization", "data_analysis", "hybrid", "insufficient_information"})
@@ -907,36 +909,6 @@ def _figure_states(case_dir: Path) -> dict[str, str]:
     return states
 
 
-def _report_verdict(path: Path, claim_exp: str) -> tuple[bool, str]:
-    """Return (has_failed_check, problem_description) for one recomputation report.
-
-    A report only backs a claim when it is parseable, actually contains checks,
-    states each verdict as a boolean, and belongs to the experiment the claim
-    cites.  The string ``"false"`` is not a passing verdict.
-    """
-
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return False, "无法解析"
-    if not isinstance(payload, Mapping):
-        return False, "格式不符合约定"
-
-    report_exp = str(payload.get("exp_id", "")).strip()
-    if claim_exp and report_exp and report_exp.casefold() != claim_exp.casefold():
-        return False, f"报告属于 {report_exp}，与 claim 的 {claim_exp} 不一致"
-
-    checks = payload.get("checks")
-    if not isinstance(checks, list) or not checks:
-        return False, "没有任何检查项"
-    for item in checks:
-        if not isinstance(item, Mapping):
-            return False, "检查项格式不符合约定"
-        if not isinstance(item.get("passed"), bool):
-            return False, f"检查项 {item.get('name', '?')} 的 passed 不是布尔值"
-    return any(not item["passed"] for item in checks), ""
-
-
 def _claim_map_findings(case_dir: Path, stage: str) -> list[Finding]:
     """Check that every paper claim resolves to evidence that actually exists.
 
@@ -1006,7 +978,9 @@ def _claim_map_findings(case_dir: Path, stage: str) -> list[Finding]:
                 known_experiments.add(exp_id)
     figures = _figure_states(case_dir)
 
+    # 写作性字段缺失是进度问题；证据性字段缺失是「这条主张没有依据」，等级不同。
     incomplete: list[str] = []
+    missing_evidence_field: list[str] = []
     dangling: list[str] = []
     missing_data: list[str] = []
     bad_reports: list[str] = []
@@ -1017,34 +991,34 @@ def _claim_map_findings(case_dir: Path, stage: str) -> list[Finding]:
     for cells in claims:
         claim_id = cells[0].strip().strip("`")
 
-        for field, label in (("statement", "主张原文"), ("strength", "强度"),
-                             ("exp_id", "来源 EXP-ID"), ("data_file", "数据文件")):
+        for field, label in (("statement", "主张原文"), ("strength", "强度")):
             if not _has_value(_cell(cells, header, field)):
                 incomplete.append(f"{claim_id}({label})")
 
-        joined = _TEMPLATE_TOKEN.sub("", " ".join(cells))
-        referenced = {match.group(0).casefold() for match in _SPEC_EXP_ID.finditer(joined)}
-        if not referenced:
-            dangling.append(f"{claim_id}(无 EXP-ID)")
-        elif known_experiments and not (referenced & known_experiments):
-            dangling.append(f"{claim_id}->{'、'.join(sorted(referenced))}")
+        # P1-2：来源实验只从 exp_id 单元格读，不扫整行 ——
+        # 数据文件名里的 EXP-ID 不得替来源列背书。
+        source = parse_source_experiment(_cell(cells, header, "exp_id"))
+        claim_exp = source.exp_id
+        if not source.ok:
+            missing_evidence_field.append(f"{claim_id}(来源 EXP-ID：{source.problem})")
+        elif known_experiments and claim_exp.casefold() not in known_experiments:
+            dangling.append(f"{claim_id}->{claim_exp}")
 
-        claim_exp = clean_reference(_cell(cells, header, "exp_id"))
-
-        # 数据文件只能落在 experiments/outputs/data/，防止用 comparison.md 之类冒充结果
+        # 数据文件只能落在 experiments/outputs/data/
         data_reference = _cell(cells, header, "data_file")
-        if _has_value(data_reference):
-            if is_traversal(data_reference):
-                missing_data.append(f"{claim_id}->{data_reference}(路径非法)")
-            elif resolve_in_case(case_dir, data_reference, kind="data") is None:
-                missing_data.append(
-                    f"{claim_id}->{data_reference}(不存在或不在 experiments/outputs/data/ 内)")
+        if not _has_value(data_reference):
+            missing_evidence_field.append(f"{claim_id}(数据文件未填写)")
+        elif is_traversal(data_reference):
+            missing_data.append(f"{claim_id}->{data_reference}(路径非法)")
+        elif resolve_in_case(case_dir, data_reference, kind="data") is None:
+            missing_data.append(
+                f"{claim_id}->{data_reference}(不存在或不在 experiments/outputs/data/ 内)")
 
-        # 复算报告：进入论文的主张必须有，且必须真的属于这条 claim 的实验
+        # 复算报告必须存在、可解析、且确属这条 claim 的实验
         report_reference = _cell(cells, header, "check_report")
         report_failed = False
         if not _has_value(report_reference):
-            bad_reports.append(f"{claim_id}(未填写复算报告)")
+            missing_evidence_field.append(f"{claim_id}(复算报告未填写)")
         elif is_traversal(report_reference):
             bad_reports.append(f"{claim_id}->{report_reference}(路径非法)")
         else:
@@ -1053,10 +1027,10 @@ def _claim_map_findings(case_dir: Path, stage: str) -> list[Finding]:
                 bad_reports.append(
                     f"{claim_id}->{report_reference}(不存在或不在 experiments/outputs/checks/ 内)")
             else:
-                failed, problem = _report_verdict(report_path, claim_exp)
-                if problem:
-                    bad_reports.append(f"{claim_id}->{report_reference}({problem})")
-                report_failed = failed
+                verdict = validate_check_report(report_path, claim_exp)
+                if not verdict.ok:
+                    bad_reports.append(f"{claim_id}->{report_reference}({verdict.problem})")
+                report_failed = verdict.has_failed_check
 
         figure_reference = _cell(cells, header, "figure_id")
         for match in _SPEC_FIGURE_ID.finditer(figure_reference):
@@ -1068,6 +1042,7 @@ def _claim_map_findings(case_dir: Path, stage: str) -> list[Finding]:
                 bad_figures.append(f"{claim_id}->{figure_id}(manifest 标记 stale)")
 
         status = _cell(cells, header, "status")
+        joined = _TEMPLATE_TOKEN.sub("", " ".join(cells))
         if "stale" in status.casefold() or "stale" in joined.casefold():
             stale.append(claim_id)
         if report_failed:
@@ -1078,7 +1053,9 @@ def _claim_map_findings(case_dir: Path, stage: str) -> list[Finding]:
 
     findings: list[Finding] = []
     for items, code, message, node, item_level in (
-        (incomplete, "CLAIM_MAP_INCOMPLETE", "claim_map 中以下必填字段为空或仍是模板占位：", "HUMAN", level),
+        (incomplete, "CLAIM_MAP_INCOMPLETE", "claim_map 中以下写作字段为空或仍是模板占位：", "HUMAN", level),
+        (missing_evidence_field, "CLAIM_EVIDENCE_MISSING",
+         "claim_map 中以下主张缺少关键证据字段，不能作为论文主张：", "C3", evidence_level),
         (dangling, "HUMAN_DECISION_REQUIRED", "claim_map 中以下主张无法追溯到实验板里的实验：", "C3", evidence_level),
         (missing_data, "CLAIM_EVIDENCE_MISSING", "claim_map 引用的结果数据文件不可用：", "C3", evidence_level),
         (bad_reports, "CLAIM_EVIDENCE_MISSING", "claim_map 的复算报告不可用：", "C3", evidence_level),

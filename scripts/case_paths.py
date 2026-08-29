@@ -45,6 +45,26 @@ def is_traversal(reference: str) -> bool:
     return ".." in Path(cleaned).parts or Path(cleaned).is_absolute()
 
 
+def contained_in(root: Path, path: Path) -> Optional[Path]:
+    """Return the real path of ``path`` when it stays inside ``root``.
+
+    Used for walking a directory the team controls (``input/``) where the entries
+    are discovered rather than typed: a symlink placed there still must not pull
+    content from outside the case into a review packet.
+    """
+
+    try:
+        real_root = root.resolve(strict=True)
+        real_path = path.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+    try:
+        real_path.relative_to(real_root)
+    except ValueError:
+        return None
+    return real_path
+
+
 def resolve_in_case(
     case_dir: Path,
     reference: str,
