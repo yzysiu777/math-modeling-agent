@@ -1,8 +1,9 @@
 name: workspace-ci
 
 on:
+  # 不用分支白名单：新前缀会静默跳过 CI，而「没跑」和「通过」在运行列表里看起来
+  # 一样。fix/** 就这样漏过一次。所有分支都跑，代价只是几分钟机器时间。
   push:
-    branches: [main, "refactor/**", "luna/**", "model/**", "analysis/**", "paper/**", "review/**"]
   pull_request:
 
 jobs:
