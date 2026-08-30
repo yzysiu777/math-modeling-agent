@@ -24,7 +24,8 @@ Independent Reviewer 不是第四个生产角色，而是**横切三者的独立
 它是唯一同时看到三方输出的实体，**会流畅完整地复述上游推理**，而那正是隔离要防的。
 因此规则是**有方向的** —— 对人可以充分转述讨论，对下游角色只传路径与状态码。
 
-角色索引和触发语在 `prompts/README.md`，交接契约在 `prompts/contracts/`。
+角色索引在 `prompts/README.md`，**启动提示词模板在 `prompts/startup/`**
+（填空后复制启动，带本轮边界与停止点），交接契约在 `prompts/contracts/`。
 
 ## 核心规则
 
