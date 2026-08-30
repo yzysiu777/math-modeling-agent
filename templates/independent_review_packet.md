@@ -1,9 +1,9 @@
-# C1/C2/C3 轻量审核卡
+# 外部 Claude C1/C2/C3 轻量审核卡
 
 ```yaml
 case_id:
-reviewer_provider:
-reviewer_model:
+reviewer_provider: anthropic
+reviewer_model: <实际使用的 Claude 型号>
 review_session: fresh
 saw_main_conversation: false
 critical_node: C1 | C2 | C3

@@ -43,6 +43,12 @@ class LightweightProtocolTests(unittest.TestCase):
         text = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
         self.assertIn("应回人工 1 次", text)
 
+    def test_external_claude_is_manual_but_stage_reports_do_not_block_early_work(self):
+        workflow = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
+        self.assertIn("队员人工调用", workflow)
+        self.assertIn("reports/stage-01.md", workflow)
+        self.assertIn("阶段 1–6 的人工阅读不阻断生产", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

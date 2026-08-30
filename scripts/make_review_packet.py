@@ -154,14 +154,14 @@ def build_packet(case_dir: Path, node: str, review_id: str | None = None) -> str
     review_id = review_id or f"{node}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     ready = "true" if not missing else "false"
     lines = [
-        f"# {node} 轻量审核卡：{review_id}",
+        f"# 外部 Claude {node} 轻量审核卡：{review_id}",
         "",
-        "本卡既是审核输入也是唯一详细记录。不要另建 packet、报告或交接副本。",
+        "本卡由 Orchestrator 生成、队员人工交给外部 Claude，是唯一详细审核记录。",
         "",
         "```yaml",
         f"case_id: {case_dir.name}",
-        "reviewer_provider:",
-        "reviewer_model:",
+        "reviewer_provider: anthropic",
+        "reviewer_model: <实际使用的 Claude 型号>",
         "review_session: fresh",
         "saw_main_conversation: false",
         f"critical_node: {node}",

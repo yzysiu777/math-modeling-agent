@@ -7,8 +7,8 @@
 
 | 工具/角色 | 版本/型号 | 开发机构/提供方 | 使用日期 | 具体用途 |
 |---|---|---|---|---|
-| Codex |  | OpenAI |  | 资料、建模、代码、写作 |
-| Independent Reviewer |  | Gemini/Grok/其他模型/人类专家 |  | 独立审核、反例、修订提案 |
+| Codex 生产 Agent | gpt-5.6-sol / high | OpenAI |  | 资料、建模、代码、写作 |
+| 外部 Claude Reviewer |  | Anthropic |  | C1/C2/C3 独立审核、反例、修订提案 |
 
 ## 使用记录
 

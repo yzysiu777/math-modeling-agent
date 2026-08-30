@@ -6,8 +6,8 @@
 
 | 工具/角色 | 版本/型号 | 开发机构/提供方 | 使用日期 | 账户/环境备注 |
 |---|---|---|---|---|
-| Codex |  | OpenAI |  |  |
-| Independent Reviewer |  | Gemini/Grok/其他模型/人类专家 |  | 新会话/人工复制精简审核包 |
+| Codex 生产 Agent | gpt-5.6-sol / high | OpenAI |  |  |
+| 外部 Claude Reviewer |  | Anthropic |  | 人工新建会话/复制轻量审核卡 |
 
 ## 使用环节
 

@@ -23,11 +23,20 @@
 | Modeler | 一题一个持续会话 | 题意、发散、路线、Probe、Full 规格 |
 | Engineer | 一题一个持续会话 | 正式实现、实验、复算、图表 |
 | Writer | 一题一个持续会话 | LaTeX、关键 Claim、语言与版式 |
-| Orchestrator | 主会话持续运行 | 推进阶段、自动触发 C1/C2/C3、处理交接 |
-| Independent Reviewer | C1/C2/C3 各一个新会话 | 方法论不同的挑战和节点决定 |
+| Orchestrator | 主会话持续运行 | 推进阶段、调度生产 Agent、准备 Claude 交接 |
+| Independent Reviewer | 人工调用外部 Claude | C1/C2/C3 方法论挑战和节点决定 |
 
 生产角色之间不传递隐藏推理，只传案例中的落盘文件。同一角色跨阶段继续工作时复用原会话，
 不重复读取整套协议。Skill 和 contracts 都按需读取，不是开工前必读清单。
+
+## 固定模型与调度权限
+
+Orchestrator、Modeler、Engineer、Writer 统一使用 `gpt-5.6-sol`，推理强度为 `high`。
+Orchestrator 创建生产 Agent 时必须显式指定该配置；不可用时报告人工，不自动降级。
+
+C1/C2/C3 不使用上述生产模型。Orchestrator 只生成审核卡和提示词，由队员人工调用新的
+外部 Claude 会话。Claude 的实际型号如实写入审核卡；Orchestrator 不得自行启动 Reviewer，
+也不得把 Claude 审核静默替换成 Codex 审核。
 
 ## AI 默认自主
 
@@ -45,7 +54,8 @@ Engineer 遇到单位、坐标系、时间基准、网格对齐或缺测语义�
 
 ## 三个短审核节点
 
-C1/C2/C3 是纠偏，不是审批流水线。Orchestrator 到点自动生成审核卡并启动新审核会话。
+C1/C2/C3 是纠偏，不是审批流水线。Orchestrator 到点自动生成审核卡和可复制提示词，
+然后明确提示队员人工调用外部 Claude。
 审核卡结论只用 `GO`、`GO_WITH_FIXES`、`STOP`。
 
 - 采纳 finding：对应生产角色直接实施，零往返；
@@ -70,3 +80,15 @@ C1/C2/C3 是纠偏，不是审批流水线。Orchestrator 到点自动生成审�
 - 不把启发式写成全局最优，不把关联写成因果；
 - 脚本通过只代表相应检查通过，不代表模型整体正确；
 - 小修改只做受影响检查，最终提交前再运行一次完整检查。
+
+## 统一回报与阶段报告
+
+每个生产 Agent 每轮结束都按 `agent.md` 的“Agent 回报卡”输出：阶段、角色、模型、本轮结果、
+风险、人工核验建议、下一步 Agent 和按需交接提示词。只有 Orchestrator 写阶段报告：
+
+```text
+reports/stage-01.md ... reports/stage-07.md
+```
+
+阶段 1–6 报告供队员异步学习和排查，不因尚未阅读而停工；发现问题后定向退回对应阶段。
+阶段 7 的最终 PDF 和实际提交必须等待人工。返工更新原阶段文件的修订记录，不建 v2 副本。

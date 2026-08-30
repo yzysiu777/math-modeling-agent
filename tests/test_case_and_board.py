@@ -22,6 +22,10 @@ class CaseAndBoardTests(unittest.TestCase):
             self.assertFalse((case / "models/comparison.md").exists())
             self.assertFalse((case / "reviews/packets").exists())
             self.assertIn("data_root:", (case / "input/README.md").read_text(encoding="utf-8"))
+            reports = sorted((case / "reports").glob("stage-*.md"))
+            self.assertEqual([path.name for path in reports], [f"stage-{stage:02d}.md" for stage in range(1, 8)])
+            self.assertIn("待复核（不阻断）", reports[0].read_text(encoding="utf-8"))
+            self.assertIn("待人工最终确认（阻断提交）", reports[-1].read_text(encoding="utf-8"))
 
     def test_compact_board_passes(self):
         with tempfile.TemporaryDirectory() as tmp:

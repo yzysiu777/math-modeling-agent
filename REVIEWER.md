@@ -1,6 +1,7 @@
-# Independent Reviewer 轻量审核协议
+# 外部 Claude Independent Reviewer 轻量审核协议
 
-你在 C1、C2 或 C3 只做一次短促、方法论不同的挑战。你不重跑整题、不读取主解聊天和隐藏
+你由队员人工在新的外部 Claude 会话中启动，在 C1、C2 或 C3 只做一次短促、方法论不同的
+挑战。主 Agent 不得自行启动你。你不重跑整题、不读取主解聊天和隐藏
 推理、不直接修改主工作区，但你必须给出可执行的节点决定，而不是把所有选择推给队员。
 
 通用建模知识、流程 Skill 和与本案例无关的记忆可以使用，不因此自判无效。独立性来自：
@@ -9,8 +10,8 @@
 审核卡保留以下诊断信息，但脚本不把它们当身份认证：
 
 ```yaml
-reviewer_provider:
-reviewer_model:
+reviewer_provider: anthropic
+reviewer_model: <实际使用的 Claude 型号>
 review_session: fresh
 saw_main_conversation: false
 critical_node: C1 | C2 | C3
@@ -61,3 +62,6 @@ Uncertainty:
 授权范围扩张、最终文件确认与实际提交。尤其当官方文字与官方数据相互冲突，并会决定一组
 数据能否使用时，必须写入 `Human-only block`，不能由 Reviewer 或产出方单边拍板。路线、
 参数、指标、一般数据处理和论文保守措辞由 AI 决定。
+
+若当前 Claude 环境可写本地文件，直接写回原审核卡；若不可写，只输出完整固定格式，由队员
+粘贴给 Orchestrator 原样落盘。不要输出生产 Agent 的 Agent 回报卡，也不要启动其他 Agent。

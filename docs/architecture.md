@@ -12,7 +12,7 @@
      ▲                        │                        │
      └──── questions ◀────────┴──── questions ◀────────┘
 
-        Independent Reviewer C1 / C2 / C3（节点自动提醒，横切三者）
+        外部 Claude Reviewer C1 / C2 / C3（人工启动，横切三者）
         确定性脚本（规格、结构、切分、约束、目标值、LaTeX、PDF）
         人类队员（关键假设、路线取舍、比赛策略、官方规则、最终提交）
 ```
@@ -22,13 +22,14 @@
 | 建模手 | 题意重构、头脑风暴、路线评估、probe 轻测试、实现规格 |
 | 编程手 | 忠实实现（Python / MATLAB）、实验、独立复算、图表 |
 | 写作手 | 论文章节、数字溯源、表述强度复核、润色 |
-| Independent Reviewer（横向机制，非生产角色） | C1 题意、C2 架构、C3 结果与强结论挑战 |
+| 外部 Claude Reviewer（横向机制，非生产角色） | C1 题意、C2 架构、C3 结果与强结论挑战 |
 | 确定性脚本 | 规格、结构、切分、泄漏、约束、目标值、LaTeX 和 PDF 检查 |
 | 人类队员 | 无法消除的官方硬冲突、授权扩张、官方规则和最终提交 |
 
 ## 为什么角色隔离但复用会话
 
-Modeler、Engineer、Writer 各复用一个持续会话；C1/C2/C3 各用一个新的 Reviewer 会话。
+Orchestrator、Modeler、Engineer、Writer 统一使用 `gpt-5.6-sol`、`high` 并复用持续会话；
+C1/C2/C3 由队员人工调用新的外部 Claude 会话。
 这样既保留正式实现与审核的视角差异，又避免每阶段重复加载全部协议。
 
 同一会话里，「我知道上游想要什么」会悄悄替代「契约里写了什么」，规格逐渐变成摆设，
@@ -65,6 +66,9 @@ AGENTS.md ── agent.md（三角色共同协议）
   └─ paper/ + writing/
 ```
 
+案例的 `reports/stage-01.md` 至 `stage-07.md` 由 Orchestrator 单独维护，集中呈现阶段结果、
+人工核验项和下一 Agent。其他角色只输出统一回报卡，避免多人写同一份阶段文档。
+
 ## 自动化的确定性风险链路
 
 复算报告 `experiments/outputs/checks/<EXP-ID>.json` 由
@@ -97,7 +101,7 @@ AGENTS.md ── agent.md（三角色共同协议）
 - 保留 Champion 和不同方法族的 Challenger；
 - 上下游通过落盘契约交接；普通可逆选择由当前角色直接完成并显式记录；
 - 数值检查使用独立计算，语义判断交给模型与队员；
-- Independent Reviewer 横切三个角色，只在关键节点挑战，不产出主解也不接管环节；
+- 外部 Claude Reviewer 横切三个角色，只在关键节点挑战，不产出主解也不接管环节；
 - 论文与实验同步，摘要、结论和核心图表的关键数字可追溯到实验和数据文件；
 - 当届官方规则在比赛开始后重新核对。
 

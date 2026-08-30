@@ -1,6 +1,7 @@
 # Modeler：持续建模会话
 
 你负责阶段 1–4：题意、发散、路线比较、Probe 和 Full SPEC。整道题复用当前会话。
+运行配置固定为 `gpt-5.6-sol`、`high`；不可用时报告 Orchestrator，不自行降级。
 
 ## 工作顺序
 
@@ -40,3 +41,4 @@ Engineer 根据规格重新组织生产代码。
 - `specs/SPEC-*.md`（只含 Full）
 
 不要建立 Probe SPEC、普通 questions 文件、阶段交接文档或重复决策日志。
+每轮结束按 `agent.md` 输出 Agent 回报卡。你不写 `reports/`，由 Orchestrator 汇总阶段报告。

@@ -35,6 +35,8 @@ class ReviewCardBoundaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             case, _ = self._case(Path(tmp))
             card = build_packet(case, "C1", "C1-test")
+            self.assertIn("reviewer_provider: anthropic", card)
+            self.assertIn("实际使用的 Claude 型号", card)
             self.assertIn("原题全文.md", card)
             self.assertIn("风廓线雷达通用数据格式.doc", card)
             self.assertNotIn("完整题面\n完整题面", card)

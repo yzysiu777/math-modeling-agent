@@ -11,6 +11,15 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "templates"
 ROUTES = {"optimization", "data_analysis", "hybrid", "insufficient_information"}
 CASE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{1,63}$")
+STAGE_REPORTS = {
+    1: ("题意重构与 C1", "题目范围、附件、硬约束、单位、数据边界和 C1 高风险遗漏"),
+    2: ("发散与路线收敛", "路线是否真正不同、是否遗漏经典方法、指标是否贴合题意"),
+    3: ("分段 Probe", "判据是否预先设定、数据是否有代表性、失败路线是否被过早淘汰"),
+    4: ("Full、赛马与 C2", "数学架构、算法、目标约束、Champion 和比较公平性"),
+    5: ("独立复算与出图", "可行性、目标值、泄漏、切分、稳健性和图表真实性"),
+    6: ("论文与 C3", "摘要、结论、关键数字、Claim 强度、图表和引用"),
+    7: ("最终检查与提交", "官方格式、匿名、AI 规则、PDF、文件名和最终版本"),
+}
 
 
 def _candidate_seed(route: str) -> str:
@@ -62,6 +71,55 @@ def _checkpoint_seed(case_id: str, route: str) -> str:
     return checkpoint.replace("<case_id>", case_id).replace("<route>", route)
 
 
+def _stage_report_seed(case_id: str, stage: int) -> str:
+    title, checklist = STAGE_REPORTS[stage]
+    review_status = "待人工最终确认（阻断提交）" if stage == 7 else "待复核（不阻断）"
+    return f"""# S{stage} 阶段报告：{title}
+
+- 案例：{case_id}
+- 阶段状态：未开始
+- 生产模型：gpt-5.6-sol
+- 推理配置：high
+- 人工复核状态：{review_status}
+
+## 阶段目标与核心结果
+
+- 待 Orchestrator 汇总。
+
+## 已更新产物
+
+- 待填写。
+
+## Claude 节点结论
+
+- 本阶段无节点或尚未完成。
+
+## 风险与未验证事项
+
+- 待填写。
+
+## 人工核验清单
+
+- {checklist}。
+- 发现问题时回复：`退回阶段 S{stage}：<问题>`
+
+## 下一步 Agent
+
+- 动作：待填写
+- 目标 Agent：待填写
+- 由谁启动：待填写
+- 任务与完成标准：待填写
+
+## 启动或交接提示词
+
+无需启动其他 Agent。
+
+## 修订记录
+
+- 无。
+"""
+
+
 def create_case(case_id: str, route: str, cases_root: Path = ROOT / "cases") -> Path:
     if not CASE_ID.fullmatch(case_id):
         raise ValueError("case-id must be 2-64 ASCII letters, digits, '-' or '_'")
@@ -75,7 +133,7 @@ def create_case(case_id: str, route: str, cases_root: Path = ROOT / "cases") -> 
         "experiments/code/python", "experiments/code/matlab",
         "experiments/outputs/data", "experiments/outputs/figures",
         "experiments/outputs/checks", "experiments/outputs/logs",
-        "reviews", "paper",
+        "reviews", "paper", "reports",
     ):
         (case_dir / relative).mkdir(parents=True, exist_ok=True)
 
@@ -95,10 +153,14 @@ def create_case(case_id: str, route: str, cases_root: Path = ROOT / "cases") -> 
     (case_dir / "decisions.md").write_text(
         (TEMPLATES / "decision_log.md").read_text(encoding="utf-8"), encoding="utf-8"
     )
+    for stage in STAGE_REPORTS:
+        (case_dir / f"reports/stage-{stage:02d}.md").write_text(
+            _stage_report_seed(case_id, stage), encoding="utf-8"
+        )
     (case_dir / "reviews/README.md").write_text(
-        "# Independent Reviewer 审核卡\n\n"
-        "C1/C2/C3 各保存一张可往返填写的审核卡。采纳 finding 零往返；拒绝 finding 时由原\n"
-        "Reviewer 在同一卡回签一次。不要再建立 packets/ 副本。\n",
+        "# 外部 Claude 审核卡\n\n"
+        "C1/C2/C3 由队员人工调用新的外部 Claude；Orchestrator 只生成卡和提示词，不得代启。\n"
+        "每个节点保存一张卡。采纳 finding 零往返；拒绝时回到原 Claude 会话回签一次。\n",
         encoding="utf-8",
     )
     (case_dir / "specs/README.md").write_text(
