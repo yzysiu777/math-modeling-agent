@@ -62,6 +62,9 @@ REQUIRED_PROMPTS = (
     "prompts/contracts/README.md", "prompts/contracts/spec.md",
     "prompts/contracts/results.md", "prompts/contracts/questions.md",
     "prompts/reviewer/C1_problem_challenge.md",
+    "prompts/startup/README.md", "prompts/startup/orchestrator.md",
+    "prompts/startup/modeler.md", "prompts/startup/engineer.md",
+    "prompts/startup/writer.md", "prompts/startup/reviewer.md",
     "prompts/reviewer/C2_model_challenge.md", "prompts/reviewer/C3_results_challenge.md",
     "prompts/reviewer/README.md",
 )
@@ -74,6 +77,8 @@ RETIRED_PATHS = (
 RETIRED_REVIEWER_PATHS = (
     "CLAUDE.md", "prompts/claude", "templates/claude_review_packet.md",
 )
+#: 审核协议文件——必须带 reviewer_provider / review_session 等元信息标记。
+#: 启动模板不在此列：它只是把 agent 指向协议的一段可复制文本，元信息由协议定义。
 REVIEWER_ACTIVE_FILES = (
     "REVIEWER.md", "templates/independent_review_packet.md",
     "prompts/reviewer/README.md", "prompts/reviewer/C1_problem_challenge.md",

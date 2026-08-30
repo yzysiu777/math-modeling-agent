@@ -141,3 +141,68 @@ class OrchestratorBoundaryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StartupTemplateTests(unittest.TestCase):
+    """启动模板必须存在、可填、且不复述协议内容。"""
+
+    ROLES = ("orchestrator", "modeler", "engineer", "writer", "reviewer")
+
+    def template(self, name):
+        return (ROOT / "prompts/startup" / f"{name}.md").read_text(encoding="utf-8")
+
+    def test_every_role_has_a_startup_template(self):
+        for name in self.ROLES:
+            path = ROOT / "prompts/startup" / f"{name}.md"
+            self.assertTrue(path.is_file(), name)
+        self.assertTrue((ROOT / "prompts/startup/README.md").is_file())
+
+    def test_templates_carry_a_copyable_block_with_slots(self):
+        for name in self.ROLES:
+            with self.subTest(role=name):
+                text = self.template(name)
+                self.assertIn("## 提示词正文", text)
+                self.assertIn("```text", text)
+                self.assertTrue(re.search(r"<[^<>\n]{2,20}>", text), "模板必须有填空槽")
+                self.assertIn("<项目根>", text)
+
+    def test_production_templates_point_at_the_role_protocol(self):
+        """模板只把 agent 指向协议，不复述协议——否则会有两份规则。"""
+
+        for name in ("orchestrator", "modeler", "engineer", "writer"):
+            with self.subTest(role=name):
+                self.assertIn(f"prompts/{name}.md", self.template(name))
+
+    def test_templates_require_a_scope_and_a_stopping_point(self):
+        """不写边界的后果实测中出现过：一路冲到 probe。"""
+
+        for name in ("orchestrator", "modeler", "engineer", "writer"):
+            with self.subTest(role=name):
+                text = self.template(name)
+                self.assertIn("到此停止", text)
+        self.assertIn("<硬范围>", self.template("modeler"))
+        self.assertIn("<本轮阶段>", self.template("modeler"))
+
+    def test_reviewer_template_encodes_both_dry_run_lessons(self):
+        text = self.template("reviewer")
+        # P4：按名单允许，不写绝对禁令
+        self.assertIn("不构成污染", text)
+        self.assertIn("不要因此判自己的报告无效", text)
+        self.assertIn("绝对禁令", text)
+        # P2：拿转述当题面
+        self.assertIn("摘录", text)
+        self.assertIn("原题全文", text)
+        # C1 顺序约束
+        self.assertIn("先只读题面原文", text)
+
+    def test_startup_templates_are_indexed(self):
+        # prompts/README.md 自己就在 prompts/ 下，用相对链接才是对的
+        self.assertIn("startup/", (ROOT / "prompts/README.md").read_text(encoding="utf-8"))
+        self.assertIn("prompts/startup/", (ROOT / "AGENTS.md").read_text(encoding="utf-8"))
+
+    def test_startup_templates_are_not_mistaken_for_reviewer_protocols(self):
+        """模板只是指路文本，审核元信息由 prompts/reviewer/ 下的协议定义。"""
+
+        from scripts.validate_workspace import REVIEWER_ACTIVE_FILES
+
+        self.assertFalse([path for path in REVIEWER_ACTIVE_FILES if "startup" in path])
