@@ -40,6 +40,44 @@ class WorkspaceContractTests(unittest.TestCase):
         ):
             self.assertFalse((ROOT / retired).exists(), retired)
 
+    def test_paper_engine_uses_the_vendored_official_class(self):
+        """论文版式由 gmcmthesis 负责，不得回退成自建 ctexart 版式。"""
+
+        main = (ROOT / "paper/main.tex").read_text(encoding="utf-8")
+        self.assertIn("{gmcmthesis}", main)
+        self.assertNotIn("{ctexart}", main)
+        # 承诺书页/摘要页由文档类生成，自建封面宏不得复活
+        self.assertNotIn("\\PaperCover", main)
+        for name in ("gmcmthesis.cls", "gmcm.bst",
+                     "figures/logo.pdf", "figures/title.pdf"):
+            self.assertTrue((ROOT / "paper" / name).is_file(), name)
+
+    def test_paper_keeps_the_split_section_structure(self):
+        """比赛期多人并行写作的前提；合并回单文件就会制造冲突。"""
+
+        sections = sorted((ROOT / "paper/sections").glob("*.tex"))
+        self.assertGreaterEqual(len(sections), 5)
+        main = (ROOT / "paper/main.tex").read_text(encoding="utf-8")
+        for path in sections:
+            self.assertIn(f"sections/{path.stem}", main, path.name)
+
+    def test_paper_bibliography_uses_bibtex_not_biber(self):
+        """gmcm.bst 是经典 BibTeX 样式；latexmkrc 与文档必须一致。"""
+
+        main = (ROOT / "paper/main.tex").read_text(encoding="utf-8")
+        self.assertIn("\\bibliographystyle{gmcm}", main)
+        self.assertNotIn("addbibresource", main)
+        latexmkrc = (ROOT / "latexmkrc").read_text(encoding="utf-8")
+        self.assertIn("bibtex", latexmkrc)
+        self.assertNotIn("$biber", latexmkrc)
+
+    def test_upstream_template_provenance_is_recorded(self):
+        readme = (ROOT / "paper/upstream/README.md").read_text(encoding="utf-8")
+        for marker in ("gmcmthesis", "校验和", "不是官方来源", "2026"):
+            self.assertIn(marker, readme, marker)
+        # 上游的推广物料不得进入比赛工程
+        self.assertFalse(list((ROOT / "paper/figures").glob("gongzhonghao*")))
+
     def test_writer_input_contract_is_not_self_contradictory(self):
         """The Writer must write model assumptions, so it needs read access to specs."""
 

@@ -20,6 +20,12 @@ def check_sources(paper_dir: Path) -> list[str]:
         paper_dir / "config/paper-profile.tex",
         paper_dir / "style/modeling-paper.sty",
         paper_dir / "bibliography/references.bib",
+        # gmcmthesis 文档类与其书目样式随仓库分发；缺任何一个都编不出官方版式。
+        paper_dir / "gmcmthesis.cls",
+        paper_dir / "gmcm.bst",
+        # 文档类硬编码 \includegraphics{logo} 与 {title}，缺图会直接编译失败。
+        paper_dir / "figures/logo.pdf",
+        paper_dir / "figures/title.pdf",
     ]
     for path in required:
         if not path.exists():
@@ -29,9 +35,13 @@ def check_sources(paper_dir: Path) -> list[str]:
         if FORBIDDEN_PLACEHOLDERS.search(text):
             errors.append(f"placeholder found in paper source: {path}")
     main_text = (paper_dir / "main.tex").read_text(encoding="utf-8")
-    for marker in ("\\addbibresource", "\\printbibliography", "\\PaperCover"):
+    for marker in ("{gmcmthesis}", "\\maketitle", "\\keywords",
+                   "\\bibliographystyle{gmcm}", "\\bibliography{"):
         if marker not in main_text:
             errors.append(f"main.tex missing required marker: {marker}")
+    # 分章结构是比赛期多人写作的前提，被合并回单文件就失去意义。
+    if not sorted((paper_dir / "sections").glob("*.tex")):
+        errors.append("no section files under sections/; the split structure is required")
     return errors
 
 

@@ -1,14 +1,21 @@
-% Internal profile. Replace with the active competition profile after the
-% current year's official standard document has been frozen.
-\newcommand{\PaperOfficialYear}{PENDING-COMPETITION-DAY-FREEZE}
-\newcommand{\PaperTitle}{通用数学建模论文模板示例}
-\newcommand{\PaperKeywords}{数学建模；运筹优化；数据分析；可复现验证}
-\newcommand{\PaperOfficialCoverPath}{official/PENDING/official-cover.pdf}
-% Set this to the page range supplied by the current official package.
-% Keep the unified abstract page in main.tex unless the official package
-% explicitly supplies it as part of the cover PDF.
-\newcommand{\PaperOfficialCoverPages}{-}
-\newif\ifPaperUseOfficialCover
-\PaperUseOfficialCoverfalse
-\newcommand{\PaperReleaseFontProfile}{competition-day-official}
-\newcommand{\PaperCIFontProfile}{fandol}
+% 队伍与赛题元信息。比赛日由队员填写，其余时间保持占位。
+%
+% gmcmthesis 用这些宏生成承诺书页与标题页。占位值会原样印到 PDF 上 ——
+% 这是刻意的：提交前忘记替换，人工核对时一眼就能看见，比默默留空安全。
+
+\title{待填写：论文标题}
+% 注：本版文档类没有 \tihao 公开接口（只有内部 token），题号写在标题或按当届
+% 官方封面要求人工填写。核对 gmcmthesis.cls 后再决定是否需要。
+\baominghao{待填写}             % 参赛队号（报名号）
+\schoolname{待填写：学校名称}
+\membera{待填写：队员一}
+\memberb{待填写：队员二}
+\memberc{待填写：队员三}
+
+% 关键词由 main.tex 的 \keywords 使用，用 \quad 分隔。
+\newcommand{\PaperKeywords}{数学建模\quad 运筹优化\quad 数据分析\quad 可复现验证}
+
+% 当届官方文件的冻结状态。比赛开始后换成当届年份并把 frozen 改为 true，
+% 同时更新 paper/official/<year>/manifest.yaml。
+\newcommand{\PaperOfficialYear}{2025}
+\newcommand{\PaperOfficialFrozen}{false}
