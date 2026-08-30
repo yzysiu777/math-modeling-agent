@@ -61,7 +61,7 @@ def build_document(snippets: List[Tuple[str, str]]) -> str:
         "% !TEX program = xelatex",
         "\\documentclass[bwprint]{gmcmthesis}",
         "\\input{config/paper-profile.tex}",
-        "\\input{style/modeling-paper.sty}",
+        "\\usepackage{style/modeling-paper}",
         "\\begin{document}",
         "\\maketitle",
         "\\begin{abstract}",
