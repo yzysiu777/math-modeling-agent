@@ -65,3 +65,9 @@ make qa
 
 CI PDF 只是预览。正式提交前，队员必须用当届官方文件核对封面/摘要页、匿名、页码、
 字体、元数据和 AI 声明，并人工打开最终 PDF。
+
+## 排版片段
+
+[LATEX_SNIPPETS.md](LATEX_SNIPPETS.md) 收录三线表、跨行表、长表、伪代码、子图、公式、
+代码附录和引用的可直接复制片段。`make snippet-check` 会把它们全部实际编译一遍，
+所以这份文档不会烂掉；`make paper-example` 编译上游完整示例，看排版效果。

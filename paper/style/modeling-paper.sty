@@ -9,9 +9,44 @@
 % gmcmthesis 已加载 booktabs、longtable、makecell、multirow、tabularx、caption、
 % subcaption、listings、enumitem、amsmath 等。这里只补它没有、而章节确实要用的：
 \RequirePackage{float}          % table[H] / figure[H] 精确定位
+
+% 子图。文档类里 subcaption 是被注释掉的（上游示例改用 subfig），所以必须在这里
+% 显式加载。两者互斥：从 paper/upstream/example.tex 抄子图代码时要改写成
+% subcaption 的 subfigure 环境，不能直接 \usepackage{subfig}。
+\RequirePackage{subcaption}
+
+% 伪代码。建模论文几乎必然要写算法，文档类没有提供，所以在这里统一加载并汉化，
+% 避免每位作者各写一套 \renewcommand 导致同一篇论文里「输入/Require」混用。
+\RequirePackage{algorithm}
+\RequirePackage[noend]{algpseudocode}
+\floatname{algorithm}{算法}
+\renewcommand{\algorithmicrequire}{\textbf{输入：}}
+\renewcommand{\algorithmicensure}{\textbf{输出：}}
+
+% 代码清单。文档类已加载 listings，这里只定义 Python / MATLAB 两种语言的统一样式，
+% 供附录使用。关键是 extendedchars + 中文字体，否则注释里的中文会掉字。
+\lstdefinestyle{modelingcode}{
+  basicstyle       = \ttfamily\footnotesize,
+  keywordstyle     = \color[rgb]{0.13,0.29,0.53}\bfseries,
+  commentstyle     = \color[rgb]{0.36,0.54,0.36}\itshape,
+  stringstyle      = \color[rgb]{0.63,0.16,0.16},
+  numbers          = left,
+  numberstyle      = \tiny\color{gray},
+  numbersep        = 8pt,
+  frame            = single,
+  rulecolor        = \color{gray!40},
+  breaklines       = true,
+  breakatwhitespace= false,
+  showstringspaces = false,
+  tabsize          = 4,
+  columns          = flexible,
+  extendedchars    = true,
+  escapeinside     = {(*@}{@*)},
+}
+\lstset{style=modelingcode}
 %
-% 只加确实被章节使用的包。amsthm 会与文档类的 \proof 冲突，siunitx 目前无人使用 ——
-% 需要时各自 \usepackage，不要预先塞进来。
+% 其余包按需在各自章节 \usepackage。amsthm 会与文档类的 \proof 冲突；
+% siunitx、tikz、colortbl 目前无人使用，不预先塞进来。
 
 % 模板示例标记。正式论文里不应残留任何 \paperexample —— make paper-ci 会检查。
 \newcommand{\paperexample}[1]{\textcolor{gray}{\emph{模板示例：#1}}}

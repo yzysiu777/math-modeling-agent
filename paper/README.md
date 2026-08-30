@@ -28,10 +28,15 @@ paper/
 ## 编译
 
 ```bash
-make paper       # 只编译
-make paper-ci    # 编译 + LaTeX QA
-make qa          # 对已生成 PDF 做检查
+make paper           # 只编译论文
+make paper-ci        # 编译 + LaTeX QA + 片段库编译验证
+make qa              # 对已生成 PDF 做检查
+make paper-example   # 编译上游示例（12 页），看这套模板支持哪些排版元素
+make snippet-check   # 单独验证 writing/LATEX_SNIPPETS.md 里的片段编得过
 ```
+
+排版元素怎么写，查 [../writing/LATEX_SNIPPETS.md](../writing/LATEX_SNIPPETS.md)，
+不要临场翻语法。
 
 需要 XeLaTeX、latexmk、**bibtex**（不是 biber）和 PyYAML。
 

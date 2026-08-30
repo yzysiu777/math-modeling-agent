@@ -1,3 +1,4 @@
+import re
 import unittest
 from pathlib import Path
 
@@ -70,6 +71,49 @@ class WorkspaceContractTests(unittest.TestCase):
         latexmkrc = (ROOT / "latexmkrc").read_text(encoding="utf-8")
         self.assertIn("bibtex", latexmkrc)
         self.assertNotIn("$biber", latexmkrc)
+
+    def test_snippet_library_is_extractable_and_non_trivial(self):
+        """片段库必须能被抽取器解析；解析不出来就等于没有验证。"""
+
+        from scripts.check_snippets import build_document, extract
+
+        library = ROOT / "writing/LATEX_SNIPPETS.md"
+        self.assertTrue(library.is_file())
+        snippets = extract(library)
+        self.assertGreaterEqual(len(snippets), 6, "片段库过于单薄")
+        for name, body in snippets:
+            self.assertTrue(body.strip(), name)
+        # 建模论文最常用的几类必须在库里
+        names = {name for name, _ in snippets}
+        for required in ("booktabs", "algorithm", "figures", "equations", "listings"):
+            self.assertIn(required, names, required)
+        document = build_document(snippets)
+        self.assertIn("{gmcmthesis}", document)
+        self.assertIn("\\end{document}", document)
+
+    def test_upstream_example_is_compilable_in_place(self):
+        """make paper-example 的前提：源、图和书目都在仓库里。"""
+
+        upstream = ROOT / "paper/upstream"
+        self.assertTrue((upstream / "example.tex").is_file())
+        self.assertTrue((upstream / "reference.bib").is_file())
+        text = (upstream / "example.tex").read_text(encoding="utf-8", errors="replace")
+        referenced = set(re.findall(r"\\includegraphics(?:\[[^\]]*\])?\{([^}]+)\}", text))
+        available = {path.stem for path in (upstream / "figures").glob("*")}
+        available |= {path.stem for path in (ROOT / "paper/figures").glob("*")}
+        missing = {name for name in referenced
+                   if Path(name).stem not in available and name not in available}
+        self.assertFalse(missing, f"上游示例引用了仓库里没有的图：{sorted(missing)}")
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("paper-example:", makefile)
+
+    def test_working_paper_figures_stay_free_of_demo_material(self):
+        """论文工程的图目录只放它自己要用的，示例图归 upstream。"""
+
+        working = {path.name for path in (ROOT / "paper/figures").glob("*")}
+        self.assertEqual(working, {"logo.pdf", "title.pdf"},
+                         "paper/figures/ 只应包含文档类硬编码依赖的两张图")
+        self.assertFalse(list((ROOT / "paper/figures").glob("gongzhonghao*")))
 
     def test_upstream_checksums_match_the_vendored_files(self):
         """记录的校验和必须在当前仓库内容上成立，否则它比没有更糟。"""
