@@ -24,7 +24,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y latexmk texlive-xetex texlive-lang-chinese \
-            texlive-latex-extra texlive-pictures texlive-fonts-recommended \
+            texlive-latex-extra texlive-pictures texlive-science texlive-fonts-recommended \
             texlive-bibtex-extra poppler-utils
 
       - name: Validate workspace contracts

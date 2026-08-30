@@ -45,6 +45,7 @@ venv/
 *.toc
 *.vrb
 paper/build/
+paper/upstream/build/
 paper/output/
 build/
 dist/

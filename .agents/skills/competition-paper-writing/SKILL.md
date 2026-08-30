@@ -104,6 +104,13 @@ single `.tex` never has two writers at once. The shared `.bib` is the only
 citation source, and it is **classic BibTeX with `gmcm.bst`** -- biblatex-only
 fields such as `urldate` are silently ignored.
 
+Do not look up LaTeX syntax under time pressure: `writing/LATEX_SNIPPETS.md` holds
+copy-ready blocks for booktabs tables, spanning cells, long tables, pseudocode,
+subfigures, equation systems, code appendices and citations, and
+`make snippet-check` compiles every one of them against this repository's own
+class -- a snippet library nobody verifies is worse than none. `make paper-example`
+builds the upstream template demo when you want to see an element rendered.
+
 Compile with `make paper-ci`, then `make qa`, then open the PDF. On Linux and in
 CI add `PAPER_FONTSET=fandol`; the resulting spacing differs slightly from the
 submission machine, so the final PDF must be rebuilt where it will be submitted.
