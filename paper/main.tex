@@ -1,28 +1,36 @@
-\documentclass[UTF8,a4paper,zihao=-4,fontset=fandol]{ctexart}
+% !Mode:: "TeX:UTF-8"
+%!TEX program = xelatex
+%
+% 华为杯研究生数学建模竞赛论文工程入口。
+%
+% 文档类 gmcmthesis 由社区维护（latexstudio / andy123t），本仓库按原样收录，
+% 版本与来源见 paper/upstream/README.md。承诺书页、编号页、摘要页版式、页码
+% 起始位置和匿名要求都由文档类处理 —— 不要在本文件里重新实现这些。
+%
+% 结构上刻意保持分章：比赛期间多人同时写作，单文件 main.tex 会制造合并冲突。
+% 每个 \input 对应一个可独立认领的章节。
+
+\documentclass[bwprint]{gmcmthesis}
+% Linux / CI / Overleaf 没有 SimSun、SimHei，需要 fandol 字体集：
+%   \documentclass[bwprint,fontset=fandol]{gmcmthesis}
+% 由 make paper-ci 通过 \PassOptionsToClass 注入，见 Makefile。
 
 \input{config/paper-profile.tex}
 \input{style/modeling-paper.sty}
-\usepackage[backend=biber,style=gb7714-2015,sorting=none]{biblatex}
-\addbibresource{bibliography/references.bib}
 
 \begin{document}
 
-\hypersetup{pageanchor=false}
-\PaperCover
-\hypersetup{pageanchor=true}
+\maketitle
 
-% The official 2025 rules start page numbering at the abstract page.
-% Reconfirm this with the active competition profile before submission.
-\pagenumbering{arabic}
-\setcounter{page}{1}
+\begin{abstract}
+\paperexample{摘要只写任务、方法、关键结果和结论。每个数字都必须能在
+\texttt{paper/claim\_map.md} 里追到实验 ID 和数据文件；追不到的数字不许写进摘要。}
 
-\begin{abstractpage}
-\paperexample{本文模板用于展示团队的论文组织、证据绑定和 LaTeX 协作方式。实际案例应在冻结题面、数据契约、模型、实验和当届官方格式后替换本页内容。}
+\paperexample{表述强度必须与证据匹配：可行解 / 当前最好解 / 给定假设下最优 /
+全局最优，关联 / 预测贡献 / 因果。把启发式结果写成「最优」是丢分最快的方式之一。}
 
-\paperexample{针对一个由多个子问题组成的数学建模任务，团队先进行题意重构与数据审计，再依据路由选择运筹优化、数据分析或混合建模方法。每个模型均先建立可解释 baseline，并通过小规模测试、独立复算和敏感性分析检查。}
-
-\paperexample{模板中的章节、公式和表格只展示排版结构，不代表任何具体案例的实验结果或结论。}
-\end{abstractpage}
+\keywords{\PaperKeywords}
+\end{abstract}
 
 \input{sections/01-problem}
 \input{sections/02-assumptions}
@@ -32,11 +40,11 @@
 \input{sections/06-robustness}
 \input{sections/07-conclusion}
 
-\clearpage
-\printbibliography[heading=bibintoc,title={参考文献}]
+\bibliographystyle{gmcm}
+\bibliography{bibliography/references}
 
-\appendix
-\clearpage
+\begin{appendices}
 \input{appendix/01-support}
+\end{appendices}
 
 \end{document}

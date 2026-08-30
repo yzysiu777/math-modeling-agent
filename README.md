@@ -63,7 +63,8 @@ python3 -m venv .venv
 
 缺这份依赖时绘图脚本会明确报告跳过并返回 0，不伪造图片，其余检查照常运行。
 
-论文编译需要本机安装 XeLaTeX、latexmk 和 biber。只做建模与实验时可以暂不安装。
+论文编译需要本机安装 XeLaTeX、latexmk 和 BibTeX。论文工程使用社区模板 gmcmthesis
+（2025 版），详见 [paper/README.md](paper/README.md)。只做建模与实验时可以暂不安装。
 MATLAB 只在本机运行，不进 CI。
 
 ## 2. 新题开始：五分钟建立案例
@@ -216,7 +217,9 @@ make final-check CASE=cases/huawei-cup-2026-a
 论文强主张阶段要求有效 C3；最终检查还要求人工决定、规格通过、claim_map 可追溯，
 并执行根论文 PDF QA。检查器只确认可见记录存在，不替代题意、数学或语义审核。
 
-仓库模板是团队内部工程模板，不是当届官方提交模板。比赛开始后必须重新核对官方封面、
+论文工程使用社区模板 **gmcmthesis**（第二十二届 / 2025 版），承诺书页、摘要页版式、
+页码起始和匿名要求由文档类负责。**它不是组委会发布件** —— 2026 官方格式出来后按
+[paper/upstream/README.md](paper/upstream/README.md) 替换，比赛日必须重新核对官方封面、
 摘要页、匿名要求、字体、页数、文件命名和 AI 使用规定。
 
 ## 5. 案例目录说明

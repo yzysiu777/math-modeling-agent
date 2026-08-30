@@ -1,7 +1,7 @@
 record_type: official_paper_profile
 year: 2025
-active: false
-status: historical_snapshot
+active: true
+status: in_use_until_2026_official_release
 sources:
   - name: "2025论文格式规范"
     url: "https://www.cmathc.org.cn/mcm/tz/317.html"
@@ -20,6 +20,23 @@ observed_rules:
   abstract_max_pages: 2
   numeric_citations: true
   pdf_submission: true
+typesetting:
+  document_class: gmcmthesis
+  class_version: "2025/09/16 v2.5 update by andy123t&latexstudio"
+  vendored_at: "paper/gmcmthesis.cls"
+  bibliography_style: gmcm.bst
+  bibliography_engine: bibtex
+  provenance: "社区模板（latexstudio / andy123t），随第二十二届分发包获得；不是组委会发布件"
+  upstream_notes: "paper/upstream/README.md"
+  bundled_word_template:
+    filename: "附件3：“华为杯”第二十二届中国研究生数学建模竞赛论文模板 (1)(1).doc"
+    sha256: ""
+    imported: false
+    discrepancy: >-
+      该分发包内的 Word 模板与 writing/official/2025/华为杯_2025_论文模板.doc
+      哈希不同（本条 sha256 vs 2fe99e58…）。后者有已记录的官方 URL，来源更强，
+      因此保留后者为准，未导入本件，也未覆盖。差异原因待人工核对。
 notes:
-  - "历史快照仅供训练和格式对照。比赛日必须重新冻结当届文件。"
-  - "社区LaTeX模板仅作工程参考，不是官方来源。"
+  - "2025 版在 2026 官方格式发布前作为日常写作模板使用，发布后按 paper/upstream/README.md 替换。"
+  - "社区LaTeX模板仅作工程参考，不是官方来源；冲突时以当届官方文件为准。"
+  - "脚本只验证可编译与结构完整；字号、行距、页边距和封面字段仍须人工对照官方模板。"

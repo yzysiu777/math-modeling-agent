@@ -93,10 +93,20 @@ follow data updates, and are exactly what a C3 review looks for.
 
 ## LaTeX collaboration
 
+The document class is the community `gmcmthesis` template (2025 edition), which
+owns the pledge page, title-and-abstract page, page-numbering origin, absence of
+running heads and body anonymity. Do not reimplement any of that: those are the
+official format, and a hand-rolled copy only drifts from it.
+
 Use `paper/main.tex` as an assembler. Keep sections, figures, tables, appendix,
-references and style tokens separate. Contributors work on section branches;
-the shared `.bib` file is the only citation source. Compile with XeLaTeX and
-biber through `make paper-ci`, then run `make qa` and inspect the rendered PDF.
+references and style tokens separate; contributors work on section branches so a
+single `.tex` never has two writers at once. The shared `.bib` is the only
+citation source, and it is **classic BibTeX with `gmcm.bst`** -- biblatex-only
+fields such as `urldate` are silently ignored.
+
+Compile with `make paper-ci`, then `make qa`, then open the PDF. On Linux and in
+CI add `PAPER_FONTSET=fandol`; the resulting spacing differs slightly from the
+submission machine, so the final PDF must be rebuilt where it will be submitted.
 
 ## Delivery limits
 

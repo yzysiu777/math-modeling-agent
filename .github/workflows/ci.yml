@@ -23,7 +23,9 @@ jobs:
       - name: Install TeX toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y latexmk texlive-xetex texlive-lang-chinese texlive-bibtex-extra biber poppler-utils
+          sudo apt-get install -y latexmk texlive-xetex texlive-lang-chinese \
+            texlive-latex-extra texlive-pictures texlive-fonts-recommended \
+            texlive-bibtex-extra poppler-utils
 
       - name: Validate workspace contracts
         run: python3 scripts/validate_workspace.py
@@ -38,10 +40,10 @@ jobs:
         run: python3 -m py_compile scripts/*.py tests/*.py
 
       - name: Compile LaTeX CI profile
-        run: make paper-ci
+        run: make PAPER_FONTSET=fandol paper-ci
 
       - name: Run paper QA after build
-        run: make qa
+        run: make PAPER_FONTSET=fandol qa
 
       - name: Upload preview PDF
         uses: actions/upload-artifact@v4

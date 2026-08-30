@@ -2,11 +2,19 @@ PAPER_DIR := paper
 PAPER_BUILD := $(PAPER_DIR)/build
 PYTHON ?= python3
 
+# gmcmthesis 默认用本机中文字体（Mac: SimSun/STSong，Windows: SimSun）。
+# CI 与 Linux 上这些字体不存在，需要 ctex 的 fandol 字体集。
+# 设 PAPER_FONTSET=fandol 即可注入；本机留空使用系统字体，排版更接近提交稿。
+PAPER_FONTSET ?=
+ifneq ($(PAPER_FONTSET),)
+LATEXMK_PRETEX := -usepretex='\PassOptionsToClass{fontset=$(PAPER_FONTSET)}{ctexart}'
+endif
+
 .PHONY: paper paper-ci qa clean test validate demos case-check spec-check review-packet final-check
 
 paper:
 	mkdir -p $(PAPER_BUILD)
-	cd $(PAPER_DIR) && latexmk -r ../latexmkrc -xelatex -interaction=nonstopmode -halt-on-error -outdir=build main.tex
+	cd $(PAPER_DIR) && latexmk -r ../latexmkrc -xelatex $(LATEXMK_PRETEX) -interaction=nonstopmode -halt-on-error -outdir=build main.tex
 
 paper-ci: paper
 	$(PYTHON) scripts/qa_latex.py --paper-dir $(PAPER_DIR) --build-dir $(PAPER_BUILD)

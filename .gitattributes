@@ -14,3 +14,10 @@
 *.zip binary
 *.tar binary
 *.gz binary
+
+# 上游模板原件按字节保留，不做行尾归一化：
+# 记录在 paper/upstream/README.md 里的校验和必须在新克隆上仍然成立，
+# 否则无法与上游新版本做有意义的比对。
+paper/gmcmthesis.cls -text
+paper/gmcm.bst       -text
+paper/upstream/*.tex -text
