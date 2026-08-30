@@ -17,9 +17,14 @@
 | 编程手 | [engineer.md](engineer.md) | `specs/SPEC-*.md`、`input/` 数据 | 代码、结果数据、图、复算报告 |
 | 写作手 | [writer.md](writer.md) | Champion 规格、`board.md`、`outputs/`、写作规范 | `paper/sections/*.tex`、`claim_map.md` |
 | 独立审核（横向机制） | [reviewer/](reviewer/) | 精简审核包 | C1/C2/C3 报告 |
+| 调度（接口位置，默认由人担任） | [orchestrator.md](orchestrator.md) | 各角色的落盘产出与检查结果 | 范围控制、案例初始化、门控提醒、实测记录 |
 
 前三行是**生产角色**，靠契约接力。独立审核是**横切三者的机制**，不产出主解、不接管
 环节，只在 C1/C2/C3 由队员手动触发一次性挑战。
+
+最后一行是人与三角色之间的接口位置，默认由队员本人担任；改由 agent 担任时，
+**对人可以充分转述，对下游角色只传路径与状态码** —— 它是唯一同时看到三方输出的
+实体，转述上游推理会直接绕过隔离。
 
 契约规则见 [contracts/](contracts/)，字段模板在 `templates/`。
 
@@ -43,6 +48,13 @@
 
 ```text
 读取 prompts/writer.md 并按其执行，为 cases/<case_id> 撰写和复核论文。
+```
+
+### 调度者（改由 agent 担任时）
+
+```text
+读取 prompts/orchestrator.md 并按其执行，负责 cases/<case_id> 的范围控制、
+案例初始化、角色调度、C1/C2/C3 门控提醒与实测记录。
 ```
 
 ### 独立审核者

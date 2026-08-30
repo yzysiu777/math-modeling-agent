@@ -1,7 +1,9 @@
 PAPER_DIR := paper
 PAPER_BUILD := $(PAPER_DIR)/build
 PAPER_EXAMPLE_BUILD := $(PAPER_DIR)/upstream/build
-PYTHON ?= python3
+# 默认用工作台虚拟环境。检查器依赖 PyYAML，用系统 python 跑会读不出 checkpoint，
+# 于是绝大部分检查被跳过 —— 实测中真的发生过，且探索阶段还返回 exit 0。
+PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
 # gmcmthesis 默认用本机中文字体（Mac: SimSun/STSong，Windows: SimSun）。
 # CI 与 Linux 上这些字体不存在，需要 ctex 的 fandol 字体集。

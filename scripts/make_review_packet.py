@@ -192,6 +192,14 @@ def _pipe_rows(text: str) -> list[list[str]]:
 _STATEMENT_NAME = re.compile(r"题面|题目|原题|statement|problem", re.IGNORECASE)
 #: `input/README.md` 里同时出现文件名和这些词时，视为显式声明该文件是题面。
 _STATEMENT_ROLE = re.compile(r"题面|题目|原题|statement|problem", re.IGNORECASE)
+#: 自称是摘录的文件不能充当 C1 的题面依据 —— C1 要核的正是「主解有没有转述走样」，
+#: 拿主解自己的摘录去核对，等于让它审自己。实测中真的发生过：1347 字符的
+#: 「本次范围摘录」被当成题面，包还报 packet_complete: true。
+_STATEMENT_IS_DIGEST = re.compile(
+    r"摘录|摘要|节选|概要|本次范围|范围说明|summary|excerpt|abridged", re.IGNORECASE
+)
+#: 原件常见格式。存在原件却只提供文本转写时，无法确认转写是全文还是节选。
+_SOURCE_DOCUMENT_SUFFIXES = frozenset({".pdf", ".doc", ".docx", ".rtf", ".odt"})
 
 
 def _declared_statements(case_dir: Path) -> set[str]:
@@ -276,6 +284,15 @@ def _add_problem_evidence(packet: Packet, case_dir: Path) -> None:
         text = _read(path)
         if not text:
             continue
+        # 自称摘录的文件不是题面依据。只查开头 —— 摘录通常在开头就声明范围。
+        digest = _STATEMENT_IS_DIGEST.search(text[:400])
+        if digest is not None:
+            packet.absent(
+                f"`{path.relative_to(case_dir)}` 自称「{digest.group(0)}」，是转述而非原题全文；"
+                "C1 要核的正是转述有没有走样，拿转述当依据等于让主解审自己。"
+                "请提供原题全文的完整转写"
+            )
+            continue
         if len(text) > _INPUT_EXCERPT_CHARS:
             packet.attach(f"`{path.relative_to(case_dir)}`（题面已截断，审核前请提供完整文件）")
         packet.section(f"原题材料：{path.name}", text, str(path.relative_to(case_dir)))
@@ -283,6 +300,19 @@ def _add_problem_evidence(packet: Packet, case_dir: Path) -> None:
 
     if statements and not excerpted:
         packet.absent("题面文件不是可摘录的文本格式，审核者必须另行拿到原题")
+
+    # 存在 PDF/DOC 原件却只给文本转写时，无法确认转写是全文还是节选。
+    originals = [path for path in files
+                 if path.suffix.casefold() in _SOURCE_DOCUMENT_SUFFIXES]
+    text_statements = [path for path in statements
+                       if path.suffix.casefold() in _TEXT_SUFFIXES]
+    if originals and text_statements:
+        packet.add(
+            "> **注意**：`input/` 中同时存在原件（"
+            + "、".join(f"`{path.name}`" for path in originals[:3])
+            + "）与文本转写。审核者应确认转写覆盖了原题全文，而不是节选。",
+            "",
+        )
 
     for path in attachments[:5]:
         if path.suffix.casefold() not in _TEXT_SUFFIXES:
