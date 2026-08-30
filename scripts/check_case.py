@@ -379,9 +379,27 @@ def _routing_findings(
     stage: str,
 ) -> tuple[list[Finding], str | None]:
     if checkpoint is None:
+        # 读不到控制文件时，check_case 会立即返回 —— 规格、C1/C2/C3、claim_map、
+        # probe 闭环全部没有运行过。这不是「工作还没做完」（那种在探索期只提醒），
+        # 而是「检查根本没跑」。后者在任何阶段都必须响，否则 exit 0 会被读成通过。
+        if _CHECKER_UNAVAILABLE.search(checkpoint_error or ""):
+            return [
+                _finding(
+                    "BLOCK", "CHECKER_UNAVAILABLE",
+                    f"{checkpoint_error}；**本次其余检查（规格、C1/C2/C3、claim_map、probe 闭环）"
+                    "全部未运行**，这不是通过。请用工作台虚拟环境重跑："
+                    "PYTHON=.venv/bin/python make case-check CASE=... STAGE=...；"
+                    "若虚拟环境缺依赖，先执行 .venv/bin/python -m pip install -r requirements-dev.txt",
+                    "HUMAN", "HUMAN",
+                )
+            ], None
         level = "REMINDER" if stage == "exploration" else "BLOCK"
         return [
-            _finding(level, "ROUTE_CONFIRMATION_REQUIRED", checkpoint_error or "案例控制文件不可用", "HUMAN", "HUMAN")
+            _finding(
+                level, "ROUTE_CONFIRMATION_REQUIRED",
+                f"{checkpoint_error or '案例控制文件不可用'}；本次其余检查未运行",
+                "HUMAN", "HUMAN",
+            )
         ], None
     routing = _mapping(checkpoint.get("routing"))
     suggested = str(routing.get("suggested", "") or "").strip()
@@ -868,6 +886,8 @@ _CLAIM_COLUMNS = (
     ("status", ("状态", "status")),
 )
 _VERIFIED_STATUS = re.compile(r"verified|已验证|已复核", re.IGNORECASE)
+#: 区分「工具跑不起来」与「工作没做完」。前者任何阶段都必须响。
+_CHECKER_UNAVAILABLE = re.compile(r"缺少 PyYAML|无法读取|顶层必须是")
 
 
 def _claim_header_map(cells: list[str]) -> dict[str, int]:
