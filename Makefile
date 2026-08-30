@@ -9,13 +9,6 @@ PYTHON ?= python3
 PAPER_FONTSET ?=
 ifneq ($(PAPER_FONTSET),)
 LATEXMK_PRETEX := -usepretex='\PassOptionsToClass{fontset=$(PAPER_FONTSET)}{ctexart}'
-# 上游示例专用：文档类在 \lstset 里硬编码了 \fontspec{Courier New}，Linux 上没有
-# 这个字体。我们自己的论文不受影响（style/modeling-paper.sty 覆盖了 basicstyle），
-# 但上游示例没覆盖。用 \AtBeginDocument 钩子在正文开始前改回 \ttfamily ——
-# 钩子晚于类加载执行，因此能覆盖，且不需要改动按字节收录的 example.tex。
-LATEXMK_PRETEX_EXAMPLE := -usepretex='\PassOptionsToClass{fontset=$(PAPER_FONTSET)}{ctexart}\AtBeginDocument{\lstset{basicstyle=\small\ttfamily}}'
-else
-LATEXMK_PRETEX_EXAMPLE :=
 endif
 
 .PHONY: paper paper-ci qa clean test validate demos case-check spec-check review-packet final-check
@@ -27,11 +20,16 @@ paper:
 # 编译上游示例，展示这套模板支持的排版元素（算法、表格、子图、代码附录）。
 # 与论文工程完全隔离：不同的源、不同的构建目录，不会污染 paper/build。
 # 它同时是一道回归——换 2026 版模板时，这里编不过说明上游有破坏性变更。
+#
+# 只在 macOS / Windows 上能跑：文档类的 Matlab/Python 代码环境在环境内部写死了
+# \fontspec{Courier New}，Linux 没有这个字体，且因为写在环境里，外部覆盖无效。
+# 修它就要改动按字节收录的 example.tex 或 .cls，会破坏 upstream/README.md 的
+# 校验和契约，不值得。因此 CI 不跑这个目标，只跑源完整性测试。
 paper-example:
 	mkdir -p $(PAPER_EXAMPLE_BUILD)
 	cd $(PAPER_DIR)/upstream && \
 	  TEXINPUTS=".:..:../figures//:" BSTINPUTS=".:..:" \
-	  latexmk -r ../../latexmkrc -xelatex $(LATEXMK_PRETEX_EXAMPLE) \
+	  latexmk -r ../../latexmkrc -xelatex $(LATEXMK_PRETEX) \
 	    -interaction=nonstopmode -halt-on-error -outdir=build example.tex
 	@echo "上游示例已编译：$(PAPER_EXAMPLE_BUILD)/example.pdf"
 	@echo "片段用法见 writing/LATEX_SNIPPETS.md；源码见 $(PAPER_DIR)/upstream/example.tex"

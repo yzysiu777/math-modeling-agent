@@ -42,9 +42,6 @@ jobs:
       - name: Compile LaTeX CI profile
         run: make PAPER_FONTSET=fandol paper-ci
 
-      - name: Compile upstream template example
-        run: make PAPER_FONTSET=fandol paper-example
-
       - name: Run paper QA after build
         run: make PAPER_FONTSET=fandol qa
 

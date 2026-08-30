@@ -91,6 +91,20 @@ class WorkspaceContractTests(unittest.TestCase):
         self.assertIn("{gmcmthesis}", document)
         self.assertIn("\\end{document}", document)
 
+    def test_snippet_library_warns_about_the_class_code_environments(self):
+        """文档类的 Matlab/Python 环境写死了 Windows/macOS 字体，换机器会炸。"""
+
+        library = (ROOT / "writing/LATEX_SNIPPETS.md").read_text(encoding="utf-8")
+        self.assertIn("Courier New", library)
+        self.assertIn("不要用文档类自带的", library)
+        # 我们自己的样式必须覆盖 basicstyle，否则本队论文也会踩同一个坑
+        style = (ROOT / "paper/style/modeling-paper.sty").read_text(encoding="utf-8")
+        self.assertIn("basicstyle", style)
+        self.assertIn("ttfamily", style)
+        main = (ROOT / "paper/main.tex").read_text(encoding="utf-8")
+        for env in ("\\begin{Matlab}", "\\begin{Python}"):
+            self.assertNotIn(env, main)
+
     def test_upstream_example_is_compilable_in_place(self):
         """make paper-example 的前提：源、图和书目都在仓库里。"""
 

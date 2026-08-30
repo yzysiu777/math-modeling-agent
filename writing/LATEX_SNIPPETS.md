@@ -138,7 +138,9 @@ make paper-example    # 编译上游完整示例，12 页
 
 ## 单图与子图
 
-子图用文档类已加载的 `subcaption`（**不是** `subfig`，两者不能混用）。
+子图用 `subcaption`，由 `style/modeling-paper.sty` 加载 —— 文档类里它是被注释掉的
+（上游示例改用 `subfig`）。两者互斥：从 `example.tex` 抄子图代码要改写成下面的
+`subfigure` 环境，不能直接 `\usepackage{subfig}`。
 
 <!-- snippet: figures -->
 ```latex
@@ -198,6 +200,12 @@ make paper-example    # 编译上游完整示例，12 页
 
 `listings` 样式已在 `style/modeling-paper.sty` 里统一定义（含中文注释支持）。
 附录只放**关键入口**，不要把整个仓库贴进去。
+
+> **不要用文档类自带的 `\begin{Matlab}{...}` / `\begin{Python}{...}` 环境。**
+> 它们在环境内部写死了 `\fontspec{Courier New}` —— 那是 Windows/macOS 字体，
+> 在 Linux 上直接编译失败，而且因为写在环境里，外部 `\lstset` 覆盖不掉。
+> 上游示例用的就是它们，所以 `make paper-example` 只能在 macOS/Windows 上跑。
+> 用下面的 `lstlisting` + 本仓库样式，换机器不会炸。
 
 <!-- snippet: listings -->
 ```latex

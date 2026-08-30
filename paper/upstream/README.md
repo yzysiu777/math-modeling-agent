@@ -47,6 +47,23 @@ a382e4fa022f4d97984807756f36076552489d3ec26530126c58587572046632  figures/logo.p
 第 5 步不能省。脚本只查得出「编得过、有摘要有关键词有参考文献、没有页眉」，
 查不出字号、行距、页边距、封面字段是否符合当届要求。
 
+## 已知限制：`make paper-example` 只能在 macOS / Windows 上跑
+
+文档类的 `\lstnewenvironment{Matlab}` 和 `{Python}` 在**环境内部**写死了
+`\fontspec{Courier New}`。Linux（含 CI）没有这个字体，而且因为写在环境里，
+外部 `\lstset` 或 `\AtBeginDocument` 都覆盖不掉。
+
+不修，理由：修它必须改动按字节收录的 `example.tex` 或 `gmcmthesis.cls`，
+那会破坏上面的校验和契约，也让将来与上游新版本的比对失去意义。
+这是上游模板面向 Windows/macOS 的固有属性，不是本仓库的缺陷。
+
+**影响不到本队论文**：`paper/style/modeling-paper.sty` 定义了自己的 listings
+样式（`\ttfamily`），`paper/main.tex` 不使用文档类的那两个环境。
+写作时也**不要**用它们，见 `writing/LATEX_SNIPPETS.md` 的代码附录一节。
+
+CI 因此不编译本示例，只运行源完整性测试（确认 `example.tex`、`reference.bib`
+和它引用的图都在仓库里）。
+
 ## 边界
 
 社区模板**不是官方来源**。它跟进得快、排版成熟，所以适合日常写作；但比赛日以
