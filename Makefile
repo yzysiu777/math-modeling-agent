@@ -9,6 +9,13 @@ PYTHON ?= python3
 PAPER_FONTSET ?=
 ifneq ($(PAPER_FONTSET),)
 LATEXMK_PRETEX := -usepretex='\PassOptionsToClass{fontset=$(PAPER_FONTSET)}{ctexart}'
+# 上游示例专用：文档类在 \lstset 里硬编码了 \fontspec{Courier New}，Linux 上没有
+# 这个字体。我们自己的论文不受影响（style/modeling-paper.sty 覆盖了 basicstyle），
+# 但上游示例没覆盖。用 \AtBeginDocument 钩子在正文开始前改回 \ttfamily ——
+# 钩子晚于类加载执行，因此能覆盖，且不需要改动按字节收录的 example.tex。
+LATEXMK_PRETEX_EXAMPLE := -usepretex='\PassOptionsToClass{fontset=$(PAPER_FONTSET)}{ctexart}\AtBeginDocument{\lstset{basicstyle=\small\ttfamily}}'
+else
+LATEXMK_PRETEX_EXAMPLE :=
 endif
 
 .PHONY: paper paper-ci qa clean test validate demos case-check spec-check review-packet final-check
@@ -24,7 +31,7 @@ paper-example:
 	mkdir -p $(PAPER_EXAMPLE_BUILD)
 	cd $(PAPER_DIR)/upstream && \
 	  TEXINPUTS=".:..:../figures//:" BSTINPUTS=".:..:" \
-	  latexmk -r ../../latexmkrc -xelatex $(LATEXMK_PRETEX) \
+	  latexmk -r ../../latexmkrc -xelatex $(LATEXMK_PRETEX_EXAMPLE) \
 	    -interaction=nonstopmode -halt-on-error -outdir=build example.tex
 	@echo "上游示例已编译：$(PAPER_EXAMPLE_BUILD)/example.pdf"
 	@echo "片段用法见 writing/LATEX_SNIPPETS.md；源码见 $(PAPER_DIR)/upstream/example.tex"
