@@ -71,6 +71,23 @@ class WorkspaceContractTests(unittest.TestCase):
         self.assertIn("bibtex", latexmkrc)
         self.assertNotIn("$biber", latexmkrc)
 
+    def test_upstream_checksums_match_the_vendored_files(self):
+        """记录的校验和必须在当前仓库内容上成立，否则它比没有更糟。"""
+
+        import hashlib
+        import re
+
+        readme = (ROOT / "paper/upstream/README.md").read_text(encoding="utf-8")
+        block = re.search(r"## 校验和\n\n```text\n(.*?)```", readme, re.S)
+        self.assertIsNotNone(block, "upstream/README.md 缺少校验和块")
+        rows = [line.split(None, 1) for line in block.group(1).strip().splitlines() if line.strip()]
+        self.assertGreaterEqual(len(rows), 4)
+        for digest, name in rows:
+            path = ROOT / "paper" / name.strip()
+            self.assertTrue(path.is_file(), name)
+            actual = hashlib.sha256(path.read_bytes()).hexdigest()
+            self.assertEqual(actual, digest, f"{name} 与记录的校验和不一致")
+
     def test_upstream_template_provenance_is_recorded(self):
         readme = (ROOT / "paper/upstream/README.md").read_text(encoding="utf-8")
         for marker in ("gmcmthesis", "校验和", "不是官方来源", "2026"):
