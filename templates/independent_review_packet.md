@@ -1,62 +1,54 @@
-# Independent Reviewer 精简审核包：C1/C2/C3
-
-> 一次只使用一个节点。删除不需要的内容，保留足够证据但不要交整题上下文；把本包复制
-> 到一个新的审核会话，不传主解完整聊天或隐藏推理。
-
-## 包信息
+# C1/C2/C3 轻量审核卡
 
 ```yaml
-case_id: <案例 ID>
-review_id: <本次审核 ID>
-reviewer_provider: <实际承担者；允许新增值，不是封闭白名单>
-reviewer_model: <实际模型或人工角色>
+case_id:
+reviewer_provider:
+reviewer_model:
 review_session: fresh
 saw_main_conversation: false
 critical_node: C1 | C2 | C3
 ```
 
-`review_session: fresh` 表示新会话或上下文隔离的新任务；`saw_main_conversation: false`
-表示审核者未看到主解完整聊天和主模型自我辩护。审核者可以看到题面、数据契约、正式
-模型、必要代码、实验结果和论文片段，但不保存或要求任何隐藏思维链。
+## 允许读取或上传的材料
 
-## 题面与范围
+- 原始材料：
+- 主解待挑战材料：
+- 题目自带说明文件：
 
-- 当前问题：
-- 题面摘要：
-- 输入、输出、目标和硬约束：
-- 字段、单位、时间边界：
-- 希望回答的 3–5 个问题：
-- 当前最担心的问题：
-- 明确未提供、因此不能判断的内容：
+## 当前最担心的问题
 
-## C1 题意挑战
+-
 
-- 可能的替代解释：
-- 最小反例或区分测试：
+## 希望回答的问题
 
-## C2 架构挑战
+1.
+2.
+3.
 
-- 候选路线与方法族：
-- Champion / Challenger：
-- 关键公式、伪代码或流程图：
-- 关键假设和不变量：
-- 已有小实验：
-- 希望挑战的架构选择：
+## Reviewer 输出
 
-## C3 结果与论文挑战
+What was checked:
 
-- 主要实验和统一比较口径：
-- 关键数字、约束和指标：
-- 论文摘要/结果/结论片段：
-- 数字对应的实验 ID 和输出：
-- 最值得抽查的强结论：
+Top findings:
 
-## 期望 Independent Reviewer 输出
+Supplementary observations:
 
-1. 先独立重构审核对象，不把主解结论当默认前提；
-2. 找出 3–5 个最高风险问题，并给出证据、影响和最小测试；
-3. 至少提出一个不同方法族、替代解释或反例/证伪测试；
-4. 给出路线保留、修改、暂停或拒绝建议；
-5. 明确 `what_was_checked`、`what_was_not_checked`、`uncertainty` 和 `human_decisions_required`；
-6. 信息不足时输出 `BLOCKED`，不得补造题面、参数、数据、结果或引用；
-7. 不直接修改主文件、不决定最终路线、不批准自己的修订。
+Node decision: GO | GO_WITH_FIXES | STOP
+
+Actions and owners:
+
+Human-only block: none
+
+What was not checked:
+
+Uncertainty:
+
+## 拒绝 finding 时的唯一往返
+
+Rejected finding:
+
+Reason and evidence:
+
+Requested reviewer sign-back:
+
+Reviewer sign-back: ACCEPT_REJECTION | REJECT_REJECTION

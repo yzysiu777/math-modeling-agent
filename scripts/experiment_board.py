@@ -1,4 +1,4 @@
-"""Validate the lightweight Markdown experiment board."""
+"""Validate the single lightweight experiment board used in competition."""
 
 from __future__ import annotations
 
@@ -8,19 +8,20 @@ from pathlib import Path
 from typing import Dict, List
 
 
-REQUIRED_COLUMNS = (
+CURRENT_COLUMNS = (
+    "实验 ID", "路线", "类型", "要回答的问题/显式假设", "预设判据",
+    "数据/实例范围", "预算", "status", "结果与判定", "是否继续", "下一步",
+)
+LEGACY_COLUMNS = (
     "实验 ID", "候选路线", "要回答的问题", "最小配置", "数据/实例范围", "指标",
     "预计成本", "status", "结果摘要", "是否继续", "下一项信息价值最高的实验",
 )
-REQUIRED_CONTENT_COLUMNS = REQUIRED_COLUMNS[:8]
 VALID_STATUS = {"queued", "running", "done", "failed", "skipped"}
 EXPERIMENT_ID = re.compile(r"EXP-[A-Za-z0-9][A-Za-z0-9_-]*$", re.IGNORECASE)
-PLACEHOLDERS = {"", "-", "—", "待填写", "待填", "待补充", "todo", "tbd", "n/a"}
+PLACEHOLDERS = {"", "-", "—", "待填写", "待填", "待替换", "待补充", "todo", "tbd", "n/a"}
 
 
 def parse_markdown_table(text: str) -> List[Dict[str, str]]:
-    """Parse pipe tables, tolerating the separator row and surrounding prose."""
-
     lines = [line.strip() for line in text.splitlines() if line.strip().startswith("|")]
     rows: List[Dict[str, str]] = []
     for index in range(len(lines) - 1):
@@ -38,8 +39,12 @@ def parse_markdown_table(text: str) -> List[Dict[str, str]]:
 
 
 def _has_value(value: str) -> bool:
-    normalized = " ".join(value.casefold().split()).strip(" .。_")
+    normalized = " ".join(value.casefold().split()).strip(" .。_`\"")
     return bool(normalized) and normalized not in PLACEHOLDERS
+
+
+def _value(row: Dict[str, str], *names: str) -> str:
+    return next((row[name].strip() for name in names if name in row), "")
 
 
 def validate_experiment_board(path: Path) -> List[str]:
@@ -50,52 +55,54 @@ def validate_experiment_board(path: Path) -> List[str]:
     if len(lines) < 2:
         return ["experiment board has no Markdown table"]
     header = [cell.strip() for cell in lines[0].strip("|").split("|")]
-    errors = [f"experiment board missing column: {column}" for column in REQUIRED_COLUMNS if column not in header]
+    current = all(column in header for column in CURRENT_COLUMNS)
+    legacy = all(column in header for column in LEGACY_COLUMNS)
+    errors: List[str] = []
+    if not current and not legacy:
+        errors.append("experiment board must use the compact current header")
     rows = parse_markdown_table(text)
     if not rows:
         errors.append("experiment board has no experiment rows")
-    ids = [row.get("实验 ID", "") for row in rows]
-    if any(not EXPERIMENT_ID.fullmatch(item.strip()) for item in ids):
-        errors.append("every experiment row needs an EXP-... identifier")
-    normalized_ids = [item.strip().casefold() for item in ids]
-    if len(normalized_ids) != len(set(normalized_ids)):
-        errors.append("experiment IDs must be unique")
-    for row in rows:
-        experiment_id = row.get("实验 ID", "").strip() or "<unknown>"
-        for column in REQUIRED_CONTENT_COLUMNS:
-            if not _has_value(row.get(column, "")):
-                errors.append(f"experiment {experiment_id} has empty required field: {column}")
+        return errors
 
-        status = row.get("status", "").strip().casefold()
+    ids = [_value(row, "实验 ID") for row in rows]
+    if any(not EXPERIMENT_ID.fullmatch(item) for item in ids):
+        errors.append("every experiment row needs an EXP-... identifier")
+    if len({item.casefold() for item in ids}) != len(ids):
+        errors.append("experiment IDs must be unique")
+
+    for row in rows:
+        exp_id = _value(row, "实验 ID") or "<unknown>"
+        status = _value(row, "status").casefold()
         if status not in VALID_STATUS:
             errors.append(f"invalid experiment status: {row.get('status')!r}")
             continue
+        if current:
+            for label in CURRENT_COLUMNS[1:7]:
+                if not _has_value(_value(row, label)):
+                    errors.append(f"experiment {exp_id} has empty required field: {label}")
+        else:
+            for label in LEGACY_COLUMNS[:8]:
+                if not _has_value(_value(row, label)):
+                    errors.append(f"experiment {exp_id} has empty required field: {label}")
 
-        result = row.get("结果摘要", "")
-        continuation = row.get("是否继续", "")
-        next_experiment = row.get("下一项信息价值最高的实验", "")
-        if status == "queued":
-            if not _has_value(next_experiment):
-                errors.append(f"queued experiment {experiment_id} needs a next experiment or 待当前实验后决定")
-        elif status == "running":
-            # A running experiment may not have a result yet; ``运行中`` is a useful explicit value.
-            continue
-        elif status == "done":
+        result = _value(row, "结果与判定", "结果摘要")
+        continuation = _value(row, "是否继续")
+        next_step = _value(row, "下一步", "下一项信息价值最高的实验")
+        kind = _value(row, "类型").casefold()
+        if status == "done":
             if not _has_value(result):
-                errors.append(f"done experiment {experiment_id} needs a result summary")
+                errors.append(f"done experiment {exp_id} needs a result and verdict")
+            if current and kind in {"probe", "reviewer_probe"} and not re.search(
+                r"\b(?:PASS|FAIL)\b|判定\s*[:：]?\s*(?:通过|失败|未通过)", result, re.IGNORECASE
+            ):
+                errors.append(f"completed probe {exp_id} needs an explicit PASS/FAIL verdict")
             if not _has_value(continuation):
-                errors.append(f"done experiment {experiment_id} needs 是否继续")
-            if not _has_value(next_experiment):
-                errors.append(f"done experiment {experiment_id} needs a next experiment or 无/路线已确定")
-        elif status == "failed":
-            if not _has_value(result):
-                errors.append(f"failed experiment {experiment_id} needs a non-empty failure summary")
-            if not _has_value(continuation):
-                errors.append(f"failed experiment {experiment_id} needs 是否继续")
-            if not _has_value(next_experiment):
-                errors.append(f"failed experiment {experiment_id} needs a next step")
-        elif status == "skipped" and not _has_value(result):
-            errors.append(f"skipped experiment {experiment_id} needs a non-empty summary")
+                errors.append(f"done experiment {exp_id} needs 是否继续")
+        elif status in {"failed", "skipped"} and not _has_value(result):
+            errors.append(f"{status} experiment {exp_id} needs a result or failure summary")
+        if status in {"done", "failed", "skipped"} and not _has_value(next_step):
+            errors.append(f"{status} experiment {exp_id} needs 下一步")
     return errors
 
 

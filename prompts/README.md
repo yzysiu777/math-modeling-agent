@@ -1,105 +1,23 @@
-# 提示词与角色入口
+# 角色入口
 
-三个角色在**各自独立的 Codex 会话**中工作，靠落盘文件接力。独立会话不是形式 ——
-它让「忠实实现」成为结构保证：编程手看不到建模手的推理，只能照规格做。
+一题使用四个持续会话：Orchestrator、Modeler、Engineer、Writer；C1/C2/C3 各使用一个
+新的 Reviewer 会话。同一角色跨阶段继续原会话，不重新启动。
 
-```text
-建模手 Modeler ──SPEC──▶ 编程手 Engineer ──结果+图──▶ 写作手 Writer
-     ▲                        │                        │
-     └──── questions ◀────────┴──── questions ◀────────┘
+| 角色 | 必读 | 案例输入 |
+|---|---|---|
+| Orchestrator | `prompts/orchestrator.md` | case 路径、题目路径、授权边界 |
+| Modeler | `prompts/modeler.md` | 原题、input、case brief |
+| Engineer | `prompts/engineer.md` | Full SPEC、candidates、board、数据 |
+| Writer | `prompts/writer.md` | Full SPEC、board、outputs、paper |
+| Reviewer | `REVIEWER.md` + 对应节点提示词 | 一张审核卡及其附件 |
 
-        Independent Reviewer C1 / C2 / C3（人工触发，横切三者）
-```
+`AGENTS.md` 由 Codex 项目自动加载；`agent.md`、contracts、writing 和 Skill 只在遇到
+具体问题时按需读取，不是每次启动的前置清单。
 
-| 角色 | 提示词 | 输入 | 输出 |
-|---|---|---|---|
-| 建模手 | [modeler.md](modeler.md) | 题面、附件、`case_brief.md` | 候选路线池、评估表、probe/full 规格 |
-| 编程手 | [engineer.md](engineer.md) | `specs/SPEC-*.md`、`input/` 数据 | 代码、结果数据、图、复算报告 |
-| 写作手 | [writer.md](writer.md) | Champion 规格、`board.md`、`outputs/`、写作规范 | `paper/sections/*.tex`、`claim_map.md` |
-| 独立审核（横向机制） | [reviewer/](reviewer/) | 精简审核包 | C1/C2/C3 报告 |
-| 调度（接口位置，默认由人担任） | [orchestrator.md](orchestrator.md) | 各角色的落盘产出与检查结果 | 范围控制、案例初始化、门控提醒、实测记录 |
-
-前三行是**生产角色**，靠契约接力。独立审核是**横切三者的机制**，不产出主解、不接管
-环节，只在 C1/C2/C3 由队员手动触发一次性挑战。
-
-最后一行是人与三角色之间的接口位置，默认由队员本人担任；改由 agent 担任时，
-**对人可以充分转述，对下游角色只传路径与状态码** —— 它是唯一同时看到三方输出的
-实体，转述上游推理会直接绕过隔离。
-
-契约规则见 [contracts/](contracts/)，字段模板在 `templates/`。
-
-## 启动提示词
-
-**启动模板在 [startup/](startup/)** —— 每个角色一份，填空后复制粘进新会话。
-模板会带上「本轮边界」和停止点，比下面这些一句话触发语安全得多：
-实测中不写边界的后果是建模手一路冲到 probe，把还没核定的东西当成前提。
-
-下面的一句话触发语只适合你已经很清楚边界、想快速拉起一个角色的时候。
-
-每次开**新的会话**，项目根目录设为本仓库，然后粘贴对应的一句话。
-
-### 建模手
-
-```text
-读取 prompts/modeler.md 并按其执行，接管 cases/<case_id>。
-```
-
-### 编程手
-
-```text
-读取 prompts/engineer.md 并按其执行，实现 cases/<case_id>/specs/<spec_id>.md。
-```
-
-### 写作手
-
-```text
-读取 prompts/writer.md 并按其执行，为 cases/<case_id> 撰写和复核论文。
-```
-
-### 调度者（改由 agent 担任时）
-
-```text
-读取 prompts/orchestrator.md 并按其执行，负责 cases/<case_id> 的范围控制、
-案例初始化、角色调度、C1/C2/C3 门控提醒与实测记录。
-```
-
-### 独立审核者
-
-不在本仓库执行。由队员生成审核包后，复制到**全新会话**（Gemini、Grok、隔离的新
-Codex 任务、其他模型或人类专家）：
+快速启动文本见 `prompts/startup/`。审核卡通过：
 
 ```bash
-make review-packet CASE=cases/<case_id> NODE=C2
+make review-packet CASE=cases/<case_id> NODE=C1
 ```
 
-## 什么时候切角色
-
-| 信号 | 切到 |
-|---|---|
-| 规格写完并通过 `make spec-check` | 编程手 |
-| 编程手回问阻塞了整条路线 | 建模手（答复并更新规格） |
-| probe 结果回填，需要决定升级还是淘汰 | 建模手 |
-| 有稳定实验结果和图，可以写对应章节 | 写作手 |
-| 写作手发现数字对不上 | 编程手（答复并重跑） |
-| 准备冻结主架构 | 先触发 C2，再回建模手 |
-| 准备写摘要和结论 | 先触发 C3，再回写作手 |
-
-不必等一个角色把所有事做完才切。竞赛节奏里常见的是：建模手出两条 probe 规格 →
-切编程手跑完 → 切回建模手评估 → 升 full 规格，一天内来回几轮。
-
-**同一时间只让一个角色写工作树**，避免并发修改冲突。
-
-## 为什么不合成一个会话
-
-合并成一个会话会更省事，但会失去两样东西：
-
-1. **忠实性**。同一个会话里，「我知道建模手想要什么」会悄悄替代「规格里写了什么」，
-   规格逐渐变成摆设，等到第三天回头看，实现和论文里的模型已经对不上了。
-2. **上下文纯净度**。四天赛程里会话会变得很长，早期的约束容易被后期的细节挤掉。
-   分角色天然限定了每个会话要装的东西。
-
-代价是每次切换要开新任务、粘一句话。这个代价是值得的。
-
-## 其他
-
-- [final-handoff.md](final-handoff.md)：最终提交前的人工交接清单。
+生成后，在独立 Reviewer 会话读取同一张卡；结果仍写回该卡，不新建 packet/report 两份文件。
