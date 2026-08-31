@@ -92,6 +92,18 @@ class SourceConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(SourceConfigError, "路径不存在"):
                 load_sources(case)
 
+    def test_nonexistent_question_mapping_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            case = create_case("case-a", cases_root=root)
+            statement = root / "statement.md"
+            statement.write_text("题面", encoding="utf-8")
+            data = root / "data"
+            data.mkdir()
+            write_sources(case, statement, data, questions="  q1: 不存在的题目目录")
+            with self.assertRaisesRegex(SourceConfigError, "questions.q1.*均不存在"):
+                load_sources(case)
+
     def test_question_mapping_must_match_question_directories(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

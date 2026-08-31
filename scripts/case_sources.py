@@ -115,6 +115,17 @@ def load_sources(
                 errors.append(f"{label} 必须是目录：{candidate}")
             elif not os.access(candidate, os.R_OK):
                 errors.append(f"{label} 不可读：{candidate}")
+        relative_paths = [
+            *((f"questions.{key}", value) for key, value in questions.items()),
+            *((f"shared[{index}]", value) for index, value in enumerate(shared)),
+        ]
+        for label, relative in relative_paths:
+            candidates = [root / relative for root in data_roots]
+            existing = [candidate for candidate in candidates if candidate.exists()]
+            if not existing:
+                errors.append(f"{label} 在任何 data_roots 下均不存在：{relative}")
+            elif not any(os.access(candidate, os.R_OK) for candidate in existing):
+                errors.append(f"{label} 不可读：{relative}")
 
     if require_question_dirs and questions:
         actual = {
