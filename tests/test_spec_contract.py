@@ -85,6 +85,35 @@ class SpecContractTests(unittest.TestCase):
             self.assertNotEqual(first, second)
             self.assertNotEqual(first_id, second_id)
 
+    def test_per_question_spec_uses_its_own_board(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case = Path(tmp) / "case-a"
+            (case / "q1/specs").mkdir(parents=True)
+            (case / "q1/specs/SPEC-Q1-M01.md").write_text(spec_text(), encoding="utf-8")
+            rows = "| EXP-001 | M-01 | probe | 结构是否可行 | PASS | toy | 1 min | done | 判定：PASS | yes | 写 Full |"
+            (case / "q1/board.md").write_text(BOARD.format(rows=rows), encoding="utf-8")
+            self.assertEqual(validate_case_specs(case), [])
+
+    def test_per_question_spec_rejects_future_question_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case = Path(tmp) / "case-a"
+            (case / "q1/specs").mkdir(parents=True)
+            text = spec_text().replace("算法入口输出。", "读取 q2/outputs/data/x.csv。")
+            (case / "q1/specs/SPEC-Q1-M01.md").write_text(text, encoding="utf-8")
+            rows = "| EXP-001 | M-01 | probe | 结构是否可行 | PASS | toy | 1 min | done | 判定：PASS | yes | 写 Full |"
+            (case / "q1/board.md").write_text(BOARD.format(rows=rows), encoding="utf-8")
+            errors = validate_case_specs(case)
+            self.assertTrue(any("CROSS_QUESTION_BACKWARD_REFERENCE" in error for error in errors))
+
+    def test_pending_probe_result_is_a_valid_full_spec_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "SPEC-Q1-M01.md"
+            path.write_text(
+                spec_text().replace("probe_result: PASS", "probe_result: PENDING"),
+                encoding="utf-8",
+            )
+            self.assertEqual(validate_spec(path), [])
+
 
 if __name__ == "__main__":
     unittest.main()

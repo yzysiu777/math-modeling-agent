@@ -3,7 +3,7 @@
 ## 题意与模型
 
 - [ ] 题面、附件和字段含义已由队员核对
-- [ ] `checkpoint.yaml` 中的 router 建议已由队员确认或修正，并写明原因
+- [ ] 每题 C1 卡有节点决定并写明推荐路由，或使用人工覆盖
 - [ ] 每个子问题有目标、变量/响应、约束、单位和评价指标
 - [ ] Champion 与 Challenger 的比较口径一致
 - [ ] 失败路线和关键假设已记录
@@ -19,12 +19,12 @@
 
 ## Independent Reviewer 与人工
 
-- [ ] 需要的 C1/C2/C3 挑战已完成并保存
+- [ ] 每题 C1、被风险触发的 C2、全案例一次 C3 已完成并保存
 - [ ] 审核报告已注明 provider、model、`review_session: fresh`、`saw_main_conversation: false` 和 critical node
-- [ ] 队员已在 `decisions.md` 记录接受/拒绝及原因
+- [ ] `decisions.md` 只记录人工专属边界决定
 - [ ] `make case-check CASE=... STAGE=paper_claims` 已运行且没有阻断项
 - [ ] 未检查内容、不确定性和限制已进入论文或交接
-- [ ] 最终模型取舍、强结论和提交策略已由人工确认
+- [ ] Reviewer 推荐动作已实施或由队员明确否决；最终提交已由人工确认
 
 ## 论文与提交
 

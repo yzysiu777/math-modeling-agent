@@ -7,6 +7,13 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+import yaml
+
+try:
+    from .case_sources import SourceConfigError, load_sources
+except ImportError:  # pragma: no cover
+    from case_sources import SourceConfigError, load_sources
+
 
 NODES = ("C1", "C2", "C3")
 STATEMENT_NAME = re.compile(r"题面|题目|原题|statement|problem", re.IGNORECASE)
@@ -39,7 +46,13 @@ def _safe_files(root: Path) -> list[Path]:
 
 
 def _data_roots(case_dir: Path) -> list[Path]:
-    """Read explicit data_root fields and the two historical prose forms."""
+    """Read ``sources.yaml`` first, then support legacy cases without it."""
+
+    if (case_dir / "sources.yaml").is_file():
+        try:
+            return list(load_sources(case_dir).data_roots)
+        except SourceConfigError:
+            return []
 
     roots: list[Path] = []
     for source in (case_dir / "input/README.md", case_dir / "case_brief.md"):
@@ -50,6 +63,15 @@ def _data_roots(case_dir: Path) -> list[Path]:
                 if candidate.is_absolute() and candidate.is_dir():
                     roots.append(candidate.resolve())
     return list(dict.fromkeys(roots))
+
+
+def _active_question(case_dir: Path) -> str | None:
+    try:
+        payload = yaml.safe_load((case_dir / "checkpoint.yaml").read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, yaml.YAMLError):
+        return None
+    value = str(payload.get("current_question", "")).strip().casefold() if isinstance(payload, dict) else ""
+    return value if re.fullmatch(r"q[1-9][0-9]*", value) else None
 
 
 def _explanation_docs(roots: list[Path]) -> list[Path]:
@@ -82,7 +104,82 @@ def _relative_or_absolute(path: Path, case_dir: Path) -> str:
         return str(path)
 
 
-def _node_materials(case_dir: Path, node: str) -> tuple[list[tuple[str, str]], list[str]]:
+def _new_node_materials(
+    case_dir: Path, node: str, question: str
+) -> tuple[list[tuple[str, str]], list[str]]:
+    missing: list[str] = []
+    materials: list[tuple[str, str]] = []
+    try:
+        sources = load_sources(case_dir)
+    except SourceConfigError as exc:
+        return [], [f"sources.yaml 无效：{exc}"]
+
+    work_dir = case_dir / question
+    if node == "C1":
+        materials.append(("原始题面（先读）", str(sources.statement.resolve())))
+        for path, label in (
+            (case_dir / "input/题面全文.md", "阶段 0 题面转写与来源行"),
+            (work_dir / "brief.md", "待挑战的本题 brief（后读）"),
+            (work_dir / "数据范围.md", "本题数据白名单"),
+        ):
+            if path.is_file():
+                materials.append((label, _relative_or_absolute(path, case_dir)))
+            else:
+                missing.append(f"{_relative_or_absolute(path, case_dir)} 不存在；先运行 ingest")
+        for path in _safe_files(case_dir / "input/说明文档"):
+            materials.append(("阶段 0 转写的说明文档", _relative_or_absolute(path, case_dir)))
+        for root in sources.data_roots:
+            materials.append(("获准原始数据根（只读）", str(root)))
+        for path in _explanation_docs(list(sources.data_roots)):
+            materials.append(("原始说明文件", str(path)))
+    elif node == "C2":
+        for path, label in (
+            (work_dir / "brief.md", "路线、七维度与 Champion"),
+            (work_dir / "board.md", "Probe 与赛马结果"),
+        ):
+            if path.is_file():
+                materials.append((label, _relative_or_absolute(path, case_dir)))
+            else:
+                missing.append(f"{_relative_or_absolute(path, case_dir)} 不存在")
+        specs = sorted((work_dir / "specs").glob("SPEC-*.md"))
+        if not specs:
+            missing.append(f"{question}/specs/ 没有 Full SPEC")
+        materials.extend(
+            ("Full SPEC", _relative_or_absolute(path, case_dir))
+            for path in specs if not path.name.endswith(".questions.md")
+        )
+    else:
+        claim_map = case_dir / "paper/claim_map.md"
+        if claim_map.is_file():
+            materials.append(("全案例关键 Claim", "paper/claim_map.md"))
+        else:
+            missing.append("paper/claim_map.md 不存在")
+        for qname in sources.questions:
+            qdir = case_dir / qname
+            board = qdir / "board.md"
+            if board.is_file():
+                materials.append((f"{qname.upper()} 实验板", _relative_or_absolute(board, case_dir)))
+            for directory, label in (
+                (qdir / "outputs/data", "结果数据"),
+                (qdir / "outputs/checks", "复算报告"),
+                (qdir / "outputs/figures", "图表"),
+            ):
+                materials.extend(
+                    (f"{qname.upper()} {label}", _relative_or_absolute(path, case_dir))
+                    for path in sorted(directory.glob("*")) if path.is_file()
+                )
+    return materials, missing
+
+
+def _node_materials(
+    case_dir: Path, node: str, question: str | None = None
+) -> tuple[list[tuple[str, str]], list[str]]:
+    if (case_dir / "sources.yaml").is_file():
+        active = question or _active_question(case_dir)
+        if not active:
+            return [], ["checkpoint.yaml 缺少 current_question"]
+        return _new_node_materials(case_dir, node, active)
+
     missing: list[str] = []
     materials: list[tuple[str, str]] = []
 
@@ -144,27 +241,31 @@ def _node_materials(case_dir: Path, node: str) -> tuple[list[tuple[str, str]], l
     return materials, missing
 
 
-def build_packet(case_dir: Path, node: str, review_id: str | None = None) -> str:
+def build_packet(
+    case_dir: Path, node: str, review_id: str | None = None, question: str | None = None
+) -> str:
     if node not in NODES:
         raise ValueError(f"node must be one of {list(NODES)}")
     if not case_dir.is_dir():
         raise FileNotFoundError(f"case directory does not exist: {case_dir}")
 
-    materials, missing = _node_materials(case_dir, node)
+    question = question or _active_question(case_dir)
+    materials, missing = _node_materials(case_dir, node, question)
     review_id = review_id or f"{node}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     ready = "true" if not missing else "false"
     lines = [
-        f"# 外部 Claude {node} 轻量审核卡：{review_id}",
+        f"# Independent Reviewer {node} 轻量审核卡：{review_id}",
         "",
-        "本卡由 Orchestrator 生成、队员人工交给外部 Claude，是唯一详细审核记录。",
+        "本卡由 Orchestrator 生成、队员人工交给新的独立审核会话，是唯一详细审核记录。",
         "",
         "```yaml",
         f"case_id: {case_dir.name}",
-        "reviewer_provider: anthropic",
-        "reviewer_model: <实际使用的 Claude 型号>",
+        "reviewer_provider: <实际 provider>",
+        "reviewer_model: <实际 model 或 human>",
         "review_session: fresh",
         "saw_main_conversation: false",
         f"critical_node: {node}",
+        f"question: {question or 'legacy'}",
         f"card_ready: {ready}",
         "```",
         "",
@@ -192,7 +293,14 @@ def build_packet(case_dir: Path, node: str, review_id: str | None = None) -> str
         "",
         "Top findings: 最多五条展开；每条写严重度、证据、影响、最小动作。",
         "",
+        "推荐动作：<唯一动作>",
+        "推荐理由：",
+        "次优项：",
+        "默认执行",
+        "",
         "Supplementary observations: 超过五条的只在这里列一行清单。",
+        "",
+        "Recommended route: <C1 必填；其他节点可 n/a>",
         "",
         "Node decision: GO | GO_WITH_FIXES | STOP",
         "",
@@ -234,6 +342,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="generate one compact review card")
     parser.add_argument("--case-dir", type=Path, required=True)
     parser.add_argument("--node", choices=NODES, required=True)
+    parser.add_argument("--question")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
@@ -245,9 +354,14 @@ def main() -> int:
         target = args.out
         review_id = f"{args.node}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     else:
-        target, review_id = _unique_target(args.case_dir / "reviews", args.node)
+        question = args.question or _active_question(args.case_dir)
+        if (args.case_dir / "sources.yaml").is_file():
+            directory = args.case_dir / ("paper/reviews" if args.node == "C3" else f"{question}/reviews")
+        else:
+            directory = args.case_dir / "reviews"
+        target, review_id = _unique_target(directory, args.node)
     target.parent.mkdir(parents=True, exist_ok=True)
-    card = build_packet(args.case_dir, args.node, review_id)
+    card = build_packet(args.case_dir, args.node, review_id, args.question)
     target.write_text(card, encoding="utf-8")
     print(f"WROTE {target}")
     print(f"SIZE {len(card.encode('utf-8'))} bytes")

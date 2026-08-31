@@ -1,11 +1,7 @@
 # C1/C2/C3 节点提示词
 
-共同规则在根目录 `REVIEWER.md`。每个节点由队员人工调用一个新的外部 Claude 会话，
-并使用一张审核卡：
+C1 每题必做；C2 按风险触发；C3 全案例一次。共同规则在根 `REVIEWER.md`。Reviewer 由队员
+人工启动新会话，provider/model 如实记录，保持最小材料和方法论独立。
 
-- C1：原题、附件、字段与 brief；
-- C2：Champion/Challenger、Full SPEC、Probe 与关键假设；
-- C3：3–5 条关键 Claim、数据和复算。
-
-Reviewer 给出节点决定；采纳零往返，生产角色拒绝 finding 时才回签一次。
-Orchestrator 不得自行启动 Reviewer，也不得用生产 Codex 会话替代 Claude。
+每条 finding 必须有唯一推荐动作、证据、次优项和默认执行。生产角色默认实施，队员可否决；
+拒绝 finding 才回原会话回签一次。Reviewer 无主解编辑权，不启动 Agent，不代写论文。

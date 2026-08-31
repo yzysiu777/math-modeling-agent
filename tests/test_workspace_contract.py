@@ -27,7 +27,7 @@ class WorkspaceContractTests(unittest.TestCase):
 
     def test_no_second_runtime_mode_or_old_packet_contract(self):
         workflow = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
-        self.assertIn("只有这一套竞赛流程", workflow)
+        self.assertIn("只有这一套流程", workflow)
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertNotIn("reviews/packets", readme)
 
@@ -68,22 +68,29 @@ class WorkspaceContractTests(unittest.TestCase):
         ):
             self.assertFalse((ROOT / relative).exists(), relative)
 
-    def test_reviewer_is_manually_started_external_claude(self):
+    def test_reviewer_is_manually_started_and_vendor_neutral(self):
         startup = (ROOT / "prompts/startup/reviewer.md").read_text(encoding="utf-8")
         orchestrator = (ROOT / "prompts/orchestrator.md").read_text(encoding="utf-8")
-        self.assertIn("人工调用外部 Claude", startup)
-        self.assertIn("reviewer_provider: anthropic", startup)
+        self.assertIn("人工启动 Independent Reviewer", startup)
+        self.assertIn("reviewer_provider:", startup)
         self.assertNotIn("gpt-5.6-sol", startup)
-        self.assertIn("不得自行调用任务工具创建 Reviewer", orchestrator)
-        self.assertIn("不得以 Codex 代替 Claude", orchestrator)
+        self.assertIn("Reviewer 同样由队员", orchestrator)
+        self.assertNotIn("anthropic", startup.casefold())
 
-    def test_agent_report_card_and_stage_reports_are_documented(self):
+    def test_six_line_agent_report_and_question_logs_are_documented(self):
         contract = (ROOT / "agent.md").read_text(encoding="utf-8")
         for marker in (
-            "## Agent 回报卡", "MANUAL_REVIEWER_LAUNCH", "人工核验建议",
-            "下一步协作", "reports/stage-01.md", "reports/stage-07.md",
+            "## Agent 回报卡", "[Q2 / 步骤B / DONE]", "产物：", "风险：",
+            "需要人工：", "下一步：",
         ):
             self.assertIn(marker, contract)
+        self.assertNotIn("reports/stage-", contract)
+
+    def test_every_startup_template_has_question_and_directory_slots(self):
+        for path in (ROOT / "prompts/startup").glob("*.md"):
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("当前子问题：Q<k>", text, path.name)
+            self.assertIn("本题目录：<案例目录>/q<k>", text, path.name)
 
 
 if __name__ == "__main__":

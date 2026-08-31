@@ -26,7 +26,8 @@ REQUIRED_FILES = (
     "protocol/competition-workflow.md", "templates/checkpoint.yaml",
     "templates/experiment_board.md", "templates/independent_review_packet.md",
     "templates/spec.md", "scripts/create_case.py",
-    "scripts/check_case.py", "scripts/check_spec.py", "scripts/make_review_packet.py",
+    "scripts/case_sources.py", "scripts/ingest.py", "scripts/check_case.py",
+    "scripts/check_spec.py", "scripts/make_review_packet.py",
     "prompts/modeler.md", "prompts/engineer.md", "prompts/writer.md",
     "prompts/startup/orchestrator.md", "prompts/startup/modeler.md",
     "prompts/startup/engineer.md", "prompts/startup/writer.md",
@@ -87,7 +88,7 @@ def validate_static_contract() -> List[str]:
             if marker not in text:
                 errors.append(f"review card/protocol missing diagnostic field {marker}: {relative}")
     workflow = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
-    for marker in ("## 1.", "## 2.", "## 3.", "## 4.", "## 5.", "## 6.", "## 7.", "被削门禁及替代办法"):
+    for marker in ("## A 定题", "## B 试跑", "## C 出结果", "## D 写本题", "## E 全案例收官", "## STAGE 对照"):
         if marker not in workflow:
             errors.append(f"competition workflow missing marker: {marker}")
     if "研究模式" in workflow and "不是另一种运行模式" not in workflow:
@@ -95,6 +96,11 @@ def validate_static_contract() -> List[str]:
     template = (ROOT / "templates/independent_review_packet.md").read_text(encoding="utf-8")
     if len(template.encode("utf-8")) > 6144:
         errors.append("review-card template exceeds 6 KiB")
+    for path in sorted((ROOT / "prompts/startup").glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        for marker in ("当前子问题：Q<k>", "本题目录：<案例目录>/q<k>"):
+            if marker not in text:
+                errors.append(f"startup template missing question slot {marker}: {path.relative_to(ROOT)}")
     for route in ("optimization", "data-analysis", "hybrid"):
         board = ROOT / f"cases/examples/{route}/experiments/board.md"
         candidates = ROOT / f"cases/examples/{route}/models/candidates.md"

@@ -1,48 +1,30 @@
 # 案例团队协作
 
-本文件约束仓库内案例协作，不约束外部开发控制面。团队用 Git 分支和 Markdown 源文件
-协作，不把开发交接单复制到案例。
+一个案例装整道题。`sources.yaml`、`input/`、`checkpoint.yaml`、`decisions.md` 和 `paper/` 是共享
+层；每天工作的硬范围是一个 `q<k>/`。同一时刻一份文件只有一个写入者。
 
 ## 文件分工
 
-- `case_brief.md`：Modeler 维护题意、目标和歧义；
-- `models/candidates.md`：Modeler 统一维护候选路线、比较和取舍；
-- `experiments/`：实验成员维护代码、板和关键输出；
-- `reviews/`：Orchestrator 到节点创建一张卡，Reviewer 在同一卡填写；
-- `reports/`：Orchestrator 唯一写入七份阶段报告，其他角色只输出回报卡；
-- `paper/`：论文成员维护案例级说明，根 `paper/` 维护共享 LaTeX 工程；
-- `decisions.md`：只记录官方硬冲突、授权扩张和最终提交等人工决定。
+- Orchestrator：`sources.yaml` 协助、阶段 0、`checkpoint.yaml`、审核卡；
+- Modeler：当前题 `brief.md`、`board.md`、`specs/`；
+- Engineer：当前题 `code/`、`outputs/` 与 board 结果；
+- Writer：`paper/sections/q<k>.tex` 与共享 `paper/claim_map.md`；
+- Reviewer：只写本题 C1/C2 卡或共享 C3 卡，不改主解；
+- 队员：人工专属 `decisions.md` 与最终提交。
 
-同一时刻一份文件只有一个写入者。大段内容通过独立分支和小提交合并，先解决
-同一文件冲突再继续实验。原始题面和附件不改名到失去来源，也不放入自动生成的
-输出目录。
+`q<k>` 可读取 `q<j>/outputs/` 当且仅当 `j < k`。任何后题到前题的反向依赖都必须消除，不能
+靠口头承诺。原始数据按阶段 0 生成的本题白名单只读。
 
-## 推荐分支
+## Git 与落盘交接
 
-```text
-model/<任务>       模型公式、算法和小实例
-analysis/<任务>    数据清洗、实验和比较
-paper/<章节>       论文章节、图表和引用
-review/<编号>      审核意见整理和复现
-```
+推荐分支仍按模型、分析、论文或审核任务命名。提交说明写改变、原因、验证和下一步。失败 Probe
+留在 board；淘汰路线留在 brief；过程只追加到本题 log。不要复制外部开发控制台材料进案例。
 
-提交说明包含：改变了什么、为什么改变、运行了什么、结果和下一步。被淘汰路线保留在
-`models/candidates.md`，失败实验保留在 `experiments/board.md`，不删除来美化结果。
+生产角色均由队员人工启动并复用本题会话，固定 `gpt-5.6-sol`、`high`。Orchestrator 只输出
+启动/继续提示词，不调用任务工具。Reviewer 由队员人工启动新会话，provider/model 不绑定厂商。
 
-## Independent Reviewer 使用
+## 审核协作
 
-Orchestrator 到节点生成轻量审核卡和提示词，队员人工把卡与允许材料交给新的外部 Claude
-会话。Orchestrator 不得自行启动 Reviewer，也不得用生产 Codex 会话替代。产出方可直接
-采纳并实施 finding；若拒绝，队员回到原 Claude 会话请求一次回签。
-
-每张审核卡保留 `reviewer_provider`、`reviewer_model`、`review_session: fresh`、
-`saw_main_conversation: false` 和 `critical_node`。审核者是否独立取决于新会话、最小
-审核包、方法论差异和反例任务；不传递主解完整聊天或隐藏推理。Claude 网页版无法写本地
-文件时，队员把输出完整转交 Orchestrator 原样落盘，不允许改写结论。
-
-## 任务启动
-
-所有新生产 Agent 均由队员人工启动。
-Orchestrator 不调用任务工具创建或继续其他 Agent。需要 Modeler、Engineer、Writer 时，
-它在回报卡输出 `MANUAL_AGENT_LAUNCH` 或 `MANUAL_AGENT_CONTINUE` 及完整提示词，由队员
-人工选择 `gpt-5.6-sol`、`high` 后启动或转交。这样任务切换可见，也不会误开重复会话。
+C1 每题必做；C2 由检查器触发；C3 全案例一次。Reviewer 的唯一推荐动作默认执行，队员可否决；
+拒绝 finding 才回原会话回签。独立性来自上下文隔离、最小材料、方法差异和证伪任务，不来自
+身份签名、哈希链或某个指定厂商。

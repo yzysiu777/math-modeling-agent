@@ -19,9 +19,9 @@ class ReviewerCardPolicyTests(unittest.TestCase):
 
     def test_official_statement_data_conflict_routes_to_human(self):
         text = (ROOT / "REVIEWER.md").read_text(encoding="utf-8")
-        self.assertIn("官方文字与官方数据相互冲突", text)
+        self.assertIn("官方材料之间无法消除", text)
         self.assertIn("Human-only block", text)
-        self.assertIn("可用数据", text)
+        self.assertIn("硬约束", text)
 
     def test_card_has_room_for_three_concise_p0_findings(self):
         base = (ROOT / "templates/independent_review_packet.md").read_text(encoding="utf-8")

@@ -17,17 +17,21 @@ VALID_BOARD = """# board
 
 
 class CaseAndBoardTests(unittest.TestCase):
-    def test_case_creation_uses_one_candidates_file_and_no_packet_directory(self):
+    def test_case_creation_uses_per_question_workbenches_without_empty_reports(self):
         with tempfile.TemporaryDirectory() as tmp:
-            case = create_case("demo-case", "hybrid", Path(tmp))
-            self.assertTrue((case / "models/candidates.md").is_file())
-            self.assertFalse((case / "models/comparison.md").exists())
+            case = create_case("demo-case", "hybrid", Path(tmp), questions=3)
+            for question in ("q1", "q2", "q3"):
+                self.assertTrue((case / question / "brief.md").is_file())
+                self.assertTrue((case / question / "board.md").is_file())
+                self.assertTrue((case / question / "log.md").is_file())
             self.assertFalse((case / "reviews/packets").exists())
-            self.assertIn("data_root:", (case / "input/README.md").read_text(encoding="utf-8"))
-            reports = sorted((case / "reports").glob("stage-*.md"))
-            self.assertEqual([path.name for path in reports], [f"stage-{stage:02d}.md" for stage in range(1, 8)])
-            self.assertIn("待复核（不阻断）", reports[0].read_text(encoding="utf-8"))
-            self.assertIn("待人工最终确认（阻断提交）", reports[-1].read_text(encoding="utf-8"))
+            self.assertFalse((case / "reports").exists())
+            self.assertTrue((case / "sources.yaml").is_file())
+            files = [path for path in case.rglob("*") if path.is_file()]
+            self.assertLessEqual(len(files), 16)
+            self.assertFalse(any("待 Orchestrator 汇总" in path.read_text(encoding="utf-8") for path in files))
+            codes = {finding.code for finding in check_case(case, "exploration").findings}
+            self.assertIn("INPUT_MATERIAL_MISSING", codes)
 
     def test_compact_board_passes(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,22 +1,23 @@
-# 轻量进度提示，不是审批或身份认证。
+# 轻量进度提示，不是审批或身份认证。create_case.py 会按题数展开 questions。
 case_id: <case_id>
-stage: 1
-route:
-  value: <route>
-  decided_by: modeler
-  confirmed_by_human: false
-  note: ""
-
+current_question: q1
+questions:
+  q1:
+    step: A
+    status: not_started
+    route:
+      value: <route>
+      decided_by: modeler
+      confirmed_by_human: false
+      note: ""
+    reviews:
+      C1: pending
+      C2: optional
+    deterministic_risks:
+      infeasible: false
+      objective_mismatch: false
+      leakage: false
+      split_overlap: false
 reviews:
-  C1: pending
-  C2: pending
   C3: pending
-
-# 只有命中人工专属边界时填写；其余情况保持空字符串。
 human_block: ""
-
-deterministic_risks:
-  infeasible: false
-  objective_mismatch: false
-  leakage: false
-  split_overlap: false

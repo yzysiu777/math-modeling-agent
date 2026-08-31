@@ -1,9 +1,10 @@
-# 外部 Claude C1/C2/C3 轻量审核卡
+# Independent Reviewer C1/C2/C3 轻量审核卡
 
 ```yaml
 case_id:
-reviewer_provider: anthropic
-reviewer_model: <实际使用的 Claude 型号>
+question:
+reviewer_provider: <实际 provider>
+reviewer_model: <实际 model 或 human>
 review_session: fresh
 saw_main_conversation: false
 critical_node: C1 | C2 | C3
@@ -12,18 +13,8 @@ critical_node: C1 | C2 | C3
 ## 允许读取或上传的材料
 
 - 原始材料：
-- 主解待挑战材料：
+- 待挑战材料：
 - 题目自带说明文件：
-
-## 当前最担心的问题
-
--
-
-## 希望回答的问题
-
-1.
-2.
-3.
 
 ## Reviewer 输出
 
@@ -31,7 +22,14 @@ What was checked:
 
 Top findings:
 
+推荐动作：<唯一动作>
+推荐理由：
+次优项：
+默认执行
+
 Supplementary observations:
+
+Recommended route: <C1 必填；其他节点可 n/a>
 
 Node decision: GO | GO_WITH_FIXES | STOP
 

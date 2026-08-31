@@ -8,8 +8,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
+    from .case_paths import reference_violation_code
     from .experiment_board import parse_markdown_table
 except ImportError:  # pragma: no cover
+    from case_paths import reference_violation_code
     from experiment_board import parse_markdown_table
 
 
@@ -17,6 +19,8 @@ FM_LINE = re.compile(r"^(?P<key>[A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?P<value>.*?)\s*$
 HEADING = re.compile(r"^##\s+(?P<number>[1-5])[.、．]?\s+")
 PLACEHOLDER = re.compile(r"^(?:<[^>]+>|待填写|待填|待替换|todo|tbd|[-—\s])*$", re.IGNORECASE)
 EXP_ID = re.compile(r"^EXP-[A-Za-z0-9][A-Za-z0-9_-]*$", re.IGNORECASE)
+QUESTION_DIR = re.compile(r"^q[1-9][0-9]*$", re.IGNORECASE)
+OUTPUT_REFERENCE = re.compile(r"(?<![A-Za-z0-9_-])(q[1-9][0-9]*/outputs/[A-Za-z0-9_./\-]+)", re.IGNORECASE)
 
 
 @dataclass
@@ -78,8 +82,8 @@ def validate_spec(path: Path) -> list[str]:
     if spec.fields.get("language", "").casefold() not in {"python", "matlab"}:
         errors.append(f"{path.name}: language 必须是 python 或 matlab")
     result = spec.fields.get("probe_result", "").casefold()
-    if result not in {"pass", "waived"}:
-        errors.append(f"{path.name}: probe_result 必须是 PASS 或 WAIVED")
+    if result not in {"pass", "waived", "pending"}:
+        errors.append(f"{path.name}: probe_result 必须是 PASS、WAIVED 或 PENDING")
     if result == "pass" and not EXP_ID.fullmatch(spec.fields.get("probe_exp_id", "")):
         errors.append(f"{path.name}: PASS 必须填写真实 probe_exp_id")
     if result == "waived" and not _has_value(spec.fields.get("probe_waiver_reason", "")):
@@ -90,8 +94,8 @@ def validate_spec(path: Path) -> list[str]:
     return errors
 
 
-def _board_rows(case_dir: Path) -> dict[str, dict[str, str]]:
-    path = case_dir / "experiments/board.md"
+def _board_rows(work_dir: Path) -> dict[str, dict[str, str]]:
+    path = work_dir / "board.md" if (work_dir / "board.md").is_file() else work_dir / "experiments/board.md"
     if not path.is_file():
         return {}
     rows: dict[str, dict[str, str]] = {}
@@ -115,8 +119,8 @@ def _pass_row(row: dict[str, str]) -> bool:
     return status == "done" and re.search(r"\bPASS\b|判定\s*[:：]?\s*通过", result, re.IGNORECASE) is not None
 
 
-def validate_case_specs(case_dir: Path) -> list[str]:
-    specs_dir = case_dir / "specs"
+def _validate_workbench_specs(case_dir: Path, work_dir: Path, question: str | None) -> list[str]:
+    specs_dir = work_dir / "specs"
     if not specs_dir.is_dir():
         return [f"缺少 specs 目录：{specs_dir}"]
     paths = [
@@ -125,9 +129,14 @@ def validate_case_specs(case_dir: Path) -> list[str]:
     ]
     errors: list[str] = []
     seen: set[str] = set()
-    board = _board_rows(case_dir)
+    board = _board_rows(work_dir)
     for path in paths:
         errors.extend(validate_spec(path))
+        if question is not None:
+            for reference in OUTPUT_REFERENCE.findall(path.read_text(encoding="utf-8", errors="replace")):
+                code = reference_violation_code(reference, question)
+                if code:
+                    errors.append(f"{path.name}: {code}: {question} 不得引用后续子问题 {reference}")
         spec, parse_errors = parse_spec(path)
         errors.extend(parse_errors)
         if spec is None:
@@ -160,11 +169,39 @@ def validate_case_specs(case_dir: Path) -> list[str]:
     return errors
 
 
+def validate_case_specs(case_dir: Path, question: str | None = None) -> list[str]:
+    """Validate one active question or every question in a new-style case.
+
+    Existing example cases without ``q<k>/`` remain readable while the runtime
+    contract moves to the per-question layout.
+    """
+
+    if question is not None:
+        normalized = question.strip().casefold()
+        if not QUESTION_DIR.fullmatch(normalized):
+            return [f"非法子问题：{question}"]
+        return _validate_workbench_specs(case_dir, case_dir / normalized, normalized)
+
+    questions = sorted(
+        (path for path in case_dir.iterdir() if path.is_dir() and QUESTION_DIR.fullmatch(path.name)),
+        key=lambda path: int(path.name[1:]),
+    ) if case_dir.is_dir() else []
+    if not questions:
+        return _validate_workbench_specs(case_dir, case_dir, None)
+    errors: list[str] = []
+    for work_dir in questions:
+        errors.extend(f"{work_dir.name}: {error}" for error in _validate_workbench_specs(
+            case_dir, work_dir, work_dir.name.casefold()
+        ))
+    return errors
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="validate compact Full SPEC files")
     parser.add_argument("--case-dir", type=Path, required=True)
+    parser.add_argument("--question")
     args = parser.parse_args()
-    errors = validate_case_specs(args.case_dir)
+    errors = validate_case_specs(args.case_dir, args.question)
     if errors:
         for error in errors:
             print(f"FAIL {error}")
