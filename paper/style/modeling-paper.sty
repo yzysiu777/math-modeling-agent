@@ -1,8 +1,7 @@
 % 工作台专用的少量辅助宏。
 %
-% 封面、承诺书、摘要版式、页码规则、匿名要求全部由 gmcmthesis 文档类负责，
-% 本文件不再重复实现 —— 那些是当届官方格式的一部分，社区文档类已经跟进，
-% 我们自己维护一套只会和官方要求漂移。
+% 封面、承诺书和摘要版式主要由 gmcmthesis 文档类负责。正文页式由 main.tex
+% 显式固定为 plain，避免社区类继承 ctexart 的章节页眉。
 
 \ProvidesPackage{style/modeling-paper}[2026/08/29 workbench helpers for gmcmthesis]
 
@@ -48,8 +47,11 @@
 % 其余包按需在各自章节 \usepackage。amsthm 会与文档类的 \proof 冲突；
 % siunitx、tikz、colortbl 目前无人使用，不预先塞进来。
 
-% 模板示例标记。正式论文里不应残留任何 \paperexample —— make paper-ci 会检查。
-\newcommand{\paperexample}[1]{\textcolor{gray}{\emph{模板示例：#1}}}
+% 模板示例标记。草稿预览允许保留，make final-check 会严格拒绝。
+% 独立成段以便长中文、路径和公式正常换行，不挤出页面边界。
+\newcommand{\paperexample}[1]{%
+  \par\noindent{\color{gray}\itshape 模板示例：#1}\par
+}
 
 % 数字溯源标记：把正文里的数字与实验 ID 绑在一起，便于写作手自查和 C3 抽查。
 % 用法：本文在 12 个算例上均可行\dataref{EXP-OPT-002}。

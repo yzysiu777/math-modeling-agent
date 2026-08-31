@@ -14,16 +14,16 @@ make demos
 
 | 演示 | 主实现 | 重点展示 |
 |---|---|---|
-| `optimization/` | Python | **完整的三角色回路**：probe 规格 → full 规格 → 实现 → 复算 → 出图 → 溯源表，含一次真实的回问与规格更正 |
+| `optimization/` | Python | **完整的三角色回路**：实验板 Probe → 五段 Full SPEC → 实现 → 复算 → 出图 → 溯源表，含一次真实的回问与规格更正 |
 | `data-analysis/` | Python | 时间序切分、泄漏**反例**复算（检查器必须真的会报错） |
 | `hybrid/` | **MATLAB** + Python 复算 | 跨语言契约：MATLAB 求解导出，Python 独立复算 |
 
 ## optimization：最值得先读的一个
 
-它保留了一次**真实发生的规格错误**。建模手在 `SPEC-P1-M02` 里预测容量边界实例的
-最优值是 6；编程手实测得到 4，按契约**没有改判据**，而是写了
+它保留了一次**真实发生的规格错误**。早期 Full SPEC 曾预测容量边界实例的最优值是 6；
+编程手实测得到 4，按契约**没有就地改判据**，而是写了
 `SPEC-P1-M02.questions.md` 回问；建模手确认预测算错并更正规格，同时记下「这个实例
-其实测不到容量约束」这条发现。
+其实测不到容量约束」这条发现。当前五段规格保留最终结论，问答文件保留发现过程。
 
 如果当时编程手顺手把 6 改成 4，这条发现就永远不会浮出来。这就是把交接做成文件契约
 的全部理由。
@@ -31,10 +31,9 @@ make demos
 按顺序读：
 
 ```text
-models/candidates.md          发散 7 条 → 收敛 3 条，含砍掉的想法与原因
-models/comparison.md          七维度评估 → 结论落到「先跑哪条 probe」
-specs/SPEC-P1-M02-probe.md    轻测试：证伪哪条假设、判据、结果回填
-specs/SPEC-P1-M02.md          full 规格八段
+models/candidates.md          发散 7 条 → 收敛 3 条，含砍掉的想法与七维度比较
+experiments/board.md          Probe 假设、预设判据、结果和下一步
+specs/SPEC-P1-M02.md          五段 Full SPEC
 specs/SPEC-P1-M02.questions.md  回问与答复
 experiments/outputs/          data / figures / checks 三类产物
 paper/claim_map.md            三条主张的强度为什么是那样定的
@@ -50,7 +49,8 @@ MATLAB）。已验证的是：
 - 规格里的手算预期值（q\* = 8，成本 8；场景成本 8 / 8 / 18）。
 
 因此 `outputs/data/` 下**没有提交 MATLAB 产物** —— 手工编造的结果文件比没有结果更
-危险。本机首次实测时请运行 `.m` 脚本，再跑复算脚本，然后回填 probe 规格的第 5 段。
+危险。因此 Full SPEC 明确使用 `probe_result: WAIVED`，并非伪造 PASS。本机首次实测时请
+运行 `.m` 脚本，再跑复算脚本，然后更新实验板与 Full SPEC 的复算状态。
 
 ## 绘图依赖
 

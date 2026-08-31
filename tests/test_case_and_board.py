@@ -4,6 +4,8 @@ from pathlib import Path
 
 from scripts.create_case import create_case
 from scripts.experiment_board import validate_experiment_board
+from scripts.check_spec import validate_case_specs
+from scripts.check_case import check_case
 
 
 VALID_BOARD = """# board
@@ -45,12 +47,19 @@ class CaseAndBoardTests(unittest.TestCase):
             path.write_text(VALID_BOARD.replace("判定：PASS，MAE=0.4", "MAE=0.4"), encoding="utf-8")
             self.assertTrue(any("PASS/FAIL" in item for item in validate_experiment_board(path)))
 
-    def test_legacy_examples_remain_readable(self):
+    def test_examples_follow_the_lightweight_board_and_spec_contract(self):
         root = Path(__file__).resolve().parents[1]
         for route in ("optimization", "data-analysis", "hybrid"):
+            case = root / f"cases/examples/{route}"
             self.assertEqual(
-                validate_experiment_board(root / f"cases/examples/{route}/experiments/board.md"), []
+                validate_experiment_board(case / "experiments/board.md"), []
             )
+            self.assertEqual(validate_case_specs(case), [])
+            self.assertFalse((case / "models/comparison.md").exists())
+            self.assertEqual(list((case / "specs").glob("*-probe.md")), [])
+            startup_codes = {finding.code for finding in check_case(case, "exploration").findings}
+            self.assertNotIn("ROUTE_MISSING", startup_codes)
+            self.assertNotIn("ROUTE_CONFIRMATION_REQUIRED", startup_codes)
 
 
 if __name__ == "__main__":

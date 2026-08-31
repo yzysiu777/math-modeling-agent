@@ -39,3 +39,10 @@ Orchestrator 到节点生成轻量审核卡和提示词，队员人工把卡与�
 `saw_main_conversation: false` 和 `critical_node`。审核者是否独立取决于新会话、最小
 审核包、方法论差异和反例任务；不传递主解完整聊天或隐藏推理。Claude 网页版无法写本地
 文件时，队员把输出完整转交 Orchestrator 原样落盘，不允许改写结论。
+
+## 任务启动
+
+所有新生产 Agent 均由队员人工启动。
+Orchestrator 不调用任务工具创建或继续其他 Agent。需要 Modeler、Engineer、Writer 时，
+它在回报卡输出 `MANUAL_AGENT_LAUNCH` 或 `MANUAL_AGENT_CONTINUE` 及完整提示词，由队员
+人工选择 `gpt-5.6-sol`、`high` 后启动或转交。这样任务切换可见，也不会误开重复会话。

@@ -13,9 +13,11 @@ import yaml
 try:
     from .experiment_board import validate_experiment_board
     from .model_pool import validate_candidate_pool
+    from .check_spec import validate_case_specs
 except ImportError:  # pragma: no cover
     from experiment_board import validate_experiment_board
     from model_pool import validate_candidate_pool
+    from check_spec import validate_case_specs
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,7 +25,7 @@ REQUIRED_FILES = (
     "README.md", "AGENTS.md", "agent.md", "REVIEWER.md", "Makefile",
     "protocol/competition-workflow.md", "templates/checkpoint.yaml",
     "templates/experiment_board.md", "templates/independent_review_packet.md",
-    "templates/spec.md", "templates/spec_probe.md", "scripts/create_case.py",
+    "templates/spec.md", "scripts/create_case.py",
     "scripts/check_case.py", "scripts/check_spec.py", "scripts/make_review_packet.py",
     "prompts/modeler.md", "prompts/engineer.md", "prompts/writer.md",
     "prompts/startup/orchestrator.md", "prompts/startup/modeler.md",
@@ -36,11 +38,13 @@ RETIRED_PATHS = (
     "CLAUDE.md", "prompts/claude", "templates/claude_review_packet.md",
     "prompts/codex-start.md", "roles", ".agents/skills/industrial-mathematical-modeling",
     ".agents/skills/model-race",
+    "templates/spec_probe.md", "templates/model_comparison.md", "templates/model_candidate.md",
 )
 REVIEW_FILES = (
     "REVIEWER.md", "templates/independent_review_packet.md",
 )
 METADATA = ("reviewer_provider", "reviewer_model", "review_session", "saw_main_conversation", "critical_node")
+RUNTIME_GMCMTHESIS_SHA256 = "2757ead1fd932291f705d5686bedf37d3463e030d821d8f7815ac7dcfee4c7aa"
 
 
 def _missing(paths: Iterable[str]) -> List[str]:
@@ -54,6 +58,9 @@ def _sha256(path: Path) -> str:
 def _official_profile_errors() -> List[str]:
     errors: List[str] = []
     try:
+        runtime_class = ROOT / "paper/gmcmthesis.cls"
+        if _sha256(runtime_class) != RUNTIME_GMCMTHESIS_SHA256:
+            errors.append("runtime gmcmthesis.cls changed without updating the reviewed checksum")
         current = yaml.safe_load((ROOT / "paper/official/2025/manifest.yaml").read_text(encoding="utf-8"))
         for source in current.get("sources", []):
             reference = source.get("local_reference")
@@ -93,6 +100,18 @@ def validate_static_contract() -> List[str]:
         candidates = ROOT / f"cases/examples/{route}/models/candidates.md"
         errors.extend(f"{board}: {error}" for error in validate_experiment_board(board))
         errors.extend(f"{candidates}: {error}" for error in validate_candidate_pool(candidates))
+        errors.extend(
+            f"cases/examples/{route}: {error}"
+            for error in validate_case_specs(ROOT / f"cases/examples/{route}")
+        )
+        legacy_files = [
+            ROOT / f"cases/examples/{route}/models/comparison.md",
+            *sorted((ROOT / f"cases/examples/{route}/specs").glob("*-probe.md")),
+        ]
+        errors.extend(
+            f"retired lightweight-example file is still active: {path.relative_to(ROOT)}"
+            for path in legacy_files if path.exists()
+        )
     errors.extend(_official_profile_errors())
     try:
         tracked = subprocess.run(

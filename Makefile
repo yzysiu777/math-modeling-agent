@@ -78,6 +78,7 @@ final-check:
 	$(PYTHON) scripts/check_case.py --case-dir "$(CASE)" --stage final || status=$$?; \
 	$(PYTHON) scripts/check_spec.py --case-dir "$(CASE)" || status=$$?; \
 	$(MAKE) PYTHON="$(PYTHON)" paper-ci || status=$$?; \
+	$(PYTHON) scripts/qa_latex.py --paper-dir $(PAPER_DIR) --build-dir $(PAPER_BUILD) --final || status=$$?; \
 	if [ -f $(PAPER_BUILD)/main.pdf ]; then sh writing/checks/check_pdf.sh $(PAPER_BUILD)/main.pdf || status=$$?; fi; \
 	exit $$status
 

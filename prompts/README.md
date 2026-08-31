@@ -1,7 +1,7 @@
 # 角色入口
 
-一题使用四个持续生产会话：Orchestrator、Modeler、Engineer、Writer，统一为
-`gpt-5.6-sol`、`high`；C1/C2/C3 由队员各自人工调用新的外部 Claude 会话。
+一题使用四个由队员人工启动的持续生产会话：Orchestrator、Modeler、Engineer、Writer，
+统一为 `gpt-5.6-sol`、`high`；C1/C2/C3 由队员各自人工调用新的外部 Claude 会话。
 同一生产角色跨阶段继续原会话，不重新启动。
 
 | 角色 | 必读 | 案例输入 |

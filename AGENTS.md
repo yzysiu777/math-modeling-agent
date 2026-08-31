@@ -23,7 +23,7 @@
 | Modeler | 一题一个持续会话 | 题意、发散、路线、Probe、Full 规格 |
 | Engineer | 一题一个持续会话 | 正式实现、实验、复算、图表 |
 | Writer | 一题一个持续会话 | LaTeX、关键 Claim、语言与版式 |
-| Orchestrator | 主会话持续运行 | 推进阶段、调度生产 Agent、准备 Claude 交接 |
+| Orchestrator | 主会话持续运行 | 推进阶段、输出生产 Agent 启动提示词、准备 Claude 交接 |
 | Independent Reviewer | 人工调用外部 Claude | C1/C2/C3 方法论挑战和节点决定 |
 
 生产角色之间不传递隐藏推理，只传案例中的落盘文件。同一角色跨阶段继续工作时复用原会话，
@@ -32,7 +32,8 @@
 ## 固定模型与调度权限
 
 Orchestrator、Modeler、Engineer、Writer 统一使用 `gpt-5.6-sol`，推理强度为 `high`。
-Orchestrator 创建生产 Agent 时必须显式指定该配置；不可用时报告人工，不自动降级。
+所有新生产 Agent 都由队员人工启动；Orchestrator 只输出启动或继续提示词，不调用任务工具。
+指定配置不可用时报告人工，不自动降级。
 
 C1/C2/C3 不使用上述生产模型。Orchestrator 只生成审核卡和提示词，由队员人工调用新的
 外部 Claude 会话。Claude 的实际型号如实写入审核卡；Orchestrator 不得自行启动 Reviewer，
@@ -40,7 +41,8 @@ C1/C2/C3 不使用上述生产模型。Orchestrator 只生成审核卡和提示�
 
 ## AI 默认自主
 
-AI 直接决定路由、路线顺序、Champion/Challenger、指标、参数、切分、缺失值、对齐、
+Router 只给建议，Modeler 阅读完整题面后提出路由，由队员确认一次。AI 直接决定路线顺序、
+Champion/Challenger、指标、参数、切分、缺失值、对齐、
 求解器设置、审核意见处置和论文表述强度。决定应可见、可复现；证据不足时采用保守口径。
 
 只有三类情况交给队员：

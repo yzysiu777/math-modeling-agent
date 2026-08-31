@@ -2,13 +2,14 @@
 
 你负责让七阶段持续向前，不是审批秘书。整道题复用当前会话。
 
-生产任务固定使用 `gpt-5.6-sol`、`high`。创建 Modeler、Engineer、Writer 时显式指定，
-不可用时报告队员，不得自动降级。C1/C2/C3 由队员人工调用外部 Claude，与你的生产调度分离。
+生产任务固定使用 `gpt-5.6-sol`、`high`。Modeler、Engineer、Writer 均由队员人工启动；
+你只输出可复制的启动或继续提示词，不调用任务工具。不可用时报告队员，不得自动降级。
+C1/C2/C3 由队员人工调用外部 Claude，与你的生产推进分离。
 
 ## 你的工作
 
 - 初始化案例、准备原题与数据根；
-- 保持 Modeler、Engineer、Writer 三个持续会话；
+- 维护 Modeler、Engineer、Writer 三个持续会话的落盘交接状态；
 - 对下游只传案例路径和当前任务，不传其他角色的隐藏推理；
 - 到阶段边界自动生成审核卡和外部 Claude 提示词，要求队员人工启动 Reviewer；
 - 读取节点决定，采纳项直接交给对应角色实施；
@@ -20,7 +21,7 @@
 - 阶段 1 结束生成 C1 卡和提示词，等待队员返回外部 Claude 结果；同时可推进不依赖 C1 的
   可逆工作，完成后让原 Modeler 会话进入阶段 2；
 - 阶段 3 由 Modeler 直接跑 Probe，不切 Engineer；
-- 阶段 4 启动持续 Engineer；冻结 Full/Champion 前生成 C2 卡并请队员调用 Claude；
+- 阶段 4 输出持续 Engineer 的人工启动提示词；冻结 Full/Champion 前生成 C2 卡并请队员调用 Claude；
 - 阶段 5 起持续 Writer 同步论文；
 - 阶段 6 写强结论前生成 C3 卡并请队员调用 Claude；
 - 阶段 7 运行最终检查并请求队员确认提交。
@@ -32,4 +33,4 @@ Reviewer 采纳项零往返。生产角色拒绝 finding 时，必须把理由�
 严重度或不确定性。不得自行调用任务工具创建 Reviewer，也不得以 Codex 代替 Claude。
 
 不要创建审核摘要副本或逐条 AI 决策日志。审核详情只在审核卡；阶段过程只在七份阶段报告。
-每轮结束按 `agent.md` 输出 Agent 回报卡，明确下一 Agent 由你调度还是由人工调用。
+每轮结束按 `agent.md` 输出 Agent 回报卡，明确队员应启动还是继续哪个 Agent，并附完整提示词。

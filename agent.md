@@ -81,15 +81,15 @@ Orchestrator、Modeler、Engineer、Writer 每轮结束统一输出：
 - 发现问题时回复：`退回阶段 Sx：<问题>`
 
 ### 下一步协作
-- 动作：CONTINUE_SELF / ORCHESTRATOR_DISPATCH / MANUAL_REVIEWER_LAUNCH / WAIT_HUMAN_DECISION / COMPLETE
+- 动作：CONTINUE_SELF / MANUAL_AGENT_LAUNCH / MANUAL_AGENT_CONTINUE / MANUAL_REVIEWER_LAUNCH / WAIT_HUMAN_DECISION / COMPLETE
 - 目标 Agent：
-- 由谁启动：Orchestrator / 人工 / 无需启动
+- 由谁启动：人工 / 无需启动
 - 任务：
 - 输入文件：
 - 完成标准：
 
 ### 启动或交接提示词
-仅在需要调度生产 Agent 或人工调用 Claude 时展开，否则写“无需启动其他 Agent”。
+仅在需要人工启动或继续生产 Agent、人工调用 Claude 时展开，否则写“无需启动其他 Agent”。
 ```
 
 ## 七份阶段报告

@@ -11,8 +11,9 @@
 /Users/lambency/Desktop/研 0 /数学建模/agent
 ```
 
-新建 Orchestrator 主任务时选择 `gpt-5.6-sol`，推理强度选择 `high`。后续生产 Agent 由
-Orchestrator 使用同一配置创建；如果该配置不可用，不要自动换模型。
+新建 Orchestrator 主任务时选择 `gpt-5.6-sol`，推理强度选择 `high`。后续 Modeler、
+Engineer、Writer 也由队员人工新建并使用同一配置；Orchestrator 只提供可复制提示词，
+不调用任务工具。如果该配置不可用，不要自动换模型。
 
 首次准备：
 
@@ -26,6 +27,10 @@ python3 -m venv .venv
 ```bash
 .venv/bin/python scripts/create_case.py --case-id huawei-cup-2026-a --route insufficient_information
 ```
+
+Router 和命令行 `--route` 都只是初始建议。Modeler 阅读完整题面后更新
+`checkpoint.yaml` 的 `route.value`，队员确认一次并把 `route.confirmed_by_human` 改为
+`true`；此后不再重复审批普通路线调整。
 
 把原题和小型说明文件放入案例 `input/`，大数据保持原位只读，并在
 `input/README.md` 重复写入：
@@ -50,8 +55,9 @@ data_root: /absolute/path/to/allowed/data
 - 一个持续 Writer 任务，从稳定 Baseline 开始同步论文；
 - C1、C2、C3 各由人工打开一个新的外部 Claude 会话。
 
-四个生产角色统一使用 `gpt-5.6-sol`、`high`。Orchestrator 可以调度生产角色，但不得启动
-Claude Reviewer。同一角色跨阶段继续原任务，不重复加载协议；角色之间不传隐藏推理。
+四个生产角色统一使用 `gpt-5.6-sol`、`high`，均由队员人工启动。Orchestrator 通过回报卡
+给出启动或继续提示词，但不直接调用其他任务；Claude Reviewer 同样由队员人工启动。
+同一角色跨阶段继续原任务，不重复加载协议；角色之间不传隐藏推理。
 
 ## 七阶段
 
@@ -92,8 +98,9 @@ paper/claim_map.md            摘要、结论和核心图表的关键 Claim
 decisions.md                  仅人工专属决定
 ```
 
-Probe 不建立独立 SPEC；一般回问不建立 questions 文件；不再维护单独 comparison、
-packet、阶段交接或逐条审核决议副本。
+Probe 不建立独立 SPEC；一般回问不建立 questions 文件，只有会改变模型契约且无法就地
+决定的问题才保留一份 `.questions.md`；不再维护单独 comparison、packet、阶段交接或
+逐条审核决议副本。
 
 ## 每阶段如何看进度
 

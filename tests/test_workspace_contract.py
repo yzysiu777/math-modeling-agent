@@ -36,6 +36,7 @@ class WorkspaceContractTests(unittest.TestCase):
         self.assertIn("{gmcmthesis}", main)
         self.assertGreaterEqual(len(list((ROOT / "paper/sections").glob("*.tex"))), 5)
         self.assertIn("\\bibliographystyle{gmcm}", main)
+        self.assertIn("\\pagestyle{plain}", main)
 
     def test_current_official_rules_remain_a_frozen_snapshot_not_2026_claim(self):
         pending = (ROOT / "paper/official/2026/manifest.yaml").read_text(encoding="utf-8")
@@ -52,6 +53,20 @@ class WorkspaceContractTests(unittest.TestCase):
             self.assertIn("high", text, relative)
         orchestrator = (ROOT / "prompts/orchestrator.md").read_text(encoding="utf-8")
         self.assertIn("不得自动降级", orchestrator)
+
+    def test_all_production_agents_are_manually_started(self):
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        orchestrator = (ROOT / "prompts/orchestrator.md").read_text(encoding="utf-8")
+        collaboration = (ROOT / "protocol/team-collaboration.md").read_text(encoding="utf-8")
+        for text in (agents, orchestrator, collaboration):
+            self.assertIn("人工启动", text)
+        self.assertIn("不调用任务工具", orchestrator)
+
+    def test_retired_probe_and_comparison_templates_are_absent(self):
+        for relative in (
+            "templates/spec_probe.md", "templates/model_comparison.md", "templates/model_candidate.md",
+        ):
+            self.assertFalse((ROOT / relative).exists(), relative)
 
     def test_reviewer_is_manually_started_external_claude(self):
         startup = (ROOT / "prompts/startup/reviewer.md").read_text(encoding="utf-8")

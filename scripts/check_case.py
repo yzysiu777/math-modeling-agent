@@ -14,9 +14,11 @@ import yaml
 try:
     from .claim_evidence import board_experiment_ids, parse_source_experiment, validate_check_report
     from .experiment_board import parse_markdown_table
+    from .make_review_packet import _data_roots
 except ImportError:  # pragma: no cover
     from claim_evidence import board_experiment_ids, parse_source_experiment, validate_check_report
     from experiment_board import parse_markdown_table
+    from make_review_packet import _data_roots
 
 
 ROUTES = {"optimization", "data_analysis", "hybrid", "insufficient_information"}
@@ -129,15 +131,53 @@ def _review_findings(case_dir: Path, stage: str) -> list[Finding]:
         if decision is None:
             findings.append(_finding(
                 "BLOCK", f"{node}_REQUIRED",
-                f"{node} 尚无可执行决定（{detail}）；Orchestrator 应自动补做，不需要人工审批",
+                f"{node} 尚无可执行决定（{detail}）；Orchestrator 应生成外部 Claude 提示词，由队员人工启动",
                 "ORCHESTRATOR", node,
             ))
         elif decision == "STOP":
             findings.append(_finding(
                 "BLOCK", f"{node}_STOP",
-                f"{node} 返回 STOP（{detail}）；由 AI 补证据、换路线或降结论，只有命中 human-only block 才问队员",
+                f"{node} 返回 STOP（{detail}）；由生产 AI 补证据、换路线或降结论，队员人工启动所需 Agent",
                 "ORCHESTRATOR", node,
             ))
+    return findings
+
+
+def _startup_findings(case_dir: Path, checkpoint: Mapping[str, Any], stage: str) -> list[Finding]:
+    level = "REMINDER" if stage == "exploration" else "BLOCK"
+    findings: list[Finding] = []
+    input_dir = case_dir / "input"
+    local_materials = [
+        path for path in input_dir.iterdir()
+        if input_dir.is_dir() and path.is_file() and path.name.casefold() != "readme.md"
+    ] if input_dir.is_dir() else []
+    external_material = bool(_data_roots(case_dir))
+    if not local_materials and not external_material:
+        findings.append(_finding(
+            level, "INPUT_MATERIAL_MISSING",
+            "input/ 中没有题面或有效 data_root；可先准备材料，但不能冻结路线",
+            "ORCHESTRATOR", "C1",
+        ))
+
+    brief = case_dir / "case_brief.md"
+    brief_text = brief.read_text(encoding="utf-8", errors="replace") if brief.is_file() else ""
+    if not brief_text or any(marker in brief_text for marker in (
+        "- 用户真正要回答什么：\n", "| Q1 |  |  |  |  |", "- 数据文件和粒度：\n",
+    )):
+        findings.append(_finding(
+            level, "CASE_BRIEF_INCOMPLETE",
+            "case_brief.md 仍缺研究目标、子问题或数据说明",
+            "MODELER", "C1",
+        ))
+
+    route = checkpoint.get("route", {})
+    route = route if isinstance(route, Mapping) else {}
+    if route.get("confirmed_by_human") is not True:
+        findings.append(_finding(
+            level, "ROUTE_CONFIRMATION_REQUIRED",
+            "Router 仅供参考；Modeler 提出正式路由后需队员确认一次",
+            "HUMAN", "C1",
+        ))
     return findings
 
 
@@ -259,6 +299,8 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
         findings.append(_finding("BLOCK", "ROUTE_MISSING", "Modeler 尚未写入正式路由", "MODELER", "C1"))
     elif value == "insufficient_information":
         findings.append(_finding("REMINDER", "ROUTE_UNRESOLVED", "继续可逆探索并让 C1 给补证据动作", "MODELER", "C1"))
+
+    findings.extend(_startup_findings(case_dir, checkpoint, stage))
 
     human_block = str(checkpoint.get("human_block", "")).strip()
     if _has_value(human_block):
