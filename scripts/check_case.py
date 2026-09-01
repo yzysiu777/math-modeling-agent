@@ -12,11 +12,19 @@ from typing import Any, Mapping
 import yaml
 
 try:
+    from .case_paths import reference_violation_code, resolve_in_case
     from .claim_evidence import board_experiment_ids, parse_source_experiment, validate_check_report
+    from .check_spec import parse_spec
     from .experiment_board import parse_markdown_table
+    from .ingest import statement_provenance_problem
+    from .make_review_packet import _data_roots
 except ImportError:  # pragma: no cover
+    from case_paths import reference_violation_code, resolve_in_case
     from claim_evidence import board_experiment_ids, parse_source_experiment, validate_check_report
+    from check_spec import parse_spec
     from experiment_board import parse_markdown_table
+    from ingest import statement_provenance_problem
+    from make_review_packet import _data_roots
 
 
 ROUTES = {"optimization", "data_analysis", "hybrid", "insufficient_information"}
@@ -40,6 +48,29 @@ REVIEWER_SIGNBACK = re.compile(
     r"^[ \t]*Reviewer\s+sign-back[ \t]*[:：][ \t]*(ACCEPT_REJECTION|REJECT_REJECTION)[ \t]*$",
     re.IGNORECASE | re.MULTILINE,
 )
+QUESTION_DIR = re.compile(r"^q[1-9][0-9]*$", re.IGNORECASE)
+ROUTE_LINE = re.compile(
+    r"^[ \t]*(?:推荐路由|Recommended\s+route|Route)[ \t]*[:：][ \t]*"
+    r"(optimization|data_analysis|hybrid|insufficient_information)[ \t]*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+CHAMPION_LINE = re.compile(
+    r"^[ \t]*(?:[-*][ \t]*)?(?:Champion|选定路线)[ \t]*[:：][ \t]*`?"
+    r"(?P<route>M-[A-Za-z0-9_-]+)`?[ \t]*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+OPTION_ENUMERATION = re.compile(
+    r"选项\s*[A-Z]|方案[一二三四五六七八九十]|\bA\s*[、,，/]\s*B\s*[、,，/]\s*C\b",
+    re.IGNORECASE,
+)
+RECOMMENDED_ACTION = re.compile(
+    r"^[ \t]*推荐动作[ \t]*[:：][ \t]*(.*?)[ \t]*$", re.MULTILINE
+)
+OUTPUT_REFERENCE = re.compile(
+    r"(?<![A-Za-z0-9_-])(q[1-9][0-9]*/outputs/[A-Za-z0-9_./\-]+)", re.IGNORECASE
+)
+APPROVAL_MATTER = re.compile(r"^[ \t]*-[ \t]*事项[ \t]*[:：][ \t]*(.*)$", re.MULTILINE)
+WAIT_ONLY_MATTER = re.compile(r"官方(?:材料|文字|数据).*冲突|授权扩张|最终提交")
 
 
 @dataclass(frozen=True)
@@ -92,17 +123,85 @@ def _load_checkpoint(case_dir: Path) -> tuple[dict[str, Any] | None, str]:
     return (payload, "") if isinstance(payload, dict) else (None, "顶层不是映射")
 
 
-def _review_files(case_dir: Path, node: str) -> list[Path]:
-    directory = case_dir / "reviews"
+def _markdown_section(text: str, heading: str) -> str:
+    match = re.search(
+        rf"^[ \t]*##[ \t]+{re.escape(heading)}[ \t]*$\n(?P<body>.*?)(?=^[ \t]*##[ \t]+|\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    return match.group("body").strip().strip("`<>") if match else ""
+
+
+def _pending_approval_findings(case_dir: Path, stage: str) -> list[Finding]:
+    directory = case_dir / "队员工作区/待批准"
+    files = sorted(directory.glob("*.md")) if directory.is_dir() else []
+    if not files:
+        return []
+
+    invalid: list[str] = []
+    for path in files:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        action = _markdown_section(text, "不回应的默认动作")
+        if action not in {"按推荐执行", "必须等待"}:
+            invalid.append(f"{path.name} 的不回应默认动作必须是“按推荐执行”或“必须等待”")
+            continue
+        matter = APPROVAL_MATTER.search(text)
+        if action == "必须等待" and (
+            matter is None or WAIT_ONLY_MATTER.search(matter.group(1)) is None
+        ):
+            invalid.append(f"{path.name} 只有官方材料冲突、授权扩张、最终提交可以“必须等待”")
+
+    findings: list[Finding] = []
+    if invalid:
+        findings.append(_finding(
+            "BLOCK", "CHECKPOINT_INVALID", "；".join(invalid), "ORCHESTRATOR", "HUMAN",
+        ))
+    if stage == "final":
+        findings.append(_finding(
+            "BLOCK", "HUMAN_ONLY_BLOCK",
+            f"队员工作区/待批准 中仍有 {len(files)} 项未裁决；最终提交必须等待队员处理",
+            "HUMAN", "HUMAN",
+        ))
+    else:
+        findings.append(_finding(
+            "REMINDER", "PENDING_APPROVAL",
+            f"队员工作区/待批准 中有 {len(files)} 项；普通取舍无回应时按批准单推荐继续",
+            "ORCHESTRATOR", "HUMAN",
+        ))
+    return findings
+
+
+def _question_context(
+    case_dir: Path, checkpoint: Mapping[str, Any]
+) -> tuple[str | None, Path, Mapping[str, Any]]:
+    raw = str(checkpoint.get("current_question", "")).strip().casefold()
+    if not raw:
+        return None, case_dir, checkpoint
+    questions = checkpoint.get("questions", {})
+    questions = questions if isinstance(questions, Mapping) else {}
+    state = questions.get(raw, {})
+    state = state if isinstance(state, Mapping) else {}
+    return raw, case_dir / raw, state
+
+
+def _review_files(case_dir: Path, node: str, question: str | None = None) -> list[Path]:
+    if question is None:
+        directory = case_dir / "reviews"
+    elif node == "C3":
+        directory = case_dir / "paper/reviews"
+    else:
+        directory = case_dir / question / "reviews"
     if not directory.is_dir():
         return []
     pattern = re.compile(rf"^{node}(?:[_. -].*)?\.md$", re.IGNORECASE)
     return sorted(path for path in directory.iterdir() if path.is_file() and pattern.fullmatch(path.name))
 
 
-def _review_decision(case_dir: Path, node: str) -> tuple[str | None, str]:
+def _review_decision(
+    case_dir: Path, node: str, question: str | None = None
+) -> tuple[str | None, str]:
     failures: list[str] = []
-    for path in reversed(_review_files(case_dir, node)):
+    for path in reversed(_review_files(case_dir, node, question)):
         text = path.read_text(encoding="utf-8")
         match = NODE_DECISION.search(text)
         if match is None:
@@ -121,7 +220,40 @@ def _review_decision(case_dir: Path, node: str) -> tuple[str | None, str]:
     return None, "; ".join(failures) or f"reviews/ 中没有 {node} 审核卡"
 
 
-def _review_findings(case_dir: Path, stage: str) -> list[Finding]:
+def _review_route(case_dir: Path, question: str) -> str | None:
+    for path in reversed(_review_files(case_dir, "C1", question)):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if NODE_DECISION.search(text) is None:
+            continue
+        match = ROUTE_LINE.search(text)
+        if match:
+            return match.group(1).casefold()
+    return None
+
+
+def _review_card_policy_findings(
+    case_dir: Path, question: str | None, *, include_c3: bool = True
+) -> list[Finding]:
+    findings: list[Finding] = []
+    paths: list[Path] = []
+    nodes = ("C1", "C2", "C3") if include_c3 else ("C1", "C2")
+    for node in nodes:
+        paths.extend(_review_files(case_dir, node, question))
+    for path in dict.fromkeys(paths):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if not OPTION_ENUMERATION.search(text):
+            continue
+        recommendation = RECOMMENDED_ACTION.search(text)
+        if recommendation is None or not _has_value(recommendation.group(1)):
+            findings.append(_finding(
+                "REMINDER", "REVIEW_CARD_NO_RECOMMENDATION",
+                f"{path.name} 列出了选项但没有非占位的推荐动作",
+                "REVIEWER", "C1/C2/C3",
+            ))
+    return findings
+
+
+def _legacy_review_findings(case_dir: Path, stage: str) -> list[Finding]:
     required = () if stage == "exploration" else (("C1", "C2") if stage == "model_selection" else ("C1", "C2", "C3"))
     findings: list[Finding] = []
     for node in required:
@@ -129,20 +261,204 @@ def _review_findings(case_dir: Path, stage: str) -> list[Finding]:
         if decision is None:
             findings.append(_finding(
                 "BLOCK", f"{node}_REQUIRED",
-                f"{node} 尚无可执行决定（{detail}）；Orchestrator 应自动补做，不需要人工审批",
+                f"{node} 尚无可执行决定（{detail}）；Orchestrator 应生成 Independent Reviewer 提示词，由队员人工启动",
                 "ORCHESTRATOR", node,
             ))
         elif decision == "STOP":
             findings.append(_finding(
                 "BLOCK", f"{node}_STOP",
-                f"{node} 返回 STOP（{detail}）；由 AI 补证据、换路线或降结论，只有命中 human-only block 才问队员",
+                f"{node} 返回 STOP（{detail}）；由生产 AI 补证据、换路线或降结论，队员人工启动所需 Agent",
                 "ORCHESTRATOR", node,
             ))
     return findings
 
 
-def _failed_experiment_findings(case_dir: Path) -> list[Finding]:
-    board = case_dir / "experiments/board.md"
+def _board_path(work_dir: Path) -> Path:
+    direct = work_dir / "board.md"
+    return direct if direct.is_file() else work_dir / "experiments/board.md"
+
+
+def _selected_route(work_dir: Path) -> str:
+    brief = work_dir / "brief.md"
+    if not brief.is_file():
+        brief = work_dir / "case_brief.md"
+    text = brief.read_text(encoding="utf-8", errors="replace") if brief.is_file() else ""
+    match = CHAMPION_LINE.search(text)
+    return match.group("route").upper() if match else ""
+
+
+def _c2_trigger_reasons(work_dir: Path) -> list[str]:
+    board = _board_path(work_dir)
+    rows = parse_markdown_table(board.read_text(encoding="utf-8")) if board.is_file() else []
+    champion = _selected_route(work_dir)
+
+    def route_of(row: Mapping[str, Any]) -> str:
+        return str(row.get("路线", row.get("候选路线", ""))).strip().upper()
+
+    def is_pass(row: Mapping[str, Any]) -> bool:
+        status = str(row.get("status", "")).strip().casefold()
+        kind = str(row.get("类型", "")).strip().casefold()
+        result = str(row.get("结果与判定", row.get("结果摘要", "")))
+        return kind in {"probe", "reviewer_probe"} and status == "done" and re.search(
+            r"\bPASS\b|判定\s*[:：]?\s*通过", result, re.IGNORECASE
+        ) is not None
+
+    reasons: list[str] = []
+    if not champion or not any(route_of(row) == champion and is_pass(row) for row in rows):
+        reasons.append("Champion 路线没有 status=done 且判定 PASS 的 probe")
+
+    failed_by_route: dict[str, int] = {}
+    for row in rows:
+        if str(row.get("status", "")).strip().casefold() != "failed":
+            continue
+        route = route_of(row)
+        if route:
+            failed_by_route[route] = failed_by_route.get(route, 0) + 1
+    repeated = sorted(route for route, count in failed_by_route.items() if count >= 2)
+    if repeated:
+        reasons.append(f"同一路线出现至少两行 failed：{'、'.join(repeated)}")
+
+    risky_specs: list[str] = []
+    specs_dir = work_dir / "specs"
+    for path in sorted(specs_dir.glob("SPEC-*.md")) if specs_dir.is_dir() else []:
+        if path.name.endswith(".questions.md"):
+            continue
+        spec, _ = parse_spec(path)
+        result = spec.fields.get("probe_result", "").casefold() if spec else ""
+        if result in {"waived", "pending"}:
+            risky_specs.append(f"{path.name}={result.upper()}")
+    if risky_specs:
+        reasons.append(f"Full SPEC 的 probe_result 需挑战：{'、'.join(risky_specs)}")
+    return reasons
+
+
+def _question_review_findings(
+    case_dir: Path, question: str, work_dir: Path, stage: str, *, include_c3: bool = True
+) -> list[Finding]:
+    findings: list[Finding] = []
+    c1_decision, c1_detail = _review_decision(case_dir, "C1", question)
+    if c1_decision is None:
+        findings.append(_finding(
+            "REMINDER" if stage == "exploration" else "BLOCK", "C1_REQUIRED",
+            f"{question.upper()} 尚无 C1 可执行决定（{c1_detail}）",
+            "ORCHESTRATOR", "C1",
+        ))
+    elif c1_decision == "STOP":
+        findings.append(_finding(
+            "BLOCK", "C1_STOP", f"{question.upper()} 的 C1 返回 STOP（{c1_detail}）",
+            "ORCHESTRATOR", "C1",
+        ))
+
+    if stage in {"model_selection", "paper_claims", "final"}:
+        reasons = _c2_trigger_reasons(work_dir)
+        c2_decision, c2_detail = _review_decision(case_dir, "C2", question)
+        if c2_decision == "STOP":
+            findings.append(_finding(
+                "BLOCK", "C2_STOP", f"C2 返回 STOP（{c2_detail}）", "ORCHESTRATOR", "C2"
+            ))
+        elif reasons and c2_decision is None:
+            findings.append(_finding(
+                "BLOCK", "C2_REQUIRED", "；".join(reasons), "ORCHESTRATOR", "C2"
+            ))
+        elif not reasons and c2_decision is None:
+            findings.append(_finding(
+                "REMINDER", "C2_SKIPPED",
+                f"{question.upper()} 未触发 C2；在 {question}/log.md 记录一行跳过理由",
+                "ORCHESTRATOR", "C2",
+            ))
+
+    if include_c3 and stage in {"paper_claims", "final"}:
+        c3_decision, c3_detail = _review_decision(case_dir, "C3", question)
+        if c3_decision is None:
+            findings.append(_finding(
+                "REMINDER" if stage == "paper_claims" else "BLOCK", "C3_REQUIRED",
+                f"全案例尚无 C3 可执行决定（{c3_detail}）", "ORCHESTRATOR", "C3",
+            ))
+        elif c3_decision == "STOP":
+            findings.append(_finding(
+                "BLOCK", "C3_STOP", f"C3 返回 STOP（{c3_detail}）", "ORCHESTRATOR", "C3"
+            ))
+    return findings
+
+
+def _startup_findings(
+    case_dir: Path,
+    checkpoint: Mapping[str, Any],
+    stage: str,
+    question: str | None = None,
+    work_dir: Path | None = None,
+    question_state: Mapping[str, Any] | None = None,
+) -> list[Finding]:
+    level = "REMINDER" if stage == "exploration" else "BLOCK"
+    findings: list[Finding] = []
+    input_dir = case_dir / "input"
+    local_materials = [
+        path for path in input_dir.iterdir()
+        if input_dir.is_dir() and path.is_file() and path.name.casefold() != "readme.md"
+    ] if input_dir.is_dir() else []
+    external_material = bool(_data_roots(case_dir))
+    if not local_materials and not external_material:
+        findings.append(_finding(
+            level, "INPUT_MATERIAL_MISSING",
+            "input/ 中没有题面或有效 data_root；可先准备材料，但不能冻结路线",
+            "ORCHESTRATOR", "C1",
+        ))
+    if question and (case_dir / "sources.yaml").is_file():
+        generated = (
+            case_dir / "input/题面全文.md",
+            case_dir / "input/数据清单.md",
+            (work_dir or case_dir / question) / "数据范围.md",
+        )
+        missing_generated = [str(path.relative_to(case_dir)) for path in generated if not path.is_file()]
+        if missing_generated:
+            findings.append(_finding(
+                level, "INPUT_MATERIAL_MISSING",
+                f"阶段 0 尚未生成：{'、'.join(missing_generated)}；先运行 make ingest",
+                "ORCHESTRATOR", "C1",
+            ))
+        statement = case_dir / "input/题面全文.md"
+        if statement.is_file():
+            provenance_problem = statement_provenance_problem(statement)
+            if provenance_problem:
+                findings.append(_finding(
+                    level, "STATEMENT_PROVENANCE_INVALID", provenance_problem,
+                    "ORCHESTRATOR", "C1",
+                ))
+
+    work_dir = work_dir or case_dir
+    brief = work_dir / "brief.md" if question else case_dir / "case_brief.md"
+    brief_text = brief.read_text(encoding="utf-8", errors="replace") if brief.is_file() else ""
+    legacy_markers = (
+        "- 用户真正要回答什么：\n", "| Q1 |  |  |  |  |", "- 数据文件和粒度：\n",
+    )
+    new_markers = ("- 本题要回答什么：\n", "- Champion：待 Probe", "- 数据范围：\n")
+    markers = new_markers if question else legacy_markers
+    if not brief_text or any(marker in brief_text for marker in markers):
+        findings.append(_finding(
+            level, "CASE_BRIEF_INCOMPLETE",
+            f"{brief.relative_to(case_dir)} 仍缺研究目标、路线选择或数据说明",
+            "MODELER", "C1",
+        ))
+
+    route_owner = question_state if question else checkpoint
+    route_owner = route_owner if isinstance(route_owner, Mapping) else {}
+    route = route_owner.get("route", {})
+    route = route if isinstance(route, Mapping) else {}
+    confirmed_by_c1 = bool(
+        question
+        and _review_route(case_dir, question) == str(route.get("value", "")).strip().casefold()
+    )
+    if route.get("confirmed_by_human") is not True and not confirmed_by_c1:
+        findings.append(_finding(
+            level, "ROUTE_CONFIRMATION_REQUIRED",
+            "路由须由带节点决定且写明同一路由的 C1 卡确认；也可用 confirmed_by_human 覆盖",
+            "ORCHESTRATOR", "C1",
+        ))
+    return findings
+
+
+def _failed_experiment_findings(work_dir: Path) -> list[Finding]:
+    board = _board_path(work_dir)
     if not board.is_file():
         return []
     failed = [
@@ -160,10 +476,10 @@ def _failed_experiment_findings(case_dir: Path) -> list[Finding]:
     )]
 
 
-def _risk_findings(case_dir: Path, checkpoint: Mapping[str, Any], stage: str) -> list[Finding]:
+def _risk_findings(work_dir: Path, state: Mapping[str, Any], stage: str) -> list[Finding]:
     strong = stage in {"paper_claims", "final"}
     findings: list[Finding] = []
-    risks = checkpoint.get("deterministic_risks", {})
+    risks = state.get("deterministic_risks", {})
     risks = risks if isinstance(risks, Mapping) else {}
     for key, label in RISK_LABELS.items():
         if risks.get(key) is True:
@@ -173,7 +489,7 @@ def _risk_findings(case_dir: Path, checkpoint: Mapping[str, Any], stage: str) ->
                 "ENGINEER", "C3" if key in {"leakage", "split_overlap"} else "C2",
             ))
 
-    checks_dir = case_dir / "experiments/outputs/checks"
+    checks_dir = work_dir / "outputs/checks"
     if not checks_dir.is_dir():
         return findings
     for path in sorted(checks_dir.glob("*.json")):
@@ -201,7 +517,36 @@ def _risk_findings(case_dir: Path, checkpoint: Mapping[str, Any], stage: str) ->
     return findings
 
 
-def _claim_findings(case_dir: Path, stage: str) -> list[Finding]:
+def _cross_question_findings(work_dir: Path, question: str | None) -> list[Finding]:
+    if question is None:
+        return []
+    paths = [work_dir / "brief.md", work_dir / "board.md", work_dir / "log.md"]
+    specs_dir = work_dir / "specs"
+    if specs_dir.is_dir():
+        paths.extend(sorted(specs_dir.glob("SPEC-*.md")))
+    for path in paths:
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for reference in OUTPUT_REFERENCE.findall(text):
+            code = reference_violation_code(reference, question)
+            if code:
+                return [_finding(
+                    "BLOCK", code,
+                    f"{path.relative_to(work_dir.parent)} 中 {question} 不得引用后续子问题 {reference}",
+                    "MODELER", "C2",
+                )]
+    return []
+
+
+def _claim_findings(
+    case_dir: Path,
+    stage: str,
+    question: str | None = None,
+    work_dir: Path | None = None,
+    *,
+    all_questions: bool = False,
+) -> list[Finding]:
     if stage not in {"paper_claims", "final"}:
         return []
     path = case_dir / "paper/claim_map.md"
@@ -212,29 +557,62 @@ def _claim_findings(case_dir: Path, stage: str) -> list[Finding]:
     if not rows:
         return [_finding(level, "CLAIM_MAP_EMPTY", "尚无已填写的关键 Claim；论文骨架可继续", "WRITER", "C3")]
 
-    known = board_experiment_ids(case_dir)
+    work_dir = work_dir or case_dir
+    known_by_question: dict[str | None, set[str]] = {}
+
+    def known_for(row_question: str | None) -> set[str]:
+        if row_question in known_by_question:
+            return known_by_question[row_question]
+        if row_question:
+            qdir = case_dir / row_question
+            board = _board_path(qdir)
+            rows_on_board = parse_markdown_table(board.read_text(encoding="utf-8")) if board.is_file() else []
+            known = {
+                str(row.get("实验 ID", "")).strip().casefold()
+                for row in rows_on_board if str(row.get("实验 ID", "")).strip()
+            }
+        else:
+            known = board_experiment_ids(case_dir)
+        known_by_question[row_question] = known
+        return known
     findings: list[Finding] = []
     for row in rows:
         claim_id = str(row.get("Claim ID", "")).strip()
+        row_question = question
+        if all_questions:
+            candidate = str(row.get("子问题", "")).strip().casefold()
+            if re.fullmatch(r"q[1-9][0-9]*", candidate):
+                row_question = candidate
+            else:
+                findings.append(_finding(
+                    "BLOCK", "CLAIM_SOURCE_MISSING",
+                    f"{claim_id} 未声明有效子问题，无法绑定本题实验板",
+                    "WRITER", "C3",
+                ))
+                continue
+        known = known_for(row_question)
         source = parse_source_experiment(str(row.get("来源 EXP-ID", "")))
         if not source.ok or source.exp_id.casefold() not in known:
             findings.append(_finding("BLOCK", "CLAIM_SOURCE_MISSING", f"{claim_id} 的来源实验无效：{source.problem or source.exp_id}", "WRITER", "C3"))
             continue
         data_ref = str(row.get("数据文件", "")).strip().strip("`")
         if _has_value(data_ref):
-            data_path = case_dir / data_ref
-            allowed = (case_dir / "experiments/outputs/data").resolve()
-            try:
-                if not data_path.is_file() or allowed not in data_path.resolve().parents:
-                    raise ValueError
-            except (OSError, ValueError):
+            data_path = (
+                resolve_in_case(case_dir, data_ref, "data", question=row_question)
+                if row_question else None
+            )
+            if data_path is None:
                 findings.append(_finding("BLOCK", "CLAIM_EVIDENCE_MISSING", f"{claim_id} 的数据文件不可用", "WRITER", "C3"))
         report_ref = str(row.get("复算报告", "")).strip().strip("`")
         if _has_value(report_ref):
-            report_path = case_dir / report_ref
-            verdict = validate_check_report(report_path, source.exp_id)
-            if not verdict.ok or verdict.has_failed_check:
-                findings.append(_finding("BLOCK", "CLAIM_CHECK_FAILED", f"{claim_id} 的复算报告无效或未通过：{verdict.problem}", "ENGINEER", "C3"))
+            report_path = (
+                resolve_in_case(case_dir, report_ref, "checks", question=row_question)
+                if row_question else None
+            )
+            verdict = validate_check_report(report_path, source.exp_id) if report_path else None
+            if verdict is None or not verdict.ok or verdict.has_failed_check:
+                problem = verdict.problem if verdict else "路径不在允许的 checks 目录"
+                findings.append(_finding("BLOCK", "CLAIM_CHECK_FAILED", f"{claim_id} 的复算报告无效或未通过：{problem}", "ENGINEER", "C3"))
         if str(row.get("状态", "")).strip().casefold() == "stale":
             findings.append(_finding("BLOCK", "CLAIM_STALE", f"{claim_id} 已过期", "WRITER", "C3"))
     return findings
@@ -252,22 +630,74 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
     findings: list[Finding] = []
     if str(checkpoint.get("case_id", "")).strip() != case_dir.name:
         findings.append(_finding("BLOCK", "CASE_ID_MISMATCH", "checkpoint case_id 与目录名不一致", "ORCHESTRATOR", "HUMAN"))
-    route = checkpoint.get("route", {})
-    route = route if isinstance(route, Mapping) else {}
-    value = str(route.get("value", "")).strip()
-    if value not in ROUTES:
-        findings.append(_finding("BLOCK", "ROUTE_MISSING", "Modeler 尚未写入正式路由", "MODELER", "C1"))
-    elif value == "insufficient_information":
-        findings.append(_finding("REMINDER", "ROUTE_UNRESOLVED", "继续可逆探索并让 C1 给补证据动作", "MODELER", "C1"))
+    question, work_dir, question_state = _question_context(case_dir, checkpoint)
+    contexts: list[tuple[str | None, Path, Mapping[str, Any]]] = [
+        (question, work_dir, question_state)
+    ]
+    raw_questions = checkpoint.get("questions", {})
+    if question and stage == "final" and isinstance(raw_questions, Mapping):
+        contexts = []
+        for qname in sorted(
+            raw_questions,
+            key=lambda item: int(str(item)[1:]) if QUESTION_DIR.fullmatch(str(item)) else 10**9,
+        ):
+            state = raw_questions.get(qname, {})
+            contexts.append((
+                str(qname).casefold(), case_dir / str(qname).casefold(),
+                state if isinstance(state, Mapping) else {},
+            ))
+
+    for qname, qdir, state in contexts:
+        if qname and (not QUESTION_DIR.fullmatch(qname) or not qdir.is_dir()):
+            findings.append(_finding(
+                "BLOCK", "CHECKPOINT_INVALID",
+                f"checkpoint 中 {qname!r} 没有对应目录", "ORCHESTRATOR", "HUMAN",
+            ))
+        route_owner = state if qname else checkpoint
+        route = route_owner.get("route", {})
+        route = route if isinstance(route, Mapping) else {}
+        value = str(route.get("value", "")).strip()
+        if value not in ROUTES:
+            findings.append(_finding(
+                "BLOCK", "ROUTE_MISSING", f"{(qname or '案例').upper()} 尚未写入正式路由",
+                "MODELER", "C1",
+            ))
+        elif value == "insufficient_information":
+            findings.append(_finding(
+                "REMINDER", "ROUTE_UNRESOLVED",
+                f"{(qname or '案例').upper()} 继续可逆探索并让 C1 给补证据动作", "MODELER", "C1",
+            ))
+
+        findings.extend(_startup_findings(
+            case_dir, checkpoint, stage, qname, qdir, state
+        ))
 
     human_block = str(checkpoint.get("human_block", "")).strip()
     if _has_value(human_block):
         findings.append(_finding("BLOCK", "HUMAN_ONLY_BLOCK", human_block, "HUMAN", "HUMAN"))
+    findings.extend(_pending_approval_findings(case_dir, stage))
 
-    findings.extend(_review_findings(case_dir, stage))
-    findings.extend(_failed_experiment_findings(case_dir))
-    findings.extend(_risk_findings(case_dir, checkpoint, stage))
-    findings.extend(_claim_findings(case_dir, stage))
+    if question:
+        for index, (qname, qdir, state) in enumerate(contexts):
+            if qname is None:
+                continue
+            findings.extend(_question_review_findings(
+                case_dir, qname, qdir, stage, include_c3=index == 0
+            ))
+            findings.extend(_review_card_policy_findings(
+                case_dir, qname, include_c3=index == 0
+            ))
+            findings.extend(_cross_question_findings(qdir, qname))
+            findings.extend(_failed_experiment_findings(qdir))
+            findings.extend(_risk_findings(qdir, state, stage))
+    else:
+        findings.extend(_legacy_review_findings(case_dir, stage))
+        findings.extend(_review_card_policy_findings(case_dir, None))
+        findings.extend(_failed_experiment_findings(case_dir))
+        findings.extend(_risk_findings(case_dir, checkpoint, stage))
+    findings.extend(_claim_findings(
+        case_dir, stage, question, work_dir, all_questions=bool(question and stage == "final")
+    ))
     return CaseReport(tuple(findings))
 
 

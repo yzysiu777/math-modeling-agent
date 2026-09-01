@@ -64,12 +64,7 @@ for marker in 摘要 关键词 参考文献; do
   fi
 done
 
-if grep -E -q '页眉|Header' "$text"; then
-  echo "WARN header-like text detected; inspect visually and compare with the current official template."
-  status=1
-else
-  echo "PASS no header-like text detected by text extraction"
-fi
+echo "NOTE header and page-number positions are checked by qa_latex.py --final; plain text alone cannot prove layout."
 
 if [ "$#" -gt 0 ]; then
   for token in "$@"; do

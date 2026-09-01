@@ -21,10 +21,13 @@
 \begin{document}
 
 \maketitle
+% 官方历史格式要求正文无页眉、页码位于页脚中部。gmcmthesis 继承的 ctexart
+% 默认页式会产生章节页眉，因此在标题页生成后显式固定为 plain。
+\pagestyle{plain}
 
 \begin{abstract}
 \paperexample{摘要只写任务、方法、关键结果和结论。每个数字都必须能在
-\texttt{paper/claim\_map.md} 里追到实验 ID 和数据文件；追不到的数字不许写进摘要。}
+\path{paper/claim_map.md} 里追到实验 ID 和数据文件；追不到的数字不许写进摘要。}
 
 \paperexample{表述强度必须与证据匹配：可行解 / 当前最好解 / 给定假设下最优 /
 全局最优，关联 / 预测贡献 / 因果。把启发式结果写成「最优」是丢分最快的方式之一。}

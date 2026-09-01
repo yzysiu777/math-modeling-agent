@@ -13,9 +13,11 @@ import yaml
 try:
     from .experiment_board import validate_experiment_board
     from .model_pool import validate_candidate_pool
+    from .check_spec import validate_case_specs
 except ImportError:  # pragma: no cover
     from experiment_board import validate_experiment_board
     from model_pool import validate_candidate_pool
+    from check_spec import validate_case_specs
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,8 +25,10 @@ REQUIRED_FILES = (
     "README.md", "AGENTS.md", "agent.md", "REVIEWER.md", "Makefile",
     "protocol/competition-workflow.md", "templates/checkpoint.yaml",
     "templates/experiment_board.md", "templates/independent_review_packet.md",
-    "templates/spec.md", "templates/spec_probe.md", "scripts/create_case.py",
-    "scripts/check_case.py", "scripts/check_spec.py", "scripts/make_review_packet.py",
+    "templates/spec.md", "templates/现在做什么.md", "templates/批准单.md",
+    "templates/审核卡索引.md", "templates/我的笔记.md", "scripts/create_case.py",
+    "scripts/case_sources.py", "scripts/ingest.py", "scripts/check_case.py",
+    "scripts/check_spec.py", "scripts/make_review_packet.py",
     "prompts/modeler.md", "prompts/engineer.md", "prompts/writer.md",
     "prompts/startup/orchestrator.md", "prompts/startup/modeler.md",
     "prompts/startup/engineer.md", "prompts/startup/writer.md",
@@ -36,11 +40,13 @@ RETIRED_PATHS = (
     "CLAUDE.md", "prompts/claude", "templates/claude_review_packet.md",
     "prompts/codex-start.md", "roles", ".agents/skills/industrial-mathematical-modeling",
     ".agents/skills/model-race",
+    "templates/spec_probe.md", "templates/model_comparison.md", "templates/model_candidate.md",
 )
 REVIEW_FILES = (
     "REVIEWER.md", "templates/independent_review_packet.md",
 )
 METADATA = ("reviewer_provider", "reviewer_model", "review_session", "saw_main_conversation", "critical_node")
+RUNTIME_GMCMTHESIS_SHA256 = "2757ead1fd932291f705d5686bedf37d3463e030d821d8f7815ac7dcfee4c7aa"
 
 
 def _missing(paths: Iterable[str]) -> List[str]:
@@ -54,6 +60,9 @@ def _sha256(path: Path) -> str:
 def _official_profile_errors() -> List[str]:
     errors: List[str] = []
     try:
+        runtime_class = ROOT / "paper/gmcmthesis.cls"
+        if _sha256(runtime_class) != RUNTIME_GMCMTHESIS_SHA256:
+            errors.append("runtime gmcmthesis.cls changed without updating the reviewed checksum")
         current = yaml.safe_load((ROOT / "paper/official/2025/manifest.yaml").read_text(encoding="utf-8"))
         for source in current.get("sources", []):
             reference = source.get("local_reference")
@@ -80,7 +89,7 @@ def validate_static_contract() -> List[str]:
             if marker not in text:
                 errors.append(f"review card/protocol missing diagnostic field {marker}: {relative}")
     workflow = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
-    for marker in ("## 1.", "## 2.", "## 3.", "## 4.", "## 5.", "## 6.", "## 7.", "被削门禁及替代办法"):
+    for marker in ("## A 定题", "## B 试跑", "## C 出结果", "## D 写本题", "## E 全案例收官", "## STAGE 对照"):
         if marker not in workflow:
             errors.append(f"competition workflow missing marker: {marker}")
     if "研究模式" in workflow and "不是另一种运行模式" not in workflow:
@@ -88,11 +97,29 @@ def validate_static_contract() -> List[str]:
     template = (ROOT / "templates/independent_review_packet.md").read_text(encoding="utf-8")
     if len(template.encode("utf-8")) > 6144:
         errors.append("review-card template exceeds 6 KiB")
+    for path in sorted((ROOT / "prompts/startup").glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        for marker in ("当前子问题：Q<k>", "本题目录：<案例目录>/q<k>"):
+            if marker not in text:
+                errors.append(f"startup template missing question slot {marker}: {path.relative_to(ROOT)}")
     for route in ("optimization", "data-analysis", "hybrid"):
-        board = ROOT / f"cases/examples/{route}/experiments/board.md"
-        candidates = ROOT / f"cases/examples/{route}/models/candidates.md"
+        board = ROOT / f"cases/examples/{route}/q1/board.md"
+        candidates = ROOT / f"cases/examples/{route}/q1/brief.md"
         errors.extend(f"{board}: {error}" for error in validate_experiment_board(board))
         errors.extend(f"{candidates}: {error}" for error in validate_candidate_pool(candidates))
+        errors.extend(
+            f"cases/examples/{route}: {error}"
+            for error in validate_case_specs(ROOT / f"cases/examples/{route}")
+        )
+        legacy_files = [
+            ROOT / f"cases/examples/{route}/case_brief.md",
+            ROOT / f"cases/examples/{route}/models",
+            ROOT / f"cases/examples/{route}/experiments",
+        ]
+        errors.extend(
+            f"retired lightweight-example file is still active: {path.relative_to(ROOT)}"
+            for path in legacy_files if path.exists()
+        )
     errors.extend(_official_profile_errors())
     try:
         tracked = subprocess.run(

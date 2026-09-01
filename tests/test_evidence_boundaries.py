@@ -2,7 +2,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.make_review_packet import _data_roots, _explanation_docs, build_packet
+from scripts.create_case import create_case
+from scripts.make_review_packet import (
+    _append_review_index,
+    _data_roots,
+    _explanation_docs,
+    build_packet,
+)
 
 
 class ReviewCardBoundaryTests(unittest.TestCase):
@@ -35,8 +41,8 @@ class ReviewCardBoundaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             case, _ = self._case(Path(tmp))
             card = build_packet(case, "C1", "C1-test")
-            self.assertIn("reviewer_provider: anthropic", card)
-            self.assertIn("实际使用的 Claude 型号", card)
+            self.assertIn("reviewer_provider: <实际 provider>", card)
+            self.assertIn("实际 model 或 human", card)
             self.assertIn("原题全文.md", card)
             self.assertIn("风廓线雷达通用数据格式.doc", card)
             self.assertNotIn("完整题面\n完整题面", card)
@@ -52,6 +58,20 @@ class ReviewCardBoundaryTests(unittest.TestCase):
             (case / "input/link").symlink_to(outside, target_is_directory=True)
             card = build_packet(case, "C1", "C1-test")
             self.assertNotIn("原题-secret.md", card)
+
+    def test_review_index_appends_pointer_without_copying_card_body(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case = create_case("case-a", cases_root=Path(tmp))
+            target = case / "q1/reviews/C1_test.md"
+            unique_body = "UNIQUE-FINDING-BODY-MUST-NOT-BE-COPIED"
+            target.write_text(unique_body, encoding="utf-8")
+
+            self.assertTrue(_append_review_index(case, target, "C1", "q1"))
+
+            index = (case / "队员工作区/审核卡索引.md").read_text(encoding="utf-8")
+            self.assertIn("q1/reviews/C1_test.md", index)
+            self.assertIn("待 Reviewer 填写", index)
+            self.assertNotIn(unique_body, index)
 
 
 if __name__ == "__main__":

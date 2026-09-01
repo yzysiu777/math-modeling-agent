@@ -25,7 +25,7 @@ SNIPPET = re.compile(
     r"<!--\s*snippet:\s*(?P<name>[A-Za-z0-9_-]+)\s*-->\s*\n```latex\n(?P<body>.*?)\n```",
     re.DOTALL,
 )
-#: 片段里引用的示意图。真实论文用 experiments/outputs/figures/ 下的产物，
+#: 片段里引用的示意图。真实论文用当前题 outputs/figures/ 下的产物，
 #: 这里只需要让 \includegraphics 找得到东西，用 mwe 的占位图。
 _PLACEHOLDER_FIGURES = ("example-image", "example-image-a", "example-image-b")
 

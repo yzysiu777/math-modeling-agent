@@ -1,0 +1,7 @@
+statement: input/source/statement.md
+data_roots:
+  - input/source/data
+docs: []
+questions:
+  q1: 第一题
+shared: []

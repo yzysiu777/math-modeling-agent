@@ -4,12 +4,12 @@
 
 | FIG-ID | 来源 EXP-ID | 生成脚本 | 数据文件 | 图题草稿 | 论文位置 | 状态 |
 |---|---|---|---|---|---|---|
-| FIG-001 | EXP- | `experiments/code/python/plot_.py` | `outputs/data/_.csv` |  | 第 x 章 | `draft` |
+| FIG-001 | EXP- | `code/python/plot_.py` | `outputs/data/_.csv` |  | 第 x 章 | `draft` |
 
 ## 字段约定
 
 - `FIG-ID`：全案例唯一，图和表分开编号（表用 `TAB-`）。
-- `来源 EXP-ID`：必须在 `experiments/board.md` 中存在。图不能凭空产生。
+- `来源 EXP-ID`：必须在本题 `board.md` 中存在。图不能凭空产生。
 - `生成脚本`：能重新跑出同一张图的入口。改图重跑脚本，不要手工修图。
 - `数据文件`：图里每个点的来源。写作手核数字时按这一列追溯。
 - `图题草稿`：编程手写事实描述即可；写作手负责改成论文语言，但**不得改变其中的数值和结论强度**。
@@ -20,8 +20,8 @@
 每个 FIG-ID 同时存在两个文件：
 
 ```text
-experiments/outputs/figures/<FIG-ID>.pdf   矢量，入 LaTeX
-experiments/outputs/figures/<FIG-ID>.png   300 dpi，供预览和讨论
+outputs/figures/<FIG-ID>.pdf   矢量，入 LaTeX
+outputs/figures/<FIG-ID>.png   300 dpi，供预览和讨论
 ```
 
 样式遵守 `.agents/skills/competition-engineering/references/figure-standards.md`。

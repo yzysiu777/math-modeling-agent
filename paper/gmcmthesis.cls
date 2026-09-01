@@ -483,6 +483,7 @@ Just choose `xelatex', no `pdflatex' or `latex' and so on.}
   \end{tabularx}
 
 	\makenametitle
+	\fi
 	}
 
 \def\makenametitle{
@@ -658,6 +659,6 @@ Just choose `xelatex', no `pdflatex' or `latex' and so on.}
 % \titlecontents{subsubsection}[55pt]{\songti}
 % {\thecontentslabel\hskip.5em}{}{\titlerule*[0.5pc]{.}\contentspage}
 
-% \pagestyle{plain}
+% 正文页式由 paper/main.tex 在 \maketitle 后统一设为 plain。
 
 \endinput

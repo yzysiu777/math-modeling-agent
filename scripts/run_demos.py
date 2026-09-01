@@ -17,14 +17,14 @@ from scripts.model_pool import validate_candidate_pool  # noqa: E402
 
 
 DEMO_SCRIPTS = (
-    ROOT / "cases/examples/optimization/experiments/code/python/run_demo.py",
-    ROOT / "cases/examples/data-analysis/experiments/code/python/run_demo.py",
-    ROOT / "cases/examples/hybrid/experiments/code/python/run_demo.py",
+    ROOT / "cases/examples/optimization/q1/code/python/run_demo.py",
+    ROOT / "cases/examples/data-analysis/q1/code/python/run_demo.py",
+    ROOT / "cases/examples/hybrid/q1/code/python/run_demo.py",
 )
 DEMO_CASES = (
-    ("optimization", DEMO_SCRIPTS[0].parents[3] / "models/candidates.md", DEMO_SCRIPTS[0].parents[3] / "experiments/board.md", DEMO_SCRIPTS[0]),
-    ("data-analysis", DEMO_SCRIPTS[1].parents[3] / "models/candidates.md", DEMO_SCRIPTS[1].parents[3] / "experiments/board.md", DEMO_SCRIPTS[1]),
-    ("hybrid", DEMO_SCRIPTS[2].parents[3] / "models/candidates.md", DEMO_SCRIPTS[2].parents[3] / "experiments/board.md", DEMO_SCRIPTS[2]),
+    ("optimization", DEMO_SCRIPTS[0].parents[2] / "brief.md", DEMO_SCRIPTS[0].parents[2] / "board.md", DEMO_SCRIPTS[0]),
+    ("data-analysis", DEMO_SCRIPTS[1].parents[2] / "brief.md", DEMO_SCRIPTS[1].parents[2] / "board.md", DEMO_SCRIPTS[1]),
+    ("hybrid", DEMO_SCRIPTS[2].parents[2] / "brief.md", DEMO_SCRIPTS[2].parents[2] / "board.md", DEMO_SCRIPTS[2]),
 )
 
 

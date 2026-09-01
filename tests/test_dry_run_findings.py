@@ -6,48 +6,45 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class LightweightProtocolTests(unittest.TestCase):
-    def test_seven_stage_skeleton_and_removed_gate_table_remain(self):
+    def test_four_question_steps_and_case_close_are_documented(self):
         text = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
-        for stage in range(1, 8):
-            self.assertIn(f"## {stage}.", text)
-        self.assertIn("被削门禁及替代办法", text)
+        for marker in ("## A 定题", "## B 试跑", "## C 出结果", "## D 写本题", "## E 全案例收官"):
+            self.assertIn(marker, text)
 
     def test_only_one_competition_mode_exists(self):
         text = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
-        self.assertIn("只有这一套竞赛流程", text)
-        self.assertIn("不是另一种运行模式", text)
+        self.assertIn("只有这一套流程", text)
+        self.assertIn("不切换模式", text)
 
-    def test_ai_accepts_findings_but_rejection_needs_signback(self):
-        for relative in ("REVIEWER.md", "protocol/competition-workflow.md"):
-            text = (ROOT / relative).read_text(encoding="utf-8")
-            self.assertIn("采纳", text)
-            self.assertIn("回签", text)
-
-    def test_modeler_may_run_probe_and_engineer_still_implements_full(self):
+    def test_timeboxes_and_stage_mapping_are_explicit(self):
         text = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
-        self.assertIn("Modeler 可以直接写和运行 Probe", text)
-        self.assertIn("正式实现仍由 Engineer 独立完成", text)
-
-    def test_semantic_assumptions_are_explicit_and_checked_at_c2(self):
-        text = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
-        for marker in ("单位", "坐标系", "时间基准", "网格对齐", "缺测语义", "C2"):
+        for marker in ("不超过 2 小时", "不超过 4 小时", "exploration", "model_selection", "paper_claims", "final"):
             self.assertIn(marker, text)
 
-    def test_reviewer_probe_recheck_happens_before_full_freeze(self):
-        text = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
-        self.assertIn("冻结 Full SPEC", text)
-        self.assertIn("Reviewer Probe", text)
-        self.assertIn("复算", text)
+    def test_review_recommendation_is_default_but_rejection_needs_signback(self):
+        for relative in ("REVIEWER.md", "protocol/competition-workflow.md"):
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn("推荐动作", text)
+            self.assertIn("默认执行", text)
+            self.assertIn("回签", text)
 
-    def test_known_official_conflict_is_counted_as_one_human_decision(self):
+    def test_c1_c2_c3_frequency_is_documented(self):
         text = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
-        self.assertIn("应回人工 1 次", text)
+        self.assertIn("C1 每题必做", text)
+        self.assertIn("C2 仅在", text)
+        self.assertIn("C3", text)
+        self.assertIn("全案例", text)
 
-    def test_external_claude_is_manual_but_stage_reports_do_not_block_early_work(self):
-        workflow = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
-        self.assertIn("队员人工调用", workflow)
-        self.assertIn("reports/stage-01.md", workflow)
-        self.assertIn("阶段 1–6 的人工阅读不阻断生产", workflow)
+    def test_stage_zero_and_shared_scope_are_documented(self):
+        text = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
+        self.assertIn("sources.yaml", text)
+        self.assertIn("shared", text)
+        self.assertIn("完整列名", text)
+
+    def test_question_dependency_is_one_way(self):
+        text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("j < k", text)
+        self.assertIn("CROSS_QUESTION_BACKWARD_REFERENCE", text)
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ class WorkspaceContractTests(unittest.TestCase):
 
     def test_no_second_runtime_mode_or_old_packet_contract(self):
         workflow = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
-        self.assertIn("只有这一套竞赛流程", workflow)
+        self.assertIn("只有这一套流程", workflow)
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertNotIn("reviews/packets", readme)
 
@@ -36,6 +36,7 @@ class WorkspaceContractTests(unittest.TestCase):
         self.assertIn("{gmcmthesis}", main)
         self.assertGreaterEqual(len(list((ROOT / "paper/sections").glob("*.tex"))), 5)
         self.assertIn("\\bibliographystyle{gmcm}", main)
+        self.assertIn("\\pagestyle{plain}", main)
 
     def test_current_official_rules_remain_a_frozen_snapshot_not_2026_claim(self):
         pending = (ROOT / "paper/official/2026/manifest.yaml").read_text(encoding="utf-8")
@@ -53,22 +54,51 @@ class WorkspaceContractTests(unittest.TestCase):
         orchestrator = (ROOT / "prompts/orchestrator.md").read_text(encoding="utf-8")
         self.assertIn("不得自动降级", orchestrator)
 
-    def test_reviewer_is_manually_started_external_claude(self):
+    def test_all_production_agents_are_manually_started(self):
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        orchestrator = (ROOT / "prompts/orchestrator.md").read_text(encoding="utf-8")
+        collaboration = (ROOT / "protocol/team-collaboration.md").read_text(encoding="utf-8")
+        for text in (agents, orchestrator, collaboration):
+            self.assertIn("人工启动", text)
+        self.assertIn("不调用任务工具", orchestrator)
+
+    def test_teammate_notes_are_on_the_orchestrator_prohibited_write_list(self):
+        orchestrator = (ROOT / "prompts/orchestrator.md").read_text(encoding="utf-8")
+        collaboration = (ROOT / "protocol/team-collaboration.md").read_text(encoding="utf-8")
+        for text in (orchestrator, collaboration):
+            self.assertIn("我的笔记.md", text)
+            self.assertIn("只读", text)
+            self.assertIn("不得修改", text)
+
+    def test_retired_probe_and_comparison_templates_are_absent(self):
+        for relative in (
+            "templates/spec_probe.md", "templates/model_comparison.md", "templates/model_candidate.md",
+        ):
+            self.assertFalse((ROOT / relative).exists(), relative)
+
+    def test_reviewer_is_manually_started_and_vendor_neutral(self):
         startup = (ROOT / "prompts/startup/reviewer.md").read_text(encoding="utf-8")
         orchestrator = (ROOT / "prompts/orchestrator.md").read_text(encoding="utf-8")
-        self.assertIn("人工调用外部 Claude", startup)
-        self.assertIn("reviewer_provider: anthropic", startup)
+        self.assertIn("人工启动 Independent Reviewer", startup)
+        self.assertIn("reviewer_provider:", startup)
         self.assertNotIn("gpt-5.6-sol", startup)
-        self.assertIn("不得自行调用任务工具创建 Reviewer", orchestrator)
-        self.assertIn("不得以 Codex 代替 Claude", orchestrator)
+        self.assertIn("Reviewer 同样由队员", orchestrator)
+        self.assertNotIn("anthropic", startup.casefold())
 
-    def test_agent_report_card_and_stage_reports_are_documented(self):
+    def test_six_line_agent_report_and_question_logs_are_documented(self):
         contract = (ROOT / "agent.md").read_text(encoding="utf-8")
         for marker in (
-            "## Agent 回报卡", "MANUAL_REVIEWER_LAUNCH", "人工核验建议",
-            "下一步协作", "reports/stage-01.md", "reports/stage-07.md",
+            "## Agent 回报卡", "[Q2 / 步骤B / DONE]", "产物：", "风险：",
+            "需要人工：", "下一步：",
         ):
             self.assertIn(marker, contract)
+        self.assertNotIn("reports/stage-", contract)
+
+    def test_every_startup_template_has_question_and_directory_slots(self):
+        for path in (ROOT / "prompts/startup").glob("*.md"):
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("当前子问题：Q<k>", text, path.name)
+            self.assertIn("本题目录：<案例目录>/q<k>", text, path.name)
 
 
 if __name__ == "__main__":

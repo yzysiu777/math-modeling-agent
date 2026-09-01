@@ -1,143 +1,105 @@
-# 华为杯数学建模 Agent 工作台
+# 数学建模 Agent 工作台
 
-这是面向四天竞赛的轻量工作台，支持运筹优化、数据分析和混合建模。它依靠强模型快速
-头脑风暴、试跑和收敛，只保留少量真正有用的纠偏与复算。
+一个案例装整道题：共享题面和数据来源，每个子问题有独立工作目录，后题可单向复用前题结果，
+最后共享一份论文。
 
 ## 快速启用
-
-在 Codex 中打开：
-
-```text
-/Users/lambency/Desktop/研 0 /数学建模/agent
-```
-
-新建 Orchestrator 主任务时选择 `gpt-5.6-sol`，推理强度选择 `high`。后续生产 Agent 由
-Orchestrator 使用同一配置创建；如果该配置不可用，不要自动换模型。
-
-首次准备：
 
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python scripts/create_case.py --case-id contest-a --questions 3
 ```
 
-新建案例：
+新案例初始 18 个文件，没有七份空阶段报告；增加的三份是队员入口，数量不随题数增长。先编辑
+`cases/contest-a/sources.yaml`：
+
+```yaml
+statement: /absolute/path/to/problem.pdf
+data_roots:
+  - /absolute/path/to/data
+docs: []
+questions:
+  q1: 第一题
+  q2: 第二题
+  q3: 第三题
+shared: [共享数据]
+```
+
+`statement` 可为 PDF、DOC/DOCX、Markdown、文本或目录。`docs: []` 会自动扫描数据根及父目录
+的说明文件。原始数据不复制、不软链、不修改。
+
+## 阶段 0
 
 ```bash
-.venv/bin/python scripts/create_case.py --case-id huawei-cup-2026-a --route insufficient_information
+make ingest CASE=cases/contest-a
 ```
 
-把原题和小型说明文件放入案例 `input/`，大数据保持原位只读，并在
-`input/README.md` 重复写入：
+它一次性生成带来源行的 `input/题面全文.md`、完整列名与缺测候选的 `input/数据清单.md`、
+`input/说明文档/`、只列需人工判断异常的 `队员工作区/数据踏勘速览.md`，以及每题
+`q<k>/数据范围.md`。路径缺失、相对、不可读或题数不一致时直接失败。
+
+## 目录
 
 ```text
-data_root: /absolute/path/to/allowed/data
+cases/<case_id>/
+├── sources.yaml
+├── checkpoint.yaml
+├── decisions.md
+├── input/{题面全文.md,数据清单.md,说明文档/}
+├── 队员工作区/{现在做什么.md,数据踏勘速览.md,审核卡索引.md,我的笔记.md,待批准/,已批准/,启动提示词/}
+├── q1/ q2/ q3/
+│   ├── brief.md
+│   ├── 数据范围.md
+│   ├── board.md
+│   ├── specs/
+│   ├── code/{python,matlab}/
+│   ├── outputs/{data,checks,figures}/
+│   ├── reviews/
+│   └── log.md
+└── paper/{claim_map.md,reviews/,sections/}
 ```
 
-然后在主 Codex 任务中发送：
+`q<k>` 只可引用编号更小的题目 outputs。跨题反向依赖会被唯一新增的 BLOCK 码拦截。
 
-```text
-读取 AGENTS.md，接管 cases/<case_id>。生产角色统一使用 gpt-5.6-sol、high，并按七阶段
-连续推进；复用 Modeler、Engineer、Writer 会话。C1/C2/C3 只生成审核卡和提示词，由我
-人工调用外部 Claude。每阶段更新 reports/stage-0N.md，并明确人工核验项和下一 Agent。
-```
+## 每题四步与时间盒
 
-## 一题的会话
+A 定题、B 试跑、C 出结果、D 写本题；最后 E 全案例收官。详细规则和时间盒见
+`protocol/competition-workflow.md`。
 
-- 一个持续 Orchestrator 主任务；
-- 一个持续 Modeler 任务，负责阶段 1–4，并可直接跑 Probe；
-- 一个持续 Engineer 任务，负责正式实现、实验、复算和出图；
-- 一个持续 Writer 任务，从稳定 Baseline 开始同步论文；
-- C1、C2、C3 各由人工打开一个新的外部 Claude 会话。
+`make case-check` 保留四个 STAGE 值：
 
-四个生产角色统一使用 `gpt-5.6-sol`、`high`。Orchestrator 可以调度生产角色，但不得启动
-Claude Reviewer。同一角色跨阶段继续原任务，不重复加载协议；角色之间不传隐藏推理。
+| 工作步骤 | STAGE |
+|---|---|
+| A 与 B 前段 | `exploration` |
+| B 末段与 C | `model_selection` |
+| D | `paper_claims` |
+| E | `final` |
 
-## 七阶段
-
-1. 启动与题意重构 → C1；
-2. 发散、七维度比较和路线收敛；
-3. Probe；
-4. Full SPEC、Baseline 和赛马 → C2；
-5. Champion 复算和出图；
-6. 论文、关键数字溯源 → C3；
-7. 最终 LaTeX、PDF 和官方规则检查。
-
-详细机制见 `protocol/competition-workflow.md`。
-
-## 审核卡
+## 审核
 
 ```bash
-make review-packet CASE=cases/<case_id> NODE=C1
+make review-packet CASE=cases/contest-a NODE=C1 QUESTION=q1
 ```
 
-命令生成一张位于 `reviews/C1_*.md` 的轻量审核卡。主 Agent 随后输出可复制提示词，由队员
-人工调用新的外部 Claude。卡中不复制题面全文，只列允许读取或上传的文件。Claude 在同一
-张卡给出 `GO`、`GO_WITH_FIXES` 或 `STOP`；网页版无法写本地文件时，由队员原样转交输出。
+C1 每题必做；C2 由检查器按 Probe/失败/SPEC 状态触发；C3 全案例一次。审核者必须给唯一推荐
+动作，生产角色默认执行，队员可否决。审核者保持新会话、最小材料、不同方法和反例任务，
+provider/model 如实填写。
 
-采纳意见直接实施；拒绝 finding 时由原 Reviewer 在同一卡回签一次。Reviewer Probe 若影响
-Full SPEC 或 Champion，必须在冻结前复算。
-
-## 案例中真正需要维护的文件
-
-```text
-case_brief.md                 题意、数据契约和官方歧义
-checkpoint.yaml               当前阶段、路由、审核状态和确定性风险
-models/candidates.md          路线、七维度比较、Champion/Challenger
-experiments/board.md          Probe 与正式实验
-specs/SPEC-*.md               进入正式赛马的五段 Full SPEC
-reviews/C1_*.md ...           单卡式审核记录
-reports/stage-01.md ...       七阶段汇报、人工核验清单和下一 Agent
-paper/claim_map.md            摘要、结论和核心图表的关键 Claim
-decisions.md                  仅人工专属决定
-```
-
-Probe 不建立独立 SPEC；一般回问不建立 questions 文件；不再维护单独 comparison、
-packet、阶段交接或逐条审核决议副本。
-
-## 每阶段如何看进度
-
-每个生产 Agent 按 `agent.md` 输出统一 Agent 回报卡。Orchestrator 是 `reports/` 的唯一写入者，
-每阶段更新对应文件，明确：当前完成了什么、人工应核验什么、下一步由哪个 Agent做什么，
-以及需要人工调用 Claude 时的可复制提示词。
-
-阶段 1–6 的报告是异步核验材料，AI 不因你尚未阅读而停工。发现漏洞时回复：
-
-```text
-退回阶段 S4：目标函数遗漏了等待成本，请重新检查 Champion 与 C2 结论。
-```
-
-Orchestrator 只返工受影响部分并更新原阶段报告。阶段 7 的最终 PDF 与实际提交必须等待人工。
-
-## 人工调用 Claude
-
-到 C1/C2/C3 时，主 Agent 会给出 `MANUAL_REVIEWER_LAUNCH` 和完整提示词。请新建外部
-Claude 会话，把审核卡及其允许材料交给它。完成后回复：
-
-```text
-C2 已完成。审核卡：/absolute/path/to/reviews/C2_....md
-```
-
-Claude 的实际型号写入 `reviewer_model`；不要填成生产模型，也不要让主 Agent 自动替代。
+队员只需从 `队员工作区/现在做什么.md` 进入。该目录只保存指针和决策所需的最小上下文，
+不复制 brief、board、SPEC 或审核卡正文；`我的笔记.md` 只由队员写。
 
 ## 常用命令
 
 ```bash
-make spec-check CASE=cases/<case_id>
-make case-check CASE=cases/<case_id> STAGE=exploration
-make review-packet CASE=cases/<case_id> NODE=C2
+make spec-check CASE=cases/contest-a
+make case-check CASE=cases/contest-a STAGE=exploration
+make review-packet CASE=cases/contest-a NODE=C2 QUESTION=q1
+make demos
+make paper
 make paper-ci
-make qa
-make final-check CASE=cases/<case_id>
+make final-check CASE=cases/contest-a
 ```
 
-探索检查以提醒为主。最终检查仍会拦截真实不可行、目标复算错误、数据泄漏、核心 Claim
-证据缺失和 LaTeX/PDF 错误。
-
-## 模式说明
-
-没有“比赛模式/研究模式”开关，也没有两套配置。本仓库当前运行时就是比赛流程。
-需要更深入时，在对应阶段增加路线、实验或稳健性分析；不要切换流水线。
-
-当前模板和历史官方文件只能作为参考。比赛开始后必须重新核对当届官方封面、匿名要求、
-字体、页数、文件命名、AI 使用规则和最终提交说明。
+探索提醒不等于阻断；确定性错误、非法跨题依赖、触发但缺失的审核和最终 Claim 证据会阻断相应
+边界。最终 PDF 和实际提交始终由队员确认。

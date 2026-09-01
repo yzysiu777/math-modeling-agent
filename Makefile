@@ -13,7 +13,7 @@ ifneq ($(PAPER_FONTSET),)
 LATEXMK_PRETEX := -usepretex='\PassOptionsToClass{fontset=$(PAPER_FONTSET)}{ctexart}'
 endif
 
-.PHONY: paper paper-ci qa clean test validate demos case-check spec-check review-packet final-check
+.PHONY: paper paper-ci qa clean test validate demos ingest case-check spec-check review-packet final-check
 
 paper:
 	mkdir -p $(PAPER_BUILD)
@@ -58,6 +58,10 @@ test:
 demos:
 	$(PYTHON) scripts/run_demos.py
 
+ingest:
+	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
+	$(PYTHON) scripts/ingest.py --case-dir "$(CASE)"
+
 case-check:
 	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
 	@test -n "$(STAGE)" || (echo "STAGE is required"; exit 2)
@@ -70,7 +74,7 @@ spec-check:
 review-packet:
 	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
 	@test -n "$(NODE)" || (echo "NODE is required (C1, C2 or C3)"; exit 2)
-	$(PYTHON) scripts/make_review_packet.py --case-dir "$(CASE)" --node "$(NODE)"
+	$(PYTHON) scripts/make_review_packet.py --case-dir "$(CASE)" --node "$(NODE)" $(if $(QUESTION),--question "$(QUESTION)",)
 
 final-check:
 	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
@@ -78,6 +82,7 @@ final-check:
 	$(PYTHON) scripts/check_case.py --case-dir "$(CASE)" --stage final || status=$$?; \
 	$(PYTHON) scripts/check_spec.py --case-dir "$(CASE)" || status=$$?; \
 	$(MAKE) PYTHON="$(PYTHON)" paper-ci || status=$$?; \
+	$(PYTHON) scripts/qa_latex.py --paper-dir $(PAPER_DIR) --build-dir $(PAPER_BUILD) --final || status=$$?; \
 	if [ -f $(PAPER_BUILD)/main.pdf ]; then sh writing/checks/check_pdf.sh $(PAPER_BUILD)/main.pdf || status=$$?; fi; \
 	exit $$status
 

@@ -1,10 +1,11 @@
-"""Resolve case-relative evidence references without escaping the case directory.
+"""Resolve question-relative evidence without escaping the case directory.
 
 Both the packet generator and the case checker turn a text reference written by
-a human ("outputs/data/EXP-001_solution.csv") into a real file.  That step is the
-one place where a typo, a copied absolute path or a stray ``..`` can make a tool
-read something outside the case, so it lives here once rather than being
-reimplemented per script.
+a human ("outputs/data/EXP-001_solution.csv") into a real file.  In the
+per-question workbench that reference is relative to ``q<k>/``.  An explicit
+``q<j>/outputs/...`` reference is allowed only when ``j <= k`` so a later
+question may consume earlier results without letting an earlier question depend
+on future work.
 
 The rules are deliberately narrow:
 
@@ -18,22 +19,27 @@ The rules are deliberately narrow:
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Iterable, Optional
 
-#: Evidence kind -> the only directory that kind may resolve into.
-EVIDENCE_ROOTS = {
-    "data": "experiments/outputs/data",
-    "checks": "experiments/outputs/checks",
-    "figures": "experiments/outputs/figures",
-    "outputs": "experiments/outputs",
-}
 
+CROSS_QUESTION_BACKWARD_REFERENCE = "CROSS_QUESTION_BACKWARD_REFERENCE"
+QUESTION_DIR = re.compile(r"^q(?P<number>[1-9][0-9]*)$", re.IGNORECASE)
+
+#: Evidence kind -> its directory relative to the active question.
+EVIDENCE_ROOTS = {
+    "data": "outputs/data",
+    "checks": "outputs/checks",
+    "figures": "outputs/figures",
+    "outputs": "outputs",
+}
 
 def clean_reference(reference: str) -> str:
     """Strip Markdown decoration from a reference cell."""
 
-    return str(reference or "").strip().strip("`").strip().lstrip("./")
+    cleaned = str(reference or "").strip().strip("`").strip()
+    return cleaned[2:] if cleaned.startswith("./") else cleaned
 
 
 def is_traversal(reference: str) -> bool:
@@ -43,6 +49,40 @@ def is_traversal(reference: str) -> bool:
     if not cleaned:
         return False
     return ".." in Path(cleaned).parts or Path(cleaned).is_absolute()
+
+
+def normalize_question(question: str | int) -> str:
+    """Return the canonical ``q<k>`` directory name."""
+
+    value = f"q{question}" if isinstance(question, int) else str(question).strip().casefold()
+    match = QUESTION_DIR.fullmatch(value)
+    if match is None:
+        raise ValueError("question must be a positive integer or q<positive integer>")
+    return f"q{int(match.group('number'))}"
+
+
+def referenced_question(reference: str) -> str | None:
+    """Return an explicit leading question directory, if present."""
+
+    cleaned = clean_reference(reference)
+    if not cleaned:
+        return None
+    match = QUESTION_DIR.fullmatch(Path(cleaned).parts[0])
+    return f"q{int(match.group('number'))}" if match else None
+
+
+def reference_violation_code(reference: str, question: str | int) -> str | None:
+    """Return the stable BLOCK code for a prohibited cross-question edge."""
+
+    current = normalize_question(question)
+    target = referenced_question(reference)
+    if target is None:
+        return None
+    current_number = int(current[1:])
+    target_number = int(target[1:])
+    if target_number > current_number:
+        return CROSS_QUESTION_BACKWARD_REFERENCE
+    return None
 
 
 def contained_in(root: Path, path: Path) -> Optional[Path]:
@@ -69,15 +109,20 @@ def resolve_in_case(
     case_dir: Path,
     reference: str,
     kind: Optional[str] = None,
-    search_bases: Iterable[str] = ("", "experiments"),
+    search_bases: Iterable[str] = ("",),
+    question: str | int | None = None,
 ) -> Optional[Path]:
     """Return the real file a reference points at, or ``None`` if it is not allowed.
 
-    ``kind`` restricts the answer to one of :data:`EVIDENCE_ROOTS`.  A reference
-    that escapes the case, points outside the allowed root, or does not name an
-    existing regular file resolves to ``None`` -- callers report that as missing
-    or illegal evidence rather than reading it.
+    ``kind`` restricts the answer to one of :data:`EVIDENCE_ROOTS` and therefore
+    requires ``question``.  Unprefixed references are resolved below that
+    question and an explicit later-question prefix is rejected.  Call
+    :func:`reference_violation_code` when a caller needs the stable diagnostic
+    code for a rejected dependency.
     """
+
+    if kind is not None and question is None:
+        raise ValueError("question is required for evidence resolution")
 
     cleaned = clean_reference(reference)
     if not cleaned or is_traversal(cleaned):
@@ -88,20 +133,30 @@ def resolve_in_case(
     except (OSError, RuntimeError):
         return None
 
+    question_name = normalize_question(question) if question is not None else None
+    if question_name is not None and reference_violation_code(cleaned, question_name):
+        return None
+    explicit_question = referenced_question(cleaned) if question_name is not None else None
+    target_question = explicit_question or question_name
+    relative_reference = Path(cleaned)
+    if explicit_question is not None:
+        relative_reference = Path(*relative_reference.parts[1:])
+
+    scope_root = case_root / target_question if target_question else case_root
     allowed_root = case_root
     if kind is not None:
         relative = EVIDENCE_ROOTS.get(kind)
         if relative is None:
             return None
         try:
-            allowed_root = (case_root / relative).resolve(strict=True)
+            allowed_root = (scope_root / relative).resolve(strict=True)
         except (OSError, RuntimeError):
             return None
 
-    candidates = [case_dir / base / cleaned if base else case_dir / cleaned
+    candidates = [scope_root / base / relative_reference if base else scope_root / relative_reference
                   for base in search_bases]
     if kind is not None:
-        candidates.insert(0, case_dir / EVIDENCE_ROOTS[kind] / Path(cleaned).name)
+        candidates.insert(0, scope_root / EVIDENCE_ROOTS[kind] / relative_reference.name)
 
     for candidate in candidates:
         try:

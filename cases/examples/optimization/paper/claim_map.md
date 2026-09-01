@@ -3,11 +3,11 @@
 论文正文、摘要、结论里的每一个数字和每一条强主张，都必须能在这张表里追到实验和
 数据文件。**追不到的数字不许写进论文。**
 
-| Claim ID | 论文位置 | 主张原文 | 强度 | 来源 EXP-ID | 数据文件 | 图/表 ID | 复算报告 | 状态 |
-|---|---|---|---|---|---|---|---|---|
-| CLM-001 | 第 4 章 结果 | 在基础实例上，全枚举给出总成本为 4 的分配方案 d1→A、d2→B、d3→B | 全局最优 | EXP-OPT-002 | `outputs/data/EXP-OPT-002_solution.csv` | FIG-OPT-001 | `outputs/checks/EXP-OPT-002.json` | `verified` |
-| CLM-002 | 第 4 章 结果 | 在本文构造的两个实例上，贪心 baseline 与全枚举得到相同的总成本 | 当前最好 | EXP-OPT-002 | `outputs/data/EXP-OPT-002_metrics.json` | FIG-OPT-001 | `outputs/checks/EXP-OPT-002.json` | `verified` |
-| CLM-003 | 第 6 章 讨论 | 本文构造的容量边界实例并未使容量约束成为紧约束，因此尚未验证容量处理的正确性 | 可行解 | EXP-OPT-002 | `outputs/data/EXP-OPT-002_metrics.json` | — | `outputs/checks/EXP-OPT-002.json` | `verified` |
+| Claim ID | 子问题 | 论文位置 | 主张原文 | 强度 | 来源 EXP-ID | 数据文件 | 图/表 ID | 复算报告 | 状态 |
+|---|---|---|---|---|---|---|---|---|---|
+| CLM-001 | Q1 | 第 4 章 结果 | 在基础实例上，全枚举给出总成本为 4 的分配方案 d1→A、d2→B、d3→B | 全局最优 | EXP-OPT-002 | `outputs/data/EXP-OPT-002_solution.csv` | FIG-OPT-001 | `outputs/checks/EXP-OPT-002.json` | `verified` |
+| CLM-002 | Q1 | 第 4 章 结果 | 在本文构造的两个实例上，贪心 baseline 与全枚举得到相同的总成本 | 当前最好 | EXP-OPT-002 | `outputs/data/EXP-OPT-002_metrics.json` | FIG-OPT-001 | `outputs/checks/EXP-OPT-002.json` | `verified` |
+| CLM-003 | Q1 | 第 6 章 讨论 | 本文构造的容量边界实例并未使容量约束成为紧约束，因此尚未验证容量处理的正确性 | 可行解 | EXP-OPT-002 | `outputs/data/EXP-OPT-002_metrics.json` | — | `outputs/checks/EXP-OPT-002.json` | `verified` |
 
 ## 本例的三处表述纪律
 
@@ -15,7 +15,8 @@
   求解器给出的解，就只能写「当前最好」。
 - **CLM-002 不能写成「贪心足以替代精确求解」**：两个玩具实例上打平，不构成一般性
   结论。强度只到「当前最好」，且必须写明实例范围。
-- **CLM-003 是主动写下的局限**，来源是 `SPEC-P1-M02.questions.md` 里编程手的回问。
+- **CLM-003 是主动写下的局限**，来源是早期 Probe 暴露的判据错误；结论已回写 Full SPEC
+  与本题 log，不再保留普通回问副本。
   论文写出自己没验证到什么，比假装全都验证过更经得起 C3 抽查。
 
 ## 强度字段

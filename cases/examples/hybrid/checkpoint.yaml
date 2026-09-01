@@ -1,28 +1,16 @@
-# 案例级轻量控制文件：队员或角色可手工编辑，不是身份认证或审批系统。
+# 轻量进度提示；演示案例的路由已由演示队员确认。
 case_id: hybrid
-routing:
-  suggested: hybrid
-  confirmed: true
-  confirmed_route: hybrid
-  confirmed_by: 演示队员
-  note: 演示案例，上下游接口与目标由简报直接给定；service_level 的处理已登记为规格未决问题
-
-# C1 可写 not_needed，但必须在 review_notes.C1 留下简短理由。
-reviews:
-  C1: not_needed
-  C2: pending
-  C3: pending
-review_notes:
-  C1: 演示案例，上下游接口与目标由简报直接给定；service_level 的处理已登记为规格未决问题
-
-# 进入摘要/结论等强主张阶段时由写作手或队员明确标记。
-paper_claims_active: false
-performance_concern: false
-
-# 优先由 experiments/outputs/checks/*.json 的复算报告自动点亮；
-# 这里的人手填写值作为覆盖手段。
-deterministic_risks:
-  infeasible: false
-  objective_mismatch: false
-  leakage: false
-  split_overlap: false
+current_question: q1
+questions:
+  q1:
+    step: C
+    status: completed
+    route:
+      value: hybrid
+      decided_by: modeler
+      confirmed_by_human: true
+      note: 点预测路线为 Champion，情景路线为 Challenger
+    reviews: {C1: pending, C2: optional}
+    deterministic_risks: {infeasible: false, objective_mismatch: false, leakage: false, split_overlap: false}
+reviews: {C3: pending}
+human_block: ""

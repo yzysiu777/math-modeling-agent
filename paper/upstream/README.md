@@ -2,6 +2,9 @@
 
 本目录保存 gmcmthesis 模板的**原件**，只作来源留痕与升级对照，不参与编译。
 参与编译的是仓库根 `paper/` 下的 `gmcmthesis.cls`、`gmcm.bst` 和 `figures/`。
+运行时 `gmcmthesis.cls` 含一处最小本地补丁：为上游遗漏闭合的
+`\if@gmcm@preface` 补上 `\fi`。上游原始校验和保留在下方，运行时补丁版本的
+校验和由工作台测试单独锁定。
 
 ## 版本
 
@@ -27,7 +30,7 @@
 ## 校验和
 
 ```text
-769a484ecfe4c2e5abb5d3d65cfd404e7325fdbf236ed12b25d2707cea177df9  gmcmthesis.cls
+769a484ecfe4c2e5abb5d3d65cfd404e7325fdbf236ed12b25d2707cea177df9  gmcmthesis.cls（上游原件，应用本地补丁前）
 cfd2ed609cfc7c7d5c2c2f4d84ee5f1a2300510cc22f5c3f6cf67d81e82ae03e  gmcm.bst
 a382e4fa022f4d97984807756f36076552489d3ec26530126c58587572046632  figures/logo.pdf
 19eee18de63633104dc4829439700fd30a7279549dfa12f71fd7d8f76d158bd7  figures/title.pdf
@@ -44,8 +47,8 @@ a382e4fa022f4d97984807756f36076552489d3ec26530126c58587572046632  figures/logo.p
 4. 更新 `paper/official/<year>/manifest.yaml` 与 `writing/official/<year>/`；
 5. 跑 `make paper-ci` 与 `make qa`，并**人工打开 PDF 与官方 Word 模板逐页对照**。
 
-第 5 步不能省。脚本只查得出「编得过、有摘要有关键词有参考文献、没有页眉」，
-查不出字号、行距、页边距、封面字段是否符合当届要求。
+第 5 步不能省。脚本能检查编译、引用、占位符、页眉和页码位置，但查不出字号、
+行距、页边距和封面视觉细节是否符合当届要求。
 
 ## 已知限制：`make paper-example` 只能在 macOS / Windows 上跑
 
@@ -53,8 +56,8 @@ a382e4fa022f4d97984807756f36076552489d3ec26530126c58587572046632  figures/logo.p
 `\fontspec{Courier New}`。Linux（含 CI）没有这个字体，而且因为写在环境里，
 外部 `\lstset` 或 `\AtBeginDocument` 都覆盖不掉。
 
-不修，理由：修它必须改动按字节收录的 `example.tex` 或 `gmcmthesis.cls`，
-那会破坏上面的校验和契约，也让将来与上游新版本的比对失去意义。
+不再为这组示例环境追加运行时补丁，理由：修它必须进一步改动 `example.tex` 或运行时
+`gmcmthesis.cls`，会扩大与上游原件的差异，也让将来与新版本的比对更困难。
 这是上游模板面向 Windows/macOS 的固有属性，不是本仓库的缺陷。
 
 **影响不到本队论文**：`paper/style/modeling-paper.sty` 定义了自己的 listings
