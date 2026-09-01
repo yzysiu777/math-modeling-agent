@@ -282,15 +282,25 @@ def _columns_and_missing(path: Path) -> tuple[str, str, str]:
         delimiter = csv.Sniffer().sniff("\n".join(lines[:20]), delimiters=",;\t|").delimiter
     except csv.Error:
         delimiter = None
-    if delimiter:
-        columns = next(csv.reader([first], delimiter=delimiter))
-    else:
-        columns = re.split(r"\s+", first)
-    if len(columns) <= 1 or all(re.fullmatch(r"[-+0-9.eE/]+", item or "") for item in columns):
-        data_line = next((line for line in lines[1:] if len(re.split(r"\s+", line)) > 1), first)
-        width = len(re.split(r"\s+", data_line))
+    def _fields(line: str) -> list[str]:
+        return next(csv.reader([line], delimiter=delimiter)) if delimiter else re.split(r"\s+", line)
+
+    columns = _fields(first)
+    # 表头必须和数据行宽度一致。定宽记录文件的首行往往是记录标识加版本号
+    # （例如 `WNDROBS 01.20`），宽度对不上却又不是纯数字，会被当成两列真表头
+    # 报出去 —— 那比报「未知」更糟，因为下游会相信它。
+    widths = [len(_fields(line)) for line in lines[1:12] if line]
+    modal_width = max(set(widths), key=widths.count) if widths else len(columns)
+    header_arity_mismatch = bool(widths) and modal_width > 1 and len(columns) != modal_width
+    all_numeric = all(re.fullmatch(r"[-+0-9.eE/]+", item or "") for item in columns)
+    if len(columns) <= 1 or all_numeric or header_arity_mismatch:
+        width = modal_width if widths else len(columns)
         columns = [f"col_{index}" for index in range(1, width + 1)]
-        marker = next((line for line in lines[:10] if re.fullmatch(r"[A-Z][A-Z0-9_ -]+", line)), "")
+        marker = next(
+            (line.strip() for line in lines[:10]
+             if re.fullmatch(r"[A-Z][A-Z0-9_. -]+", line.strip())),
+            "",
+        )
         if marker:
             columns.append(f"record_marker={marker}")
     values = re.split(r"[,;\t|\s]+", "\n".join(lines[:200]).casefold())

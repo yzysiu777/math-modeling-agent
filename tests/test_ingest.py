@@ -294,6 +294,46 @@ class InventoryScaleTests(unittest.TestCase):
             self.assertRegex(total, r"总大小：[0-9.]+ (?:B|KB|MB|GB)")
 
 
+class HeaderlessDetectionTests(unittest.TestCase):
+    """定宽记录文件的首行是记录标识，不是表头；报成表头比报未知更糟。"""
+
+    def _ingest(self, root: Path, first_line: str) -> Path:
+        case = create_case("headerless", cases_root=root / "cases")
+        source = root / "src"
+        (source / "第一题").mkdir(parents=True)
+        rows = "\n".join(
+            "  100.0  180.0    3.2    0.1   95.0   90.0  -14.2" for _ in range(6)
+        )
+        (source / "第一题" / "ROBS.txt").write_text(f"{first_line}\n{rows}\n", encoding="utf-8")
+        (root / "statement.md").write_text("本题要求建立模型。" * 40, encoding="utf-8")
+        write_sources(case, root / "statement.md", source)
+        ingest_case(case)
+        return case
+
+    def test_record_marker_line_is_not_reported_as_a_two_column_header(self):
+        with tempfile.TemporaryDirectory() as name:
+            case = self._ingest(Path(name), "WNDROBS 01.20")
+            inventory = (case / "input/数据清单.md").read_text(encoding="utf-8")
+            self.assertNotIn("[WNDROBS, 01.20]", inventory)
+            self.assertIn("col_7", inventory)
+            self.assertIn("record_marker=WNDROBS 01.20", inventory)
+
+    def test_headerless_file_is_flagged_for_human_confirmation(self):
+        with tempfile.TemporaryDirectory() as name:
+            case = self._ingest(Path(name), "WNDROBS 01.20")
+            scout = (case / "队员工作区/数据踏勘速览.md").read_text(encoding="utf-8")
+            self.assertIn("疑似无表头", scout)
+
+    def test_a_real_header_of_matching_width_is_kept(self):
+        with tempfile.TemporaryDirectory() as name:
+            case = self._ingest(
+                Path(name), "高度 风向 风速 垂直速度 水平可信度 垂直可信度 Cn2"
+            )
+            inventory = (case / "input/数据清单.md").read_text(encoding="utf-8")
+            self.assertIn("Cn2", inventory)
+            self.assertNotIn("col_7", inventory)
+
+
 class StatementProvenanceTests(unittest.TestCase):
     @staticmethod
     def _write(path: Path, body: str, *, source_chars: int, extracted_chars: int) -> None:
