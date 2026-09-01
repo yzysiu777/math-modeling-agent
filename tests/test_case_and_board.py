@@ -28,8 +28,23 @@ class CaseAndBoardTests(unittest.TestCase):
             self.assertFalse((case / "reports").exists())
             self.assertTrue((case / "sources.yaml").is_file())
             files = [path for path in case.rglob("*") if path.is_file()]
-            self.assertLessEqual(len(files), 16)
+            self.assertEqual(len(files), 18)
             self.assertFalse(any("待 Orchestrator 汇总" in path.read_text(encoding="utf-8") for path in files))
+            workspace = case / "队员工作区"
+            self.assertEqual(
+                {path.name for path in workspace.iterdir() if path.is_file()},
+                {"现在做什么.md", "审核卡索引.md", "我的笔记.md"},
+            )
+            self.assertEqual(
+                {path.name for path in workspace.iterdir() if path.is_dir()},
+                {"待批准", "已批准", "启动提示词"},
+            )
+            self.assertFalse(any(path.is_dir() for directory in workspace.iterdir() if directory.is_dir() for path in directory.iterdir()))
+            workspace_text = "\n".join(
+                path.read_text(encoding="utf-8") for path in workspace.glob("*.md")
+            )
+            for copied_marker in ("无评价发散（至少六条）", "要回答的问题/显式假设", "## 1. 目标与判据"):
+                self.assertNotIn(copied_marker, workspace_text)
             codes = {finding.code for finding in check_case(case, "exploration").findings}
             self.assertIn("INPUT_MATERIAL_MISSING", codes)
 
@@ -56,14 +71,19 @@ class CaseAndBoardTests(unittest.TestCase):
         for route in ("optimization", "data-analysis", "hybrid"):
             case = root / f"cases/examples/{route}"
             self.assertEqual(
-                validate_experiment_board(case / "experiments/board.md"), []
+                validate_experiment_board(case / "q1/board.md"), []
             )
             self.assertEqual(validate_case_specs(case), [])
-            self.assertFalse((case / "models/comparison.md").exists())
-            self.assertEqual(list((case / "specs").glob("*-probe.md")), [])
             startup_codes = {finding.code for finding in check_case(case, "exploration").findings}
             self.assertNotIn("ROUTE_MISSING", startup_codes)
             self.assertNotIn("ROUTE_CONFIRMATION_REQUIRED", startup_codes)
+
+    def test_examples_have_no_old_layout_markers(self):
+        root = Path(__file__).resolve().parents[1] / "cases/examples"
+        for route in ("optimization", "data-analysis", "hybrid"):
+            case = root / route
+            for retired in ("case_brief.md", "models", "experiments"):
+                self.assertFalse((case / retired).exists(), f"{route}/{retired}")
 
 
 if __name__ == "__main__":

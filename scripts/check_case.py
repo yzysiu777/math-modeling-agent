@@ -16,12 +16,14 @@ try:
     from .claim_evidence import board_experiment_ids, parse_source_experiment, validate_check_report
     from .check_spec import parse_spec
     from .experiment_board import parse_markdown_table
+    from .ingest import statement_provenance_problem
     from .make_review_packet import _data_roots
 except ImportError:  # pragma: no cover
     from case_paths import reference_violation_code, resolve_in_case
     from claim_evidence import board_experiment_ids, parse_source_experiment, validate_check_report
     from check_spec import parse_spec
     from experiment_board import parse_markdown_table
+    from ingest import statement_provenance_problem
     from make_review_packet import _data_roots
 
 
@@ -67,6 +69,8 @@ RECOMMENDED_ACTION = re.compile(
 OUTPUT_REFERENCE = re.compile(
     r"(?<![A-Za-z0-9_-])(q[1-9][0-9]*/outputs/[A-Za-z0-9_./\-]+)", re.IGNORECASE
 )
+APPROVAL_MATTER = re.compile(r"^[ \t]*-[ \t]*事项[ \t]*[:：][ \t]*(.*)$", re.MULTILINE)
+WAIT_ONLY_MATTER = re.compile(r"官方(?:材料|文字|数据).*冲突|授权扩张|最终提交")
 
 
 @dataclass(frozen=True)
@@ -117,6 +121,54 @@ def _load_checkpoint(case_dir: Path) -> tuple[dict[str, Any] | None, str]:
     except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
         return None, str(exc)
     return (payload, "") if isinstance(payload, dict) else (None, "顶层不是映射")
+
+
+def _markdown_section(text: str, heading: str) -> str:
+    match = re.search(
+        rf"^[ \t]*##[ \t]+{re.escape(heading)}[ \t]*$\n(?P<body>.*?)(?=^[ \t]*##[ \t]+|\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    return match.group("body").strip().strip("`<>") if match else ""
+
+
+def _pending_approval_findings(case_dir: Path, stage: str) -> list[Finding]:
+    directory = case_dir / "队员工作区/待批准"
+    files = sorted(directory.glob("*.md")) if directory.is_dir() else []
+    if not files:
+        return []
+
+    invalid: list[str] = []
+    for path in files:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        action = _markdown_section(text, "不回应的默认动作")
+        if action not in {"按推荐执行", "必须等待"}:
+            invalid.append(f"{path.name} 的不回应默认动作必须是“按推荐执行”或“必须等待”")
+            continue
+        matter = APPROVAL_MATTER.search(text)
+        if action == "必须等待" and (
+            matter is None or WAIT_ONLY_MATTER.search(matter.group(1)) is None
+        ):
+            invalid.append(f"{path.name} 只有官方材料冲突、授权扩张、最终提交可以“必须等待”")
+
+    findings: list[Finding] = []
+    if invalid:
+        findings.append(_finding(
+            "BLOCK", "CHECKPOINT_INVALID", "；".join(invalid), "ORCHESTRATOR", "HUMAN",
+        ))
+    if stage == "final":
+        findings.append(_finding(
+            "BLOCK", "HUMAN_ONLY_BLOCK",
+            f"队员工作区/待批准 中仍有 {len(files)} 项未裁决；最终提交必须等待队员处理",
+            "HUMAN", "HUMAN",
+        ))
+    else:
+        findings.append(_finding(
+            "REMINDER", "PENDING_APPROVAL",
+            f"队员工作区/待批准 中有 {len(files)} 项；普通取舍无回应时按批准单推荐继续",
+            "ORCHESTRATOR", "HUMAN",
+        ))
+    return findings
 
 
 def _question_context(
@@ -364,6 +416,14 @@ def _startup_findings(
                 f"阶段 0 尚未生成：{'、'.join(missing_generated)}；先运行 make ingest",
                 "ORCHESTRATOR", "C1",
             ))
+        statement = case_dir / "input/题面全文.md"
+        if statement.is_file():
+            provenance_problem = statement_provenance_problem(statement)
+            if provenance_problem:
+                findings.append(_finding(
+                    level, "STATEMENT_PROVENANCE_INVALID", provenance_problem,
+                    "ORCHESTRATOR", "C1",
+                ))
 
     work_dir = work_dir or case_dir
     brief = work_dir / "brief.md" if question else case_dir / "case_brief.md"
@@ -430,8 +490,6 @@ def _risk_findings(work_dir: Path, state: Mapping[str, Any], stage: str) -> list
             ))
 
     checks_dir = work_dir / "outputs/checks"
-    if not checks_dir.is_dir():
-        checks_dir = work_dir / "experiments/outputs/checks"
     if not checks_dir.is_dir():
         return findings
     for path in sorted(checks_dir.glob("*.json")):
@@ -539,12 +597,18 @@ def _claim_findings(
             continue
         data_ref = str(row.get("数据文件", "")).strip().strip("`")
         if _has_value(data_ref):
-            data_path = resolve_in_case(case_dir, data_ref, "data", question=row_question)
+            data_path = (
+                resolve_in_case(case_dir, data_ref, "data", question=row_question)
+                if row_question else None
+            )
             if data_path is None:
                 findings.append(_finding("BLOCK", "CLAIM_EVIDENCE_MISSING", f"{claim_id} 的数据文件不可用", "WRITER", "C3"))
         report_ref = str(row.get("复算报告", "")).strip().strip("`")
         if _has_value(report_ref):
-            report_path = resolve_in_case(case_dir, report_ref, "checks", question=row_question)
+            report_path = (
+                resolve_in_case(case_dir, report_ref, "checks", question=row_question)
+                if row_question else None
+            )
             verdict = validate_check_report(report_path, source.exp_id) if report_path else None
             if verdict is None or not verdict.ok or verdict.has_failed_check:
                 problem = verdict.problem if verdict else "路径不在允许的 checks 目录"
@@ -611,6 +675,7 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
     human_block = str(checkpoint.get("human_block", "")).strip()
     if _has_value(human_block):
         findings.append(_finding("BLOCK", "HUMAN_ONLY_BLOCK", human_block, "HUMAN", "HUMAN"))
+    findings.extend(_pending_approval_findings(case_dir, stage))
 
     if question:
         for index, (qname, qdir, state) in enumerate(contexts):

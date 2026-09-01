@@ -7,7 +7,14 @@ from pathlib import Path
 
 from scripts.case_sources import SourceConfigError, load_sources
 from scripts.create_case import create_case
-from scripts.ingest import ExtractedText, _write_statement, excerpt_problem, ingest_case
+from scripts.check_case import check_case
+from scripts.ingest import (
+    ExtractedText,
+    _write_statement,
+    excerpt_problem,
+    ingest_case,
+    statement_provenance_problem,
+)
 from scripts.make_review_packet import build_packet
 
 
@@ -177,6 +184,98 @@ class IngestTests(unittest.TestCase):
             self.assertIn(str(statement.resolve()), card)
             self.assertIn("q1/brief.md", card)
             self.assertNotIn("card_ready: false", card)
+
+    def test_clean_ingest_scout_reports_no_anomaly_without_copying_columns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            case = create_case("case-a", cases_root=root)
+            statement = root / "statement.md"
+            statement.write_text("完整题面" * 100, encoding="utf-8")
+            data = root / "data"
+            question_data = data / "第一题"
+            question_data.mkdir(parents=True)
+            columns = [f"very_long_field_{index}" for index in range(1, 9)]
+            (question_data / "clean.csv").write_text(
+                ",".join(columns) + "\n" + ",".join(str(index) for index in range(8)) + "\n",
+                encoding="utf-8",
+            )
+            write_sources(case, statement, data)
+
+            ingest_case(case)
+
+            inventory = (case / "input/数据清单.md").read_text(encoding="utf-8")
+            scout = (case / "队员工作区/数据踏勘速览.md").read_text(encoding="utf-8")
+            self.assertIn(", ".join(columns), inventory)
+            self.assertIn("未发现异常", scout)
+            self.assertNotIn(", ".join(columns), scout)
+            self.assertIn("文件数：1", scout)
+
+
+class StatementProvenanceTests(unittest.TestCase):
+    @staticmethod
+    def _write(path: Path, body: str, *, source_chars: int, extracted_chars: int) -> None:
+        path.write_text(
+            "> 来源绝对路径：/tmp/statement.md\n"
+            "> 源字节数：1000\n"
+            "> 抽取工具：test\n"
+            f"> 源文本层字符数：{source_chars}\n"
+            f"> 抽取后字符数：{extracted_chars}\n\n"
+            f"{body}\n",
+            encoding="utf-8",
+        )
+
+    def test_missing_provenance_is_rejected_through_ingest_and_case_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            case = create_case("case-a", cases_root=root)
+            statement = root / "statement.md"
+            statement.write_text("完整题面" * 100, encoding="utf-8")
+            data = root / "data"
+            (data / "第一题").mkdir(parents=True)
+            write_sources(case, statement, data)
+            ingest_case(case)
+            (case / "input/题面全文.md").write_text("一句话\n", encoding="utf-8")
+
+            finding = next(
+                item for item in check_case(case, "exploration").findings
+                if item.code == "STATEMENT_PROVENANCE_INVALID"
+            )
+            self.assertEqual(finding.level, "REMINDER")
+            self.assertIn("不是阶段 0 生成", finding.reason)
+
+    def test_complete_provenance_is_accepted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "题面全文.md"
+            body = "完整题面" * 100
+            self._write(path, body, source_chars=len(body), extracted_chars=len(body))
+            self.assertEqual(statement_provenance_problem(path), "")
+
+    def test_body_length_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "题面全文.md"
+            self._write(path, "正文", source_chars=2, extracted_chars=20)
+            self.assertEqual(statement_provenance_problem(path), "题面在阶段 0 之后被改写")
+
+    def test_matching_body_length_is_accepted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "题面全文.md"
+            body = "正文内容"
+            self._write(path, body, source_chars=len(body), extracted_chars=len(body))
+            self.assertEqual(statement_provenance_problem(path), "")
+
+    def test_excerpt_ratio_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "题面全文.md"
+            body = "短" * 100
+            self._write(path, body, source_chars=1000, extracted_chars=len(body))
+            self.assertIn("题面疑似摘录", statement_provenance_problem(path))
+
+    def test_adequate_ratio_is_accepted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "题面全文.md"
+            body = "足" * 600
+            self._write(path, body, source_chars=1000, extracted_chars=len(body))
+            self.assertEqual(statement_provenance_problem(path), "")
 
 
 if __name__ == "__main__":

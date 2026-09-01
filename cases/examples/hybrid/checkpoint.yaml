@@ -1,15 +1,16 @@
 # 轻量进度提示；演示案例的路由已由演示队员确认。
 case_id: hybrid
-stage: 4
-route:
-  value: hybrid
-  decided_by: modeler
-  confirmed_by_human: true
-  note: 上下游接口与目标由 case_brief.md 给出；service_level 仍是 Full SPEC 的显式遗留假设
-reviews: {C1: pending, C2: pending, C3: pending}
+current_question: q1
+questions:
+  q1:
+    step: C
+    status: completed
+    route:
+      value: hybrid
+      decided_by: modeler
+      confirmed_by_human: true
+      note: 点预测路线为 Champion，情景路线为 Challenger
+    reviews: {C1: pending, C2: optional}
+    deterministic_risks: {infeasible: false, objective_mismatch: false, leakage: false, split_overlap: false}
+reviews: {C3: pending}
 human_block: ""
-deterministic_risks:
-  infeasible: false
-  objective_mismatch: false
-  leakage: false
-  split_overlap: false

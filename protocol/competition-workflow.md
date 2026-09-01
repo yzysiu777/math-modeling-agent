@@ -9,7 +9,9 @@
 转写完整题面并记录来源行，扫描数据根和父目录的说明文件，列出每个数据文件的大小、行数、
 完整列名、编码和缺测候选值，再按 `questions` 与 `shared` 生成每题白名单。
 
-阶段 0 不复制原始数据。无内嵌表头的格式必须结合转写说明核对，不能静默省略列。
+阶段 0 不复制原始数据。无内嵌表头的格式必须结合转写说明核对，不能静默省略列。阶段 0
+结束时生成 `队员工作区/数据踏勘速览.md`，只列需人工判断的异常，并由 Orchestrator 覆盖更新
+`现在做什么.md`；不得复制数据清单正文。
 
 ## A 定题（不超过 2 小时）
 
@@ -18,13 +20,15 @@
 主要风险七维度比较；选择 Champion/Challenger 与路由。
 
 C1 每题必做。A 结束必须完成本题 C1。Reviewer 先读原始题面与说明，再读 brief；卡中有节点决定且写明推荐
-路由，即完成路由确认，无需第二次签字。
+路由，即完成路由确认，无需第二次签字。A 结束时 Orchestrator 更新 `现在做什么.md`；需要
+队员裁决则新建文件名含 `Q<k>-A` 的批准单，并同步其中的待批准指针，不建立题或步骤子目录。
 
 ## B 试跑（不超过 2 小时）
 
 Modeler 在 `q<k>/board.md` 写 2–3 行便宜 Probe：先填假设、判据、范围、预算，再运行并写
 PASS/FAIL。只为进入正式实现的路线写一份五段 Full SPEC。B 结束时至少一条 Champion Probe
-为 done+PASS，且 `make spec-check` 通过。
+为 done+PASS，且 `make spec-check` 通过。B 结束时 Orchestrator 更新 `现在做什么.md` 和
+`审核卡索引.md`；索引只写卡片路径、节点决定与一句话结论，不复制 finding 正文。
 
 ## C 出结果（不超过 4 小时）
 
@@ -37,18 +41,21 @@ C2 仅在以下任一条件成立时阻断 `model_selection`：
 2. 同一路线至少出现两行 `status=failed`；
 3. Full SPEC 的 `probe_result` 为 `WAIVED` 或 `PENDING`。
 
-全假时检查器输出 REMINDER，并要求在 `q<k>/log.md` 记一行跳过理由。
+全假时检查器输出 REMINDER，并要求在 `q<k>/log.md` 记一行跳过理由。C 结束时 Orchestrator
+覆盖更新 `现在做什么.md`，只链接 board、SPEC 和 outputs，不转写内容。
 
 ## D 写本题（不超过 2 小时）
 
 Writer 只从 Full SPEC、board、outputs 与复算报告写 `paper/sections/q<k>.tex`，并在全案例
 `paper/claim_map.md` 增加本题关键 Claim。普通表格由数据生成，不逐数登记。证据不足时降低
-“最优”“因果”等表述强度。
+“最优”“因果”等表述强度。D 结束时 Orchestrator 覆盖更新 `现在做什么.md`，只登记本题
+章节和 Claim 路径。
 
 ## E 全案例收官
 
 全部子问题完成后只做一次 C3，从 claim map 抽查 3–5 条最高风险强结论。随后统一核数、术语、
 图表、引用、匿名、官方格式和 PDF，运行 `make final-check`。最终文件确认与实际提交必须等待队员。
+E 结束时 Orchestrator 更新 `现在做什么.md` 与 C3 索引；最终提交批准单必须使用“必须等待”。
 
 ## STAGE 对照
 
@@ -72,6 +79,9 @@ Writer 只从 Full SPEC、board、outputs 与复算报告写 `paper/sections/q<k
 
 Reviewer 仍保持新会话、最小审核包、先读原始证据、方法论不同和反例任务；不修改主解、不启动
 其他 Agent、C3 不代写论文。`Human-only block` 只限官方材料硬冲突、授权范围扩张、最终提交。
+
+`队员工作区/待批准/` 的普通取舍必须写“按推荐执行”，无回应时继续；只有上述三类人工专属
+边界可写“必须等待”。`final` 前仍有待批准项时复用 `HUMAN_ONLY_BLOCK` 阻断。
 
 ## 每题日志与回报
 

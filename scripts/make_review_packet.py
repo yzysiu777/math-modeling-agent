@@ -224,15 +224,15 @@ def _node_materials(
         for path, label in (
             (case_dir / "paper/claim_map.md", "关键 Claim"),
             (case_dir / "experiments/board.md", "实验板"),
-            (case_dir / "experiments/outputs/figures/manifest.md", "图表清单"),
+            (case_dir / "outputs/figures/manifest.md", "图表清单"),
         ):
             if path.is_file():
                 materials.append((label, _relative_or_absolute(path, case_dir)))
             else:
                 missing.append(f"{_relative_or_absolute(path, case_dir)} 不存在")
         for directory, label in (
-            (case_dir / "experiments/outputs/data", "结果数据"),
-            (case_dir / "experiments/outputs/checks", "复算报告"),
+            (case_dir / "outputs/data", "结果数据"),
+            (case_dir / "outputs/checks", "复算报告"),
         ):
             for path in sorted(directory.glob("*")):
                 if path.is_file() and path.name != "README.md":
@@ -338,6 +338,28 @@ def _unique_target(directory: Path, node: str) -> tuple[Path, str]:
     return target, review_id
 
 
+def _append_review_index(
+    case_dir: Path, target: Path, node: str, question: str | None
+) -> bool:
+    """Append pointer metadata only; never copy review-card content."""
+
+    index = case_dir / "队员工作区/审核卡索引.md"
+    if not index.is_file():
+        return False
+    try:
+        pointer = target.resolve().relative_to(case_dir.resolve()).as_posix()
+    except ValueError:
+        pointer = str(target.resolve())
+    scope = "全案例" if node == "C3" else (question or "未指定").upper()
+    row = (
+        f"| {node} | {scope} | `{pointer}` | "
+        "待 Reviewer 填写 | 待 Reviewer 填写 | 否 |\n"
+    )
+    with index.open("a", encoding="utf-8") as handle:
+        handle.write(row)
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="generate one compact review card")
     parser.add_argument("--case-dir", type=Path, required=True)
@@ -363,7 +385,11 @@ def main() -> int:
     target.parent.mkdir(parents=True, exist_ok=True)
     card = build_packet(args.case_dir, args.node, review_id, args.question)
     target.write_text(card, encoding="utf-8")
+    question = args.question or _active_question(args.case_dir)
+    indexed = _append_review_index(args.case_dir, target, args.node, question)
     print(f"WROTE {target}")
+    if indexed:
+        print(f"INDEXED {args.case_dir / '队员工作区/审核卡索引.md'}")
     print(f"SIZE {len(card.encode('utf-8'))} bytes")
     if "card_ready: false" in card:
         print("注意：材料不完整，先补齐再交给 Reviewer。")

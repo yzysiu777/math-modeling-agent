@@ -1,15 +1,16 @@
 # 轻量进度提示；演示案例的路由已由演示队员确认。
 case_id: optimization
-stage: 4
-route:
-  value: optimization
-  decided_by: modeler
-  confirmed_by_human: true
-  note: 题意由 case_brief.md 给出，无会改变演示路线的歧义
-reviews: {C1: pending, C2: pending, C3: pending}
+current_question: q1
+questions:
+  q1:
+    step: C
+    status: completed
+    route:
+      value: optimization
+      decided_by: modeler
+      confirmed_by_human: true
+      note: 小实例以精确枚举为 Champion，贪心为 Challenger
+    reviews: {C1: pending, C2: optional}
+    deterministic_risks: {infeasible: false, objective_mismatch: false, leakage: false, split_overlap: false}
+reviews: {C3: pending}
 human_block: ""
-deterministic_risks:
-  infeasible: false
-  objective_mismatch: false
-  leakage: false
-  split_overlap: false

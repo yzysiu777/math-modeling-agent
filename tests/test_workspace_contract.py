@@ -62,6 +62,14 @@ class WorkspaceContractTests(unittest.TestCase):
             self.assertIn("人工启动", text)
         self.assertIn("不调用任务工具", orchestrator)
 
+    def test_teammate_notes_are_on_the_orchestrator_prohibited_write_list(self):
+        orchestrator = (ROOT / "prompts/orchestrator.md").read_text(encoding="utf-8")
+        collaboration = (ROOT / "protocol/team-collaboration.md").read_text(encoding="utf-8")
+        for text in (orchestrator, collaboration):
+            self.assertIn("我的笔记.md", text)
+            self.assertIn("只读", text)
+            self.assertIn("不得修改", text)
+
     def test_retired_probe_and_comparison_templates_are_absent(self):
         for relative in (
             "templates/spec_probe.md", "templates/model_comparison.md", "templates/model_candidate.md",

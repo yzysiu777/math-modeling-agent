@@ -25,7 +25,8 @@ REQUIRED_FILES = (
     "README.md", "AGENTS.md", "agent.md", "REVIEWER.md", "Makefile",
     "protocol/competition-workflow.md", "templates/checkpoint.yaml",
     "templates/experiment_board.md", "templates/independent_review_packet.md",
-    "templates/spec.md", "scripts/create_case.py",
+    "templates/spec.md", "templates/现在做什么.md", "templates/批准单.md",
+    "templates/审核卡索引.md", "templates/我的笔记.md", "scripts/create_case.py",
     "scripts/case_sources.py", "scripts/ingest.py", "scripts/check_case.py",
     "scripts/check_spec.py", "scripts/make_review_packet.py",
     "prompts/modeler.md", "prompts/engineer.md", "prompts/writer.md",
@@ -102,8 +103,8 @@ def validate_static_contract() -> List[str]:
             if marker not in text:
                 errors.append(f"startup template missing question slot {marker}: {path.relative_to(ROOT)}")
     for route in ("optimization", "data-analysis", "hybrid"):
-        board = ROOT / f"cases/examples/{route}/experiments/board.md"
-        candidates = ROOT / f"cases/examples/{route}/models/candidates.md"
+        board = ROOT / f"cases/examples/{route}/q1/board.md"
+        candidates = ROOT / f"cases/examples/{route}/q1/brief.md"
         errors.extend(f"{board}: {error}" for error in validate_experiment_board(board))
         errors.extend(f"{candidates}: {error}" for error in validate_candidate_pool(candidates))
         errors.extend(
@@ -111,8 +112,9 @@ def validate_static_contract() -> List[str]:
             for error in validate_case_specs(ROOT / f"cases/examples/{route}")
         )
         legacy_files = [
-            ROOT / f"cases/examples/{route}/models/comparison.md",
-            *sorted((ROOT / f"cases/examples/{route}/specs").glob("*-probe.md")),
+            ROOT / f"cases/examples/{route}/case_brief.md",
+            ROOT / f"cases/examples/{route}/models",
+            ROOT / f"cases/examples/{route}/experiments",
         ]
         errors.extend(
             f"retired lightweight-example file is still active: {path.relative_to(ROOT)}"

@@ -1,15 +1,16 @@
 # 轻量进度提示；演示案例的路由已由演示队员确认。
 case_id: data-analysis
-stage: 4
-route:
-  value: data_analysis
-  decided_by: modeler
-  confirmed_by_human: true
-  note: 切分规则与指标由 case_brief.md 给出，无会改变演示路线的歧义
-reviews: {C1: pending, C2: pending, C3: pending}
+current_question: q1
+questions:
+  q1:
+    step: C
+    status: completed
+    route:
+      value: data_analysis
+      decided_by: modeler
+      confirmed_by_human: true
+      note: 固定时间切分下以线性回归为 Champion
+    reviews: {C1: pending, C2: optional}
+    deterministic_risks: {infeasible: false, objective_mismatch: false, leakage: false, split_overlap: false}
+reviews: {C3: pending}
 human_block: ""
-deterministic_risks:
-  infeasible: false
-  objective_mismatch: false
-  leakage: false
-  split_overlap: false

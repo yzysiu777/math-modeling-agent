@@ -53,6 +53,12 @@ class CasePathTests(unittest.TestCase):
             self.assertIsNone(resolve_in_case(case, "outputs/data/x.csv", "checks", question="q2"))
             self.assertIsNone(resolve_in_case(case, "../q1/outputs/data/x.csv", "data", question="q2"))
 
+    def test_evidence_kind_requires_question(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case = self._case(Path(tmp))
+            with self.assertRaisesRegex(ValueError, "question is required"):
+                resolve_in_case(case, "outputs/data/x.csv", "data")
+
 
 if __name__ == "__main__":
     unittest.main()

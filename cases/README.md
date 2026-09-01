@@ -12,6 +12,7 @@ cases/<case_id>/
 ├── checkpoint.yaml
 ├── decisions.md
 ├── input/{题面全文.md,数据清单.md,说明文档/}
+├── 队员工作区/{现在做什么.md,数据踏勘速览.md,审核卡索引.md,我的笔记.md,待批准/,已批准/,启动提示词/}
 ├── q1/ q2/ q3/
 │   ├── brief.md
 │   ├── 数据范围.md
@@ -30,12 +31,15 @@ cases/<case_id>/
 make ingest CASE=cases/<case_id>
 ```
 
-阶段 0 生成题面来源行、说明文档登记、完整数据清单和每题白名单。原始数据保持原位只读。
+阶段 0 生成题面来源行、说明文档登记、完整数据清单、只列异常的 `数据踏勘速览.md` 和每题
+白名单。原始数据保持原位只读。
 
 ## 写入者与依赖方向
 
 Modeler 写本题 brief/board/specs；Engineer 写本题 code/outputs；Writer 写本题章节与共享 claim map；
-Orchestrator 写 checkpoint 和审核卡。`q<k>` 只可使用 `q<j>/outputs/` 且 `j < k`。
+Orchestrator 写 checkpoint、审核卡和 `队员工作区/`；`我的笔记.md` 是唯一例外，AI 只读。
+队员工作区不复制 brief、board、SPEC 或审核卡正文，也不按题或步骤建子目录。`q<k>` 只可
+使用 `q<j>/outputs/` 且 `j < k`。
 
 每题 log 是唯一过程记录，每步追加“做了什么 / 产物路径 / 风险 / 下一步”。不建七份阶段报告。
 

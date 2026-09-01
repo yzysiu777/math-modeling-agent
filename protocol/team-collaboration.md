@@ -1,16 +1,22 @@
 # 案例团队协作
 
 一个案例装整道题。`sources.yaml`、`input/`、`checkpoint.yaml`、`decisions.md` 和 `paper/` 是共享
-层；每天工作的硬范围是一个 `q<k>/`。同一时刻一份文件只有一个写入者。
+层；每天工作的硬范围是一个 `q<k>/`。同一时刻一份文件只有一个写入者。`队员工作区/` 由
+Orchestrator 独占写入，唯一例外 `队员工作区/我的笔记.md` 属于队员，所有 AI 只读，不得修改、
+重排或整理。
 
 ## 文件分工
 
-- Orchestrator：`sources.yaml` 协助、阶段 0、`checkpoint.yaml`、审核卡；
+- Orchestrator：`sources.yaml` 协助、阶段 0、`checkpoint.yaml`、审核卡及队员工作区指针；
 - Modeler：当前题 `brief.md`、`board.md`、`specs/`；
 - Engineer：当前题 `code/`、`outputs/` 与 board 结果；
 - Writer：`paper/sections/q<k>.tex` 与共享 `paper/claim_map.md`；
 - Reviewer：只写本题 C1/C2 卡或共享 C3 卡，不改主解；
 - 队员：人工专属 `decisions.md` 与最终提交。
+
+队员工作区只放当前状态、原文件指针、批准所需的一句话上下文和审核卡索引，不复制 brief、
+board、SPEC、审核卡正文。其下只允许固定的 `待批准/`、`已批准/`、`启动提示词/` 目录；题号与
+步骤写进文件名，不再建子目录。
 
 `q<k>` 可读取 `q<j>/outputs/` 当且仅当 `j < k`。任何后题到前题的反向依赖都必须消除，不能
 靠口头承诺。原始数据按阶段 0 生成的本题白名单只读。

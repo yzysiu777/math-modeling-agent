@@ -35,16 +35,6 @@ EVIDENCE_ROOTS = {
     "outputs": "outputs",
 }
 
-# Kept only for callers that omit ``question`` while existing example cases are
-# migrated.  New case code must always pass the active question.
-LEGACY_EVIDENCE_ROOTS = {
-    "data": "experiments/outputs/data",
-    "checks": "experiments/outputs/checks",
-    "figures": "experiments/outputs/figures",
-    "outputs": "experiments/outputs",
-}
-
-
 def clean_reference(reference: str) -> str:
     """Strip Markdown decoration from a reference cell."""
 
@@ -124,12 +114,15 @@ def resolve_in_case(
 ) -> Optional[Path]:
     """Return the real file a reference points at, or ``None`` if it is not allowed.
 
-    ``kind`` restricts the answer to one of :data:`EVIDENCE_ROOTS`.  With a
-    ``question``, unprefixed references are resolved below that question and an
-    explicit later-question prefix is rejected.  Call
+    ``kind`` restricts the answer to one of :data:`EVIDENCE_ROOTS` and therefore
+    requires ``question``.  Unprefixed references are resolved below that
+    question and an explicit later-question prefix is rejected.  Call
     :func:`reference_violation_code` when a caller needs the stable diagnostic
     code for a rejected dependency.
     """
+
+    if kind is not None and question is None:
+        raise ValueError("question is required for evidence resolution")
 
     cleaned = clean_reference(reference)
     if not cleaned or is_traversal(cleaned):
@@ -152,8 +145,7 @@ def resolve_in_case(
     scope_root = case_root / target_question if target_question else case_root
     allowed_root = case_root
     if kind is not None:
-        roots = EVIDENCE_ROOTS if question_name is not None else LEGACY_EVIDENCE_ROOTS
-        relative = roots.get(kind)
+        relative = EVIDENCE_ROOTS.get(kind)
         if relative is None:
             return None
         try:
@@ -164,8 +156,7 @@ def resolve_in_case(
     candidates = [scope_root / base / relative_reference if base else scope_root / relative_reference
                   for base in search_bases]
     if kind is not None:
-        roots = EVIDENCE_ROOTS if question_name is not None else LEGACY_EVIDENCE_ROOTS
-        candidates.insert(0, scope_root / roots[kind] / relative_reference.name)
+        candidates.insert(0, scope_root / EVIDENCE_ROOTS[kind] / relative_reference.name)
 
     for candidate in candidates:
         try:

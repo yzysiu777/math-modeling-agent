@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from scripts.check_case import check_case
+from scripts.create_case import create_case
 
 
 QUESTION_BOARD = """| 实验 ID | 路线 | 类型 | 要回答的问题/显式假设 | 预设判据 | 数据/实例范围 | 预算 | status | 结果与判定 | 是否继续 | 下一步 |
@@ -91,7 +92,7 @@ def question_review(case: Path, route: str | None = "optimization", body: str = 
 
 def make_case(root: Path, case_id: str = "case-a", *, complete_startup: bool = True) -> Path:
     case = root / case_id
-    for relative in ("input", "reviews", "models", "experiments/outputs/checks", "paper"):
+    for relative in ("input", "reviews", "models", "outputs/checks", "paper"):
         (case / relative).mkdir(parents=True, exist_ok=True)
     (case / "checkpoint.yaml").write_text(
         f"""case_id: {case_id}
@@ -132,6 +133,70 @@ Reviewer sign-back: {signback}
 
 
 class CaseCheckTests(unittest.TestCase):
+    @staticmethod
+    def _approval(path: Path, matter: str, action: str) -> None:
+        path.write_text(
+            "# 批准单：test\n\n"
+            f"- 事项：{matter}\n\n"
+            "## 唯一推荐\n\n继续推荐动作\n\n"
+            f"## 不回应的默认动作\n\n{action}\n",
+            encoding="utf-8",
+        )
+
+    def test_pending_approvals_remind_early_and_reuse_human_block_at_final(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case = create_case("case-a", cases_root=Path(tmp), questions=3)
+            pending = case / "队员工作区/待批准"
+            self._approval(pending / "Q1-A-路线.md", "确定路线", "按推荐执行")
+            self._approval(pending / "E-最终提交.md", "最终提交", "必须等待")
+
+            for stage in ("exploration", "model_selection", "paper_claims"):
+                finding = next(
+                    item for item in check_case(case, stage).findings
+                    if item.code == "PENDING_APPROVAL"
+                )
+                self.assertEqual(finding.level, "REMINDER")
+                self.assertIn("2 项", finding.reason)
+            final_codes = [item.code for item in check_case(case, "final").findings]
+            self.assertIn("HUMAN_ONLY_BLOCK", final_codes)
+            self.assertNotIn("PENDING_APPROVAL", final_codes)
+
+            for path in pending.glob("*.md"):
+                path.unlink()
+            final_human_blocks = [
+                item for item in check_case(case, "final").findings
+                if item.code == "HUMAN_ONLY_BLOCK"
+            ]
+            self.assertEqual(final_human_blocks, [])
+
+    def test_approval_rejects_a_third_default_action(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case = create_case("case-a", cases_root=Path(tmp))
+            self._approval(
+                case / "队员工作区/待批准/Q1-A-路线.md",
+                "确定路线",
+                "等队员有空再说",
+            )
+            finding = next(
+                item for item in check_case(case, "exploration").findings
+                if item.code == "CHECKPOINT_INVALID"
+            )
+            self.assertIn("必须是", finding.reason)
+
+    def test_must_wait_is_rejected_for_an_ordinary_tradeoff(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case = create_case("case-a", cases_root=Path(tmp))
+            self._approval(
+                case / "队员工作区/待批准/Q1-C-champion.md",
+                "选择 Champion",
+                "必须等待",
+            )
+            finding = next(
+                item for item in check_case(case, "exploration").findings
+                if item.code == "CHECKPOINT_INVALID"
+            )
+            self.assertIn("只有官方材料冲突", finding.reason)
+
     def test_exploration_moves_without_reviews(self):
         with tempfile.TemporaryDirectory() as tmp:
             report = check_case(make_case(Path(tmp)), "exploration")

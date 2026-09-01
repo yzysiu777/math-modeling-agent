@@ -24,6 +24,8 @@ STATEMENT_SUFFIXES = DOCUMENT_SUFFIXES | {".md", ".txt"}
 TEXT_DATA_SUFFIXES = {".csv", ".tsv", ".txt"}
 DOC_TEXT_HINT = re.compile(r"说明|格式|字段|字典|指南|手册|readme|guide|manual|spec", re.IGNORECASE)
 MISSING_TOKENS = {"", "na", "n/a", "nan", "null", "none", "-9999", "9999", "9999.0", "/"}
+PROVENANCE_LINE = re.compile(r"^> (?P<label>[^：]+)：(?P<value>.*)$")
+REQUIRED_PROVENANCE = ("来源绝对路径", "源文本层字符数", "抽取后字符数")
 
 
 @dataclass(frozen=True)
@@ -33,6 +35,18 @@ class ExtractedText:
     source_bytes: int
     source_text_chars: int
     sources: tuple[Path, ...]
+
+
+@dataclass(frozen=True)
+class DataObservation:
+    root: Path
+    path: Path
+    relative: Path
+    size: int
+    row_count: int | str
+    columns: str
+    encoding: str
+    missing: str
 
 
 def _decode(data: bytes) -> tuple[str, str]:
@@ -123,6 +137,41 @@ def excerpt_problem(source_text_chars: int, extracted_chars: int) -> str:
     return ""
 
 
+def statement_provenance_problem(path: Path) -> str:
+    """题面文件不可信时返回一句话原因，可信时返回空串。"""
+
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return "题面不是阶段 0 生成的，无法确认是全文而非摘录"
+
+    lines = text.splitlines()
+    provenance: dict[str, str] = {}
+    body_start = 0
+    for index, line in enumerate(lines):
+        match = PROVENANCE_LINE.fullmatch(line)
+        if match is None:
+            body_start = index
+            break
+        provenance[match.group("label").strip()] = match.group("value").strip()
+    else:
+        body_start = len(lines)
+
+    if any(not provenance.get(label) for label in REQUIRED_PROVENANCE):
+        return "题面不是阶段 0 生成的，无法确认是全文而非摘录"
+    try:
+        source_chars = int(provenance["源文本层字符数"])
+        declared_chars = int(provenance["抽取后字符数"])
+    except ValueError:
+        return "题面不是阶段 0 生成的，无法确认是全文而非摘录"
+
+    body = "\n".join(lines[body_start:]).lstrip("\n").rstrip()
+    actual_chars = len(body)
+    if declared_chars != actual_chars:
+        return "题面在阶段 0 之后被改写"
+    return excerpt_problem(source_chars, actual_chars)
+
+
 def _write_statement(case_dir: Path, extracted: ExtractedText) -> Path:
     problem = excerpt_problem(extracted.source_text_chars, len(extracted.text))
     if problem:
@@ -171,10 +220,11 @@ def _safe_doc_name(path: Path, used: set[str]) -> str:
     return name
 
 
-def _write_docs(case_dir: Path, docs: Iterable[Path]) -> list[str]:
+def _write_docs(case_dir: Path, docs: Iterable[Path]) -> tuple[list[str], list[Path]]:
     directory = case_dir / "input/说明文档"
     directory.mkdir(parents=True, exist_ok=True)
     texts: list[str] = []
+    untranscribed: list[Path] = []
     used: set[str] = set()
     for source in docs:
         target = directory / _safe_doc_name(source, used)
@@ -186,12 +236,13 @@ def _write_docs(case_dir: Path, docs: Iterable[Path]) -> list[str]:
             )
             texts.append(text)
         except Exception as exc:  # noqa: BLE001
+            untranscribed.append(source.resolve())
             body = (
                 f"> 原路径：{source.resolve()}\n\n"
                 f"**未转写，需人工打开**：{exc}\n"
             )
         target.write_text(body, encoding="utf-8")
-    return texts
+    return texts, untranscribed
 
 
 def _count_lines(path: Path) -> int:
@@ -235,7 +286,12 @@ def _columns_and_missing(path: Path) -> tuple[str, str, str]:
             columns.append(f"record_marker={marker}")
     values = re.split(r"[,;\t|\s]+", "\n".join(lines[:200]).casefold())
     missing = sorted({value for value in values if value in MISSING_TOKENS})
-    return "[" + ", ".join(columns) + "]", encoding, ", ".join(missing) if missing else "未发现"
+    rendered_missing = ["<空字符串>" if value == "" else value for value in missing]
+    return (
+        "[" + ", ".join(columns) + "]",
+        encoding,
+        ", ".join(rendered_missing) if rendered_missing else "未发现",
+    )
 
 
 def _xlsx_profile(path: Path) -> tuple[str, str, str, str]:
@@ -288,7 +344,10 @@ def _xlsx_profile(path: Path) -> tuple[str, str, str, str]:
                 if not header and any(value.strip() for value in values):
                     header = values
             summaries.append(f"{name}=[{', '.join(header)}]")
-    missing = ", ".join(sorted(missing_values)) if missing_values else "未发现"
+    missing = (
+        ", ".join("<空字符串>" if value == "" else value for value in sorted(missing_values))
+        if missing_values else "未发现"
+    )
     return "; ".join(summaries), "; ".join(row_counts), "xlsx/xml", missing
 
 
@@ -322,7 +381,9 @@ def _field_declarations(doc_texts: Iterable[str]) -> list[str]:
     return list(dict.fromkeys(found))
 
 
-def _write_inventory(case_dir: Path, sources: CaseSources, doc_texts: list[str]) -> Path:
+def _write_inventory(
+    case_dir: Path, sources: CaseSources, doc_texts: list[str]
+) -> tuple[Path, list[DataObservation]]:
     lines = [
         "# 数据清单",
         "",
@@ -331,6 +392,7 @@ def _write_inventory(case_dir: Path, sources: CaseSources, doc_texts: list[str])
         "| 数据根 | 相对路径 | 字节数 | 行数 | 列名全量 | 编码 | 缺测标记候选值 |",
         "|---|---|---:|---:|---|---|---|",
     ]
+    observations: list[DataObservation] = []
     for root, path in _data_files(sources):
         relative = path.relative_to(root)
         if path.suffix.casefold() == ".xlsx":
@@ -345,12 +407,110 @@ def _write_inventory(case_dir: Path, sources: CaseSources, doc_texts: list[str])
             root.name, relative, path.stat().st_size, row_count, columns, encoding, missing
         )
         lines.append("| " + " | ".join(_markdown_cell(cell) for cell in cells) + " |")
+        observations.append(DataObservation(
+            root=root,
+            path=path.resolve(),
+            relative=relative,
+            size=path.stat().st_size,
+            row_count=row_count,
+            columns=columns,
+            encoding=encoding,
+            missing=missing,
+        ))
     declarations = _field_declarations(doc_texts)
     lines.extend(["", "## 说明文档中的字段声明", ""])
     lines.extend(f"- {item}" for item in declarations)
     if not declarations:
         lines.append("- 未自动识别；请打开 `input/说明文档/` 核对无表头记录。")
     target = case_dir / "input/数据清单.md"
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return target, observations
+
+
+def _duplicate_columns(columns: str) -> bool:
+    """Detect repeated header labels without copying those labels to the scout."""
+
+    groups = re.findall(r"\[([^\]]*)\]", columns)
+    for group in groups:
+        names = [item.strip().casefold() for item in group.split(",")]
+        names = [item for item in names if item and not item.startswith("record_marker=")]
+        if len(names) != len(set(names)):
+            return True
+    return False
+
+
+def _zero_rows(value: int | str) -> bool:
+    if isinstance(value, int):
+        return value == 0
+    counts = [int(item) for item in re.findall(r"(?:^|=)([0-9]+)(?:$|;)", value)]
+    return bool(counts) and any(item == 0 for item in counts)
+
+
+def _scope_label(observation: DataObservation, sources: CaseSources) -> str:
+    relative = observation.relative.as_posix().strip("/")
+    for question, scope in sources.questions.items():
+        normalized = scope.strip("/")
+        if relative == normalized or relative.startswith(f"{normalized}/"):
+            return question.upper()
+    for scope in sources.shared:
+        normalized = scope.strip("/")
+        if relative == normalized or relative.startswith(f"{normalized}/"):
+            return "共享"
+    return "未映射"
+
+
+def _write_scout(
+    case_dir: Path,
+    sources: CaseSources,
+    observations: list[DataObservation],
+    untranscribed: list[Path],
+) -> Path:
+    """Write human-decision anomalies only; never mirror the data inventory."""
+
+    issues: list[str] = []
+    for path in untranscribed:
+        issues.append(f"- 未能转写：`{path}` —— 需人工打开")
+    for item in observations:
+        location = f"`{item.path}`"
+        if item.encoding not in {"utf-8", "utf-8-sig", "xlsx/xml", "n/a"}:
+            issues.append(f"- 非 UTF-8 编码：{location} —— {item.encoding}")
+        if item.size == 0 or _zero_rows(item.row_count):
+            issues.append(f"- 空文件或零行文件：{location}")
+        if _duplicate_columns(item.columns):
+            issues.append(f"- 列名重复：{location} —— 需人工确认字段语义")
+        if "col_" in item.columns:
+            issues.append(f"- 疑似无表头：{location} —— 需结合说明文档确认字段")
+        if item.missing not in {"", "未发现", "n/a", "空文件"}:
+            issues.append(f"- 缺测标记候选值：{item.missing} —— {location}")
+
+    distribution: dict[str, int] = {}
+    for item in observations:
+        label = _scope_label(item, sources)
+        distribution[label] = distribution.get(label, 0) + 1
+    distribution_text = "、".join(
+        f"{label} {count} 个" for label, count in sorted(distribution.items())
+    ) or "无数据文件"
+    total_size = sum(item.size for item in observations)
+    lines = [
+        "# 数据踏勘速览",
+        "",
+        "> 本文件由阶段 0 生成，只列需要队员判断的异常；完整清单见 `input/数据清单.md`。",
+        "",
+        "## 需要人工判断",
+        "",
+    ]
+    if issues:
+        lines.extend(issues)
+    else:
+        lines.append("未发现异常：未发现需要人工判断的异常。")
+    lines.extend([
+        "",
+        "## 总计",
+        "",
+        f"- 文件数：{len(observations)}；总大小：{total_size} 字节；按题分布：{distribution_text}。",
+    ])
+    target = case_dir / "队员工作区/数据踏勘速览.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return target
 
@@ -384,9 +544,10 @@ def _write_scopes(case_dir: Path, sources: CaseSources) -> list[Path]:
 def ingest_case(case_dir: Path) -> list[Path]:
     sources = load_sources(case_dir)
     statement = _write_statement(case_dir, _extract_statement(sources.statement))
-    doc_texts = _write_docs(case_dir, _auto_docs(sources))
-    inventory = _write_inventory(case_dir, sources, doc_texts)
-    return [statement, inventory, *_write_scopes(case_dir, sources)]
+    doc_texts, untranscribed = _write_docs(case_dir, _auto_docs(sources))
+    inventory, observations = _write_inventory(case_dir, sources, doc_texts)
+    scout = _write_scout(case_dir, sources, observations, untranscribed)
+    return [statement, inventory, scout, *_write_scopes(case_dir, sources)]
 
 
 def main() -> int:

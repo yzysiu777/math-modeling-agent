@@ -11,7 +11,8 @@ python3 -m venv .venv
 .venv/bin/python scripts/create_case.py --case-id contest-a --questions 3
 ```
 
-新案例初始 15 个文件，没有七份空阶段报告。先编辑 `cases/contest-a/sources.yaml`：
+新案例初始 18 个文件，没有七份空阶段报告；增加的三份是队员入口，数量不随题数增长。先编辑
+`cases/contest-a/sources.yaml`：
 
 ```yaml
 statement: /absolute/path/to/problem.pdf
@@ -35,7 +36,8 @@ make ingest CASE=cases/contest-a
 ```
 
 它一次性生成带来源行的 `input/题面全文.md`、完整列名与缺测候选的 `input/数据清单.md`、
-`input/说明文档/`，以及每题 `q<k>/数据范围.md`。路径缺失、相对、不可读或题数不一致时直接失败。
+`input/说明文档/`、只列需人工判断异常的 `队员工作区/数据踏勘速览.md`，以及每题
+`q<k>/数据范围.md`。路径缺失、相对、不可读或题数不一致时直接失败。
 
 ## 目录
 
@@ -45,6 +47,7 @@ cases/<case_id>/
 ├── checkpoint.yaml
 ├── decisions.md
 ├── input/{题面全文.md,数据清单.md,说明文档/}
+├── 队员工作区/{现在做什么.md,数据踏勘速览.md,审核卡索引.md,我的笔记.md,待批准/,已批准/,启动提示词/}
 ├── q1/ q2/ q3/
 │   ├── brief.md
 │   ├── 数据范围.md
@@ -82,6 +85,9 @@ make review-packet CASE=cases/contest-a NODE=C1 QUESTION=q1
 C1 每题必做；C2 由检查器按 Probe/失败/SPEC 状态触发；C3 全案例一次。审核者必须给唯一推荐
 动作，生产角色默认执行，队员可否决。审核者保持新会话、最小材料、不同方法和反例任务，
 provider/model 如实填写。
+
+队员只需从 `队员工作区/现在做什么.md` 进入。该目录只保存指针和决策所需的最小上下文，
+不复制 brief、board、SPEC 或审核卡正文；`我的笔记.md` 只由队员写。
 
 ## 常用命令
 

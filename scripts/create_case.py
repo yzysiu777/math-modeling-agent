@@ -95,7 +95,10 @@ def create_case(
     if case_dir.exists():
         raise FileExistsError(f"case already exists: {case_dir}")
 
-    for relative in ("input/说明文档", "paper/reviews", "paper/sections"):
+    for relative in (
+        "input/说明文档", "paper/reviews", "paper/sections",
+        "队员工作区/待批准", "队员工作区/已批准", "队员工作区/启动提示词",
+    ):
         (case_dir / relative).mkdir(parents=True, exist_ok=True)
     for index in range(1, questions + 1):
         question = f"q{index}"
@@ -131,6 +134,11 @@ def create_case(
     (case_dir / "paper/claim_map.md").write_text(
         (TEMPLATES / "claim_map.md").read_text(encoding="utf-8"), encoding="utf-8"
     )
+    for name in ("现在做什么.md", "审核卡索引.md", "我的笔记.md"):
+        text = (TEMPLATES / name).read_text(encoding="utf-8")
+        if name == "现在做什么.md":
+            text = text.replace("- 案例：/", f"- 案例：{case_id} /")
+        (case_dir / "队员工作区" / name).write_text(text, encoding="utf-8")
     return case_dir
 
 
