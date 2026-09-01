@@ -5,7 +5,7 @@
 ## 目录
 
 ```text
-experiments/code/matlab/
+q<k>/code/matlab/
 ├── run_EXP_OPT_003.m      每个实验一个入口脚本
 ├── lib/                   共用函数，每个文件一个函数
 └── plot_FIG_001.m         绘图脚本，与计算分开

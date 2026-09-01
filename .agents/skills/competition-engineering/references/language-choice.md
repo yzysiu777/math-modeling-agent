@@ -1,7 +1,7 @@
 # Python 与 MATLAB
 
 两者并列主力。**规格的 `language` 字段说了算**；规格没指定时按下表默认，并把理由写进
-`experiments/board.md` 的运行记录。
+`q<k>/board.md` 的运行记录。
 
 ## 默认倾向
 

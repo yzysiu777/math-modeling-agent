@@ -15,12 +15,12 @@ the model and experiments, not a final-day decoration.
 
 1. **Every number is traceable.** Each number and strong claim in the abstract,
    body and conclusion must resolve through `paper/claim_map.md` to an
-   experiment ID and a file under `experiments/outputs/data/`. A number that
+   experiment ID and a file under `q<k>/outputs/data/`. A number that
    cannot be traced does not enter the paper.
 2. **Polishing never changes values.** Language, structure, layout and figure
    aesthetics are the Writer's to change. Numbers, units, significant digits and
    claim strength are not. A mismatch is reported through
-   `specs/<spec_id>.questions.md`, never corrected in place.
+   the Engineer via `q<k>/log.md`, never corrected in place.
 3. **Claim strength matches evidence.** Feasible, current best, optimal under
    stated assumptions, globally optimal; association, predictive contribution,
    causation. These are the distinctions judges read most closely.
@@ -30,12 +30,12 @@ the model and experiments, not a final-day decoration.
 A paper states both what the model is and what the results are, so material
 comes from three read-only classes:
 
-- **Model truth** - the accepted Champion full spec (`specs/SPEC-*.md` with
-  `status: full`), `models/comparison.md` and `decisions.md`. Source for
+- **Model truth** - the accepted Champion full spec (`q<k>/specs/SPEC-*.md` with
+  `status: full`), `q<k>/brief.md` and `decisions.md`. Source for
   assumptions, symbols, formulas, constraints, algorithm structure and the
   reasoning behind route selection.
-- **Result truth** - `experiments/board.md`, `experiments/outputs/data/`,
-  `experiments/outputs/figures/manifest.md` and `experiments/outputs/checks/`.
+- **Result truth** - `q<k>/board.md`, `q<k>/outputs/data/`,
+  `q<k>/outputs/figures/manifest.md` and `q<k>/outputs/checks/`.
 - **Writing standards** - the `writing/` guides and the current official rules.
 
 All three are read-only for the Writer. Do not reconstruct a model definition

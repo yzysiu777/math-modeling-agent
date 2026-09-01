@@ -18,9 +18,9 @@ Writer role.
 
 ## Start with one brief
 
-Read the root/case `AGENTS.md`, `README.md`, `case_brief.md` and the original
-statement and attachments. The only required human input at startup is the case
-brief. Record unknowns rather than filling them from memory. Route the case to
+Read the root `AGENTS.md`, the Stage 0 outputs (`input/题面全文.md`,
+`input/说明文档/`, `input/数据清单.md`) and this question's `q<k>/数据范围.md`.
+Everything you write goes into `q<k>/brief.md`; you touch only your own `q<k>/`. Record unknowns rather than filling them from memory. Route the case to
 `optimization`, `data_analysis`, `hybrid` or `insufficient_information` from the
 statement itself and explain the evidence; `scripts/router.py` is a keyword
 prescreen only and cannot settle the route.
@@ -33,11 +33,13 @@ prescreen only and cannot settle the route.
    filtering, sampling deliberately across method families. See
    `references/brainstorming.md`.
 3. **Converge**: keep at least three methodologically different routes in
-   `models/candidates.md`, scored on the seven fixed dimensions in
-   `references/route-evaluation.md` and recorded in `models/comparison.md`.
-4. **Probe before full**: write a probe spec for each surviving route that
-   attacks its most fragile assumption within 50 lines and one minute. A route
-   does not get a full spec until its probe passes.
+   `q<k>/brief.md`, scored on the seven fixed dimensions in
+   `references/route-evaluation.md`. Routes, comparison and the
+   Champion/Challenger choice all live in that one file.
+4. **Probe before full**: each surviving route gets two or three probe rows in
+   `q<k>/board.md` -- assumption, numeric criterion, data range and budget
+   written *before* the run, within 50 lines and one minute. Probes have no
+   separate spec. A route does not get a full spec until its probe passes.
 5. Write the full spec for surviving routes so an Engineer who cannot see this
    session can implement it without guessing. See `references/spec-writing.md`.
 6. Keep a Champion and a methodologically different Challenger until the
@@ -96,7 +98,7 @@ metrics, same constraint tolerance and comparable resource budget.
 ## Failure records
 
 When a route fails, write the smallest reproducible reason in
-`models/candidates.md` and `experiments/board.md`: failed metric, violated
+`q<k>/brief.md` and `q<k>/board.md`: failed metric, violated
 constraint, leakage, instability, cost or a stronger alternative. Preserve
 reusable code and observations. A probe that kills a route in one minute is a
 success, not a setback.

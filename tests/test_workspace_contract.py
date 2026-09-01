@@ -1,10 +1,36 @@
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from scripts.validate_workspace import validate_static_contract
+from scripts.validate_workspace import _retired_reference_errors, validate_static_contract
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class RetiredReferenceGuardTests(unittest.TestCase):
+    """三个 Skill 在三轮重构里没人动过，仍教 Agent 写早已删掉的文件。
+    检查器只看文件在不在，看不到还有谁在引用它 —— 口径分叉不报错，只让两个
+    Agent 各做各的。"""
+
+    def test_guidance_does_not_point_at_the_retired_layout(self):
+        self.assertEqual(_retired_reference_errors(), [])
+
+    def test_guard_actually_fires_on_a_retired_reference(self):
+        scratch = Path(tempfile.mkdtemp())
+        try:
+            doc = scratch / "prompts" / "stale.md"
+            doc.parent.mkdir(parents=True)
+            doc.write_text("请把路线写进 models/comparison.md。", encoding="utf-8")
+            with mock.patch("scripts.validate_workspace.ROOT", scratch), \
+                 mock.patch("scripts.validate_workspace.GUIDANCE_DIRS", ("prompts",)), \
+                 mock.patch("scripts.validate_workspace.GUIDANCE_ROOT_FILES", ()):
+                errors = _retired_reference_errors()
+            self.assertTrue(any("models/comparison.md" in item for item in errors))
+        finally:
+            shutil.rmtree(scratch)
 
 
 class WorkspaceContractTests(unittest.TestCase):

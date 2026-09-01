@@ -18,7 +18,7 @@ make paper-example    # 编译上游完整示例，12 页
 ## 图表的共同约定
 
 **每张图表的标题都要能自洽**（不看正文也知道它在说什么），并写明来源实验 ID。
-写作手核数字时按这个 ID 去 `experiments/outputs/figures/manifest.md` 追溯。
+写作手核数字时按这个 ID 去 `q<k>/outputs/figures/manifest.md` 追溯。
 
 ```text
 \caption{不同容量下的最优总成本（EXP-OPT-002）}
@@ -169,7 +169,7 @@ make paper-example    # 编译上游完整示例，12 页
 \end{figure}
 ```
 
-图文件放 `experiments/outputs/figures/`，编译时通过 `\graphicspath` 或相对路径引用；
+图文件放 `q<k>/outputs/figures/`，编译时通过 `\graphicspath` 或相对路径引用；
 **永远不要手工修图**，改图就重跑生成脚本。
 
 ---

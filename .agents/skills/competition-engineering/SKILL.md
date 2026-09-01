@@ -31,17 +31,24 @@ The Engineer does not decide the model. The spec decides the model.
 Ask: does this choice change the objective, a constraint, a metric definition,
 the data interpretation or the strength of a conclusion?
 
-- Yes -> modeling decision -> write `specs/<spec_id>.questions.md` and stop that
-  route. See `prompts/contracts/questions.md`.
 - No -> engineering decision -> decide it yourself and continue.
+- Yes -> modeling decision -> do **not** stop by default. Record the explicit
+  assumption as one line in `q<k>/board.md`, run the cheapest sensitivity or
+  control, and put it on the C2 list. Units, coordinate systems, time bases,
+  grid alignment and missing-data semantics always take this route.
+- Only a genuine human-only boundary (official materials conflict and change a
+  hard constraint or deliverable; the authorised data/directory/network scope
+  must widen; final submission) justifies a `.questions.md` and a stop. See
+  `prompts/contracts/questions.md`.
 
 Data structures, vectorization, library and version choice, logging format, file
 naming, module layout and exception handling are all engineering decisions.
 Constraint relaxation, parameter ranges, metric definitions, missing-value
 policy, split ratios and gap tolerances are all modeling decisions.
 
-Ambiguous cases are treated as modeling decisions. Asking once is far cheaper
-than running a whole route on a wrong assumption.
+Ambiguous cases are treated as modeling decisions: write the assumption down
+and carry on. Stopping the route is the expensive option, and in a one-day
+budget it is almost never the right one.
 
 ## Refusing to start
 
@@ -61,7 +68,7 @@ statement. This is the most frequent point of spec failure.
 3. Implement the main logic strictly per spec sections 2, 3 and 4.
 4. Run the recomputation required by spec section 6.
 5. Write data and figures per spec section 5.
-6. Update `experiments/board.md` and `experiments/outputs/figures/manifest.md`.
+6. Update `q<k>/board.md` and `q<k>/outputs/figures/manifest.md`.
 
 Any deviation from the spec, including a workaround made to get a run to
 complete, is recorded in the board's result summary.
@@ -88,7 +95,7 @@ from scripts.model_checks import (
 )
 ```
 
-The report at `experiments/outputs/checks/<EXP-ID>.json` is read automatically by
+The report at `q<k>/outputs/checks/<EXP-ID>.json` is read automatically by
 `scripts/check_case.py` and raises the corresponding deterministic risk flag.
 That link is automatic and does not depend on anyone remembering to edit
 `checkpoint.yaml`, so a failed check must be written honestly.
