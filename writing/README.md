@@ -13,8 +13,8 @@
 3. **表述强度匹配证据。** 可行解 / 当前最好 / 给定假设下最优 / 全局最优；关联 /
    预测贡献 / 因果。
 
-模型真值读取 `specs/SPEC-*.md`，结果真值读取 `experiments/board.md`、图表清单和
-`experiments/outputs/data/`。不从聊天记录抄数字。
+模型真值读取 `q<k>/specs/SPEC-*.md`，结果真值读取 `q<k>/board.md`、图表清单和
+`q<k>/outputs/data/`。不从聊天记录抄数字。
 
 ## 阅读顺序
 

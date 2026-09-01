@@ -5,7 +5,7 @@
 ## 目录
 
 ```text
-experiments/code/python/
+q<k>/code/python/
 ├── run_<EXP-ID>.py        每个实验一个入口，能直接 python 运行
 ├── lib/                   多个实验共用的部分才放这里
 └── plot_<FIG-ID>.py       绘图脚本，与计算分开
@@ -24,7 +24,7 @@ import numpy as np
 
 SEED = 42
 CASE = Path(__file__).resolve().parents[3]      # cases/<case_id>/
-OUT = CASE / "experiments/outputs"
+OUT = CASE / "q<k>/outputs"
 
 def main() -> int:
     random.seed(SEED)

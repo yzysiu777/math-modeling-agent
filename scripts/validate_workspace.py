@@ -42,6 +42,18 @@ RETIRED_PATHS = (
     ".agents/skills/model-race",
     "templates/spec_probe.md", "templates/model_comparison.md", "templates/model_candidate.md",
 )
+# 指导文本里指向已废布局的引用。三个 Skill 曾在三轮重构里没人动过，仍教 Agent 去写
+# `models/comparison.md` 这种早就删掉的文件 —— 检查器抓不到，因为它只看文件在不在，
+# 不看有没有人还在引用它。口径分叉不会报错，只会让两个 Agent 各做各的。
+RETIRED_REFERENCES = (
+    "models/candidates.md", "models/comparison.md", "templates/spec_probe.md",
+    "templates/model_candidate.md", "templates/model_comparison.md",
+    "experiments/board.md", "experiments/outputs/", "experiments/code/",
+    "reports/stage-0",
+)
+GUIDANCE_DIRS = (".agents", "prompts", "protocol", "writing", "docs")
+GUIDANCE_ROOT_FILES = ("README.md", "AGENTS.md", "agent.md", "REVIEWER.md")
+
 REVIEW_FILES = (
     "REVIEWER.md", "templates/independent_review_packet.md",
 )
@@ -77,6 +89,26 @@ def _official_profile_errors() -> List[str]:
     return errors
 
 
+def _guidance_files() -> List[Path]:
+    found = [ROOT / name for name in GUIDANCE_ROOT_FILES]
+    for directory in GUIDANCE_DIRS:
+        found.extend(sorted((ROOT / directory).rglob("*.md")))
+    return [path for path in found if path.is_file()]
+
+
+def _retired_reference_errors() -> List[str]:
+    errors: List[str] = []
+    for path in _guidance_files():
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for marker in RETIRED_REFERENCES:
+            if marker in text:
+                errors.append(
+                    f"guidance still points at the retired layout: "
+                    f"{path.relative_to(ROOT).as_posix()} -> {marker}"
+                )
+    return errors
+
+
 def validate_static_contract() -> List[str]:
     errors = [f"missing required file: {path}" for path in _missing(REQUIRED_FILES)]
     errors.extend(f"retired path is still active: {path}" for path in RETIRED_PATHS if (ROOT / path).exists())
@@ -88,6 +120,7 @@ def validate_static_contract() -> List[str]:
         for marker in METADATA:
             if marker not in text:
                 errors.append(f"review card/protocol missing diagnostic field {marker}: {relative}")
+    errors.extend(_retired_reference_errors())
     workflow = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
     for marker in ("## A 定题", "## B 试跑", "## C 出结果", "## D 写本题", "## E 全案例收官", "## STAGE 对照"):
         if marker not in workflow:
