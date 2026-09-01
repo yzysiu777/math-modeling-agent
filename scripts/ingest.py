@@ -364,6 +364,25 @@ def _markdown_cell(value: object) -> str:
     return str(value).replace("|", "\\|").replace("\n", " ")
 
 
+def _human_size(size: int) -> str:
+    """Render bytes for a human; 11043129126 tells nobody anything."""
+
+    value = float(size)
+    for unit in ("B", "KB", "MB", "GB"):
+        if value < 1024 or unit == "GB":
+            return f"{int(value)} B" if unit == "B" else f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} GB"
+
+
+def _row_span(counts: list[object]) -> str:
+    numbers = [item for item in counts if isinstance(item, int)]
+    if not numbers:
+        return "、".join(dict.fromkeys(str(item) for item in counts)) or "n/a"
+    low, high = min(numbers), max(numbers)
+    return str(low) if low == high else f"{low}–{high}"
+
+
 def _data_files(sources: CaseSources) -> Iterable[tuple[Path, Path]]:
     seen: set[Path] = set()
     for root in sources.data_roots:
@@ -393,14 +412,6 @@ def _field_declarations(doc_texts: Iterable[str]) -> list[str]:
 def _write_inventory(
     case_dir: Path, sources: CaseSources, doc_texts: list[str]
 ) -> tuple[Path, list[DataObservation]]:
-    lines = [
-        "# 数据清单",
-        "",
-        "数据保持原位只读；列名不截断。无内嵌表头的文本记录使用 `col_n`，并在下方列出说明文档中的字段声明。",
-        "",
-        "| 数据根 | 相对路径 | 字节数 | 行数 | 列名全量 | 编码 | 缺测标记候选值 |",
-        "|---|---|---:|---:|---|---|---|",
-    ]
     observations: list[DataObservation] = []
     for root, path in _data_files(sources):
         relative = path.relative_to(root)
@@ -412,10 +423,6 @@ def _write_inventory(
         else:
             columns, encoding, missing = _columns_and_missing(path)
             row_count = _count_lines(path) if path.suffix.casefold() in TEXT_DATA_SUFFIXES else "n/a"
-        cells = (
-            root.name, relative, path.stat().st_size, row_count, columns, encoding, missing
-        )
-        lines.append("| " + " | ".join(_markdown_cell(cell) for cell in cells) + " |")
         observations.append(DataObservation(
             root=root,
             path=path.resolve(),
@@ -426,8 +433,55 @@ def _write_inventory(
             encoding=encoding,
             missing=missing,
         ))
+
+    # 一套列结构只完整打印一次。上千个雷达文件共用同一组一千多列的表头，逐文件
+    # 重复会把清单撑到十几 MB —— 建模手读不进去的清单等于没有清单。分组保住了
+    # 「每一种不同的列集合都完整出现」这条保证：漏掉某一列仍然不可能。
+    signatures: dict[str, str] = {}
+    groups: dict[tuple[str, str, str, str, str], list[DataObservation]] = {}
+    for item in observations:
+        if item.columns not in signatures:
+            signatures[item.columns] = f"C{len(signatures) + 1:02d}"
+        directory = item.relative.parent.as_posix()
+        key = (item.root.name, "." if directory == "." else directory,
+               signatures[item.columns], item.encoding, item.missing)
+        groups.setdefault(key, []).append(item)
+
+    lines = [
+        "# 数据清单",
+        "",
+        "数据保持原位只读。按「目录 × 列结构」分组：同一目录下列结构相同的文件合并成一行，"
+        "每一种列结构在下方 `## 列结构` 中完整列出一次，不截断。",
+        "",
+        "| 数据根 | 目录 | 文件数 | 合计大小 | 行数 | 列结构 | 编码 | 缺测标记候选值 |",
+        "|---|---|---:|---:|---|---|---|---|",
+    ]
+    for (root_name, directory, signature, encoding, missing), items in groups.items():
+        cells = (
+            root_name, directory, len(items),
+            _human_size(sum(entry.size for entry in items)),
+            _row_span([entry.row_count for entry in items]),
+            signature, encoding, missing,
+        )
+        lines.append("| " + " | ".join(_markdown_cell(cell) for cell in cells) + " |")
+
+    lines.extend(["", "## 列结构", ""])
+    counts: dict[str, list[DataObservation]] = {}
+    for item in observations:
+        counts.setdefault(signatures[item.columns], []).append(item)
+    for columns, signature in signatures.items():
+        members = counts[signature]
+        example = members[0]
+        lines.extend([
+            f"### {signature} —— {len(members)} 个文件，例如 "
+            f"`{example.root.name}/{example.relative.as_posix()}`",
+            "",
+            _markdown_cell(columns),
+            "",
+        ])
+
     declarations = _field_declarations(doc_texts)
-    lines.extend(["", "## 说明文档中的字段声明", ""])
+    lines.extend(["## 说明文档中的字段声明", ""])
     lines.extend(f"- {item}" for item in declarations)
     if not declarations:
         lines.append("- 未自动识别；请打开 `input/说明文档/` 核对无表头记录。")
@@ -476,21 +530,37 @@ def _write_scout(
 ) -> Path:
     """Write human-decision anomalies only; never mirror the data inventory."""
 
-    issues: list[str] = []
+    # 同一种异常逐文件列一行，在真实赛题数据上会变成几百行 —— 那就不是速览了。
+    # 按异常种类聚合，给出计数和最多三个例子，队员一屏能读完。
+    found: dict[str, list[str]] = {}
+    def note(label: str, where: str) -> None:
+        found.setdefault(label, []).append(where)
+
     for path in untranscribed:
-        issues.append(f"- 未能转写：`{_display_path(case_dir, path)}` —— 需人工打开")
+        note("未能转写，需人工打开", _display_path(case_dir, path))
     for item in observations:
-        location = f"`{_display_path(case_dir, item.path)}`"
+        location = f"{item.root.name}/{item.relative.as_posix()}"
         if item.encoding not in {"utf-8", "utf-8-sig", "xlsx/xml", "n/a"}:
-            issues.append(f"- 非 UTF-8 编码：{location} —— {item.encoding}")
+            note(f"非 UTF-8 编码（{item.encoding}）", location)
         if item.size == 0 or _zero_rows(item.row_count):
-            issues.append(f"- 空文件或零行文件：{location}")
+            note("空文件或零行文件", location)
         if _duplicate_columns(item.columns):
-            issues.append(f"- 列名重复：{location} —— 需人工确认字段语义")
+            note("列名重复，需人工确认字段语义", location)
         if "col_" in item.columns:
-            issues.append(f"- 疑似无表头：{location} —— 需结合说明文档确认字段")
+            note("疑似无表头，需结合说明文档确认字段", location)
         if item.missing not in {"", "未发现", "n/a", "空文件"}:
-            issues.append(f"- 缺测标记候选值：{item.missing} —— {location}")
+            note(f"缺测标记候选值 {item.missing}", location)
+
+    issues: list[str] = []
+    for label, places in found.items():
+        examples = "、".join(f"`{item}`" for item in places[:3])
+        if len(places) <= 3:
+            issues.append(f"- {label} —— {examples}")
+        else:
+            issues.append(
+                f"- {label} —— {len(places)} 个文件，例如 {examples} 等"
+                "（完整名单见 `input/数据清单.md` 同列结构分组）"
+            )
 
     distribution: dict[str, int] = {}
     for item in observations:
@@ -516,7 +586,7 @@ def _write_scout(
         "",
         "## 总计",
         "",
-        f"- 文件数：{len(observations)}；总大小：{total_size} 字节；按题分布：{distribution_text}。",
+        f"- 文件数：{len(observations)}；总大小：{_human_size(total_size)}；按题分布：{distribution_text}。",
     ])
     target = case_dir / "队员工作区/数据踏勘速览.md"
     target.parent.mkdir(parents=True, exist_ok=True)

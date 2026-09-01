@@ -231,6 +231,69 @@ class IngestTests(unittest.TestCase):
             self.assertIn("文件数：1", scout)
 
 
+class InventoryScaleTests(unittest.TestCase):
+    """真实赛题里上千个雷达文件共用一套上千列的表头，逐文件重复会把清单撑爆。"""
+
+    def _build(self, root: Path, wide_files: int) -> Path:
+        case = create_case("scale-case", cases_root=root / "cases")
+        source = root / "src"
+        (source / "第一题" / "雷达").mkdir(parents=True)
+        # 真实雷达 CSV 把距离库当列名，一份表头上千列、上千个文件共用它。
+        wide = "azim," + ",".join(f"{index * 0.06:.2f}" for index in range(1, 400))
+        body = "\n".join(
+            f"{row}," + ",".join("9999.0" if row == 2 else "0.5" for _ in range(399))
+            for row in range(1, 9)
+        )
+        for index in range(wide_files):
+            (source / "第一题" / "雷达" / f"scan{index:03d}.csv").write_text(
+                f"{wide}\n{body}\n", encoding="utf-8"
+            )
+        (source / "第一题" / "探空.csv").write_text(
+            "时间,高度,水平风速,Cn2\n1,100,3.2,-14.2\n", encoding="utf-8"
+        )
+        (root / "statement.md").write_text("本题要求建立模型。" * 40, encoding="utf-8")
+        write_sources(case, root / "statement.md", source)
+        ingest_case(case)
+        return case
+
+    def test_shared_column_signature_is_printed_once_not_per_file(self):
+        with tempfile.TemporaryDirectory() as name:
+            case = self._build(Path(name), wide_files=40)
+            inventory = (case / "input/数据清单.md").read_text(encoding="utf-8")
+            # 宽表头只完整出现一次，而不是每个文件一次。
+            self.assertEqual(inventory.count("23.94"), 1)
+            # 40 个同结构文件合并成一行分组。
+            self.assertIn("| 40 |", inventory)
+            self.assertLess(len(inventory), 60_000)
+
+    def test_every_distinct_column_set_still_appears_in_full(self):
+        with tempfile.TemporaryDirectory() as name:
+            case = self._build(Path(name), wide_files=40)
+            inventory = (case / "input/数据清单.md").read_text(encoding="utf-8")
+            # 分组不得让任何一列消失 —— 这正是上次实测漏掉 Cn2 的那类失败。
+            for column in ("时间", "高度", "水平风速", "Cn2"):
+                self.assertIn(column, inventory)
+
+    def test_scout_aggregates_repeated_anomalies_into_one_line(self):
+        with tempfile.TemporaryDirectory() as name:
+            case = self._build(Path(name), wide_files=40)
+            scout = (case / "队员工作区/数据踏勘速览.md").read_text(encoding="utf-8")
+            repeated = [
+                line for line in scout.splitlines()
+                if line.startswith("- 缺测标记候选值")
+            ]
+            self.assertEqual(len(repeated), 1)
+            self.assertIn("40 个文件", repeated[0])
+            self.assertLess(len(scout.splitlines()), 40)
+
+    def test_total_size_is_human_readable(self):
+        with tempfile.TemporaryDirectory() as name:
+            case = self._build(Path(name), wide_files=40)
+            scout = (case / "队员工作区/数据踏勘速览.md").read_text(encoding="utf-8")
+            total = next(line for line in scout.splitlines() if line.startswith("- 文件数"))
+            self.assertRegex(total, r"总大小：[0-9.]+ (?:B|KB|MB|GB)")
+
+
 class StatementProvenanceTests(unittest.TestCase):
     @staticmethod
     def _write(path: Path, body: str, *, source_chars: int, extracted_chars: int) -> None:
