@@ -85,9 +85,29 @@ class SourceConfigTests(unittest.TestCase):
             statement.write_text("题面", encoding="utf-8")
             data = root / "data"
             data.mkdir()
-            write_sources(case, statement, data, statement_value="relative.md")
-            with self.assertRaisesRegex(SourceConfigError, "绝对路径"):
+            write_sources(case, statement, data, statement_value="../statement.md")
+            with self.assertRaisesRegex(SourceConfigError, "相对路径只能指向案例目录内，案例外的来源必须写绝对路径"):
                 load_sources(case)
+
+    def test_relative_source_path_inside_case_is_accepted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            case = create_case("case-a", cases_root=root)
+            statement = case / "input/source/statement.md"
+            statement.parent.mkdir(parents=True)
+            statement.write_text("题面", encoding="utf-8")
+            data = case / "input/source/data"
+            (data / "第一题").mkdir(parents=True)
+            write_sources(
+                case,
+                statement,
+                data,
+                statement_value="input/source/statement.md",
+                data_value="input/source/data",
+            )
+            sources = load_sources(case)
+            self.assertEqual(sources.statement, statement.resolve())
+            self.assertEqual(sources.data_roots, (data.resolve(),))
 
     def test_nonexistent_source_path_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

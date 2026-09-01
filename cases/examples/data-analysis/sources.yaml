@@ -1,6 +1,6 @@
-statement: /Users/lambency/Desktop/研 0 /数学建模/agent/cases/examples/data-analysis/input/source/statement.md
+statement: input/source/statement.md
 data_roots:
-  - /Users/lambency/Desktop/研 0 /数学建模/agent/cases/examples/data-analysis/input/source/data
+  - input/source/data
 docs: []
 questions:
   q1: 第一题

@@ -58,6 +58,15 @@ def _decode(data: bytes) -> tuple[str, str]:
     return data.decode("utf-8", errors="replace"), "utf-8-replace"
 
 
+def _display_path(case_dir: Path, path: Path) -> str:
+    candidate = path if path.is_absolute() else case_dir / path
+    try:
+        rel = candidate.resolve().relative_to(case_dir.resolve())
+        return rel.as_posix()
+    except (ValueError, RuntimeError):
+        return str(candidate.resolve())
+
+
 def _run_text_tool(command: list[str], tool: str) -> str:
     process = subprocess.run(command, text=False, capture_output=True, check=False)
     if process.returncode != 0:
@@ -176,7 +185,7 @@ def _write_statement(case_dir: Path, extracted: ExtractedText) -> Path:
     problem = excerpt_problem(extracted.source_text_chars, len(extracted.text))
     if problem:
         raise RuntimeError(problem)
-    sources = "；".join(str(path.resolve()) for path in extracted.sources)
+    sources = "；".join(_display_path(case_dir, path) for path in extracted.sources)
     header = (
         f"> 来源绝对路径：{sources}\n"
         f"> 源字节数：{extracted.source_bytes}\n"
@@ -231,14 +240,14 @@ def _write_docs(case_dir: Path, docs: Iterable[Path]) -> tuple[list[str], list[P
         try:
             text, tool = _extract_file(source)
             body = (
-                f"> 原路径：{source.resolve()}\n> 转写工具：{tool}\n"
+                f"> 原路径：{_display_path(case_dir, source)}\n> 转写工具：{tool}\n"
                 f"> 源字节数：{source.stat().st_size}\n\n{text.rstrip()}\n"
             )
             texts.append(text)
         except Exception as exc:  # noqa: BLE001
             untranscribed.append(source.resolve())
             body = (
-                f"> 原路径：{source.resolve()}\n\n"
+                f"> 原路径：{_display_path(case_dir, source)}\n\n"
                 f"**未转写，需人工打开**：{exc}\n"
             )
         target.write_text(body, encoding="utf-8")
@@ -469,9 +478,9 @@ def _write_scout(
 
     issues: list[str] = []
     for path in untranscribed:
-        issues.append(f"- 未能转写：`{path}` —— 需人工打开")
+        issues.append(f"- 未能转写：`{_display_path(case_dir, path)}` —— 需人工打开")
     for item in observations:
-        location = f"`{item.path}`"
+        location = f"`{_display_path(case_dir, item.path)}`"
         if item.encoding not in {"utf-8", "utf-8-sig", "xlsx/xml", "n/a"}:
             issues.append(f"- 非 UTF-8 编码：{location} —— {item.encoding}")
         if item.size == 0 or _zero_rows(item.row_count):
@@ -531,7 +540,7 @@ def _write_scopes(case_dir: Path, sources: CaseSources) -> list[Path]:
             "",
             "以下绝对路径是本题可读白名单；原始数据只读。后续题可引用前题 outputs，反向不允许。",
             "",
-            *(f"- `{path}`" for path in allowed),
+            *(f"- `{_display_path(case_dir, path)}`" for path in allowed),
         ]
         if not allowed:
             lines.append("- 未找到映射目录；需核对 sources.yaml。")

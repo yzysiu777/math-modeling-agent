@@ -1,3 +1,5 @@
+import re
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -84,6 +86,30 @@ class CaseAndBoardTests(unittest.TestCase):
             case = root / route
             for retired in ("case_brief.md", "models", "experiments"):
                 self.assertFalse((case / retired).exists(), f"{route}/{retired}")
+
+    def test_committed_case_files_contain_no_user_or_home_absolute_paths(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        proc = subprocess.run(
+            ["git", "ls-files", "-z", "cases"],
+            cwd=repo_root,
+            capture_output=True,
+            check=True,
+        )
+        files = [
+            repo_root / item.decode("utf-8")
+            for item in proc.stdout.split(b"\0")
+            if item
+        ]
+        home_pattern = re.compile(r"/(?:Users|home)/")
+        offenders: list[str] = []
+        for path in files:
+            if not path.is_file() or path.suffix.casefold() in {".png", ".jpg", ".pdf", ".xlsx", ".parquet"}:
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            for line_no, line in enumerate(text.splitlines(), start=1):
+                if home_pattern.search(line):
+                    offenders.append(f"{path.relative_to(repo_root)}:{line_no}: {line.strip()}")
+        self.assertEqual(offenders, [], "cases/ 下被提交的文件不应包含 /Users/ 或 /home/ 绝对路径")
 
 
 if __name__ == "__main__":

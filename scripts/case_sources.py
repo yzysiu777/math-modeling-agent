@@ -36,11 +36,34 @@ def _relative_scope(value: Any, label: str, errors: list[str]) -> str:
     return text
 
 
-def _absolute_path(value: Any, label: str, errors: list[str]) -> Path:
-    path = Path(str(value or "").strip()).expanduser()
-    if not path.is_absolute():
-        errors.append(f"{label} 必须是绝对路径：{value!r}")
-    return path
+try:
+    from .case_paths import contained_in
+except ImportError:  # pragma: no cover
+    from case_paths import contained_in
+
+
+def _source_path(value: Any, label: str, case_dir: Path, errors: list[str]) -> Path:
+    text = str(value or "").strip()
+    if not text:
+        errors.append(f"{label} 相对路径只能指向案例目录内，案例外的来源必须写绝对路径：{value!r}")
+        return Path()
+    path = Path(text).expanduser()
+    if path.is_absolute():
+        return path
+    candidate = case_dir / path
+    contained = contained_in(case_dir, candidate)
+    if contained is not None:
+        return contained
+    escaped = False
+    try:
+        candidate.resolve().relative_to(case_dir.resolve())
+    except (ValueError, RuntimeError):
+        escaped = True
+    if escaped or candidate.exists():
+        errors.append(
+            f"{label} 相对路径只能指向案例目录内，案例外的来源必须写绝对路径：{value!r}"
+        )
+    return candidate
 
 
 def load_sources(
@@ -58,14 +81,14 @@ def load_sources(
         raise SourceConfigError("sources.yaml 顶层必须是映射")
 
     errors = [f"缺少字段：{field}" for field in REQUIRED_FIELDS if field not in payload]
-    statement = _absolute_path(payload.get("statement"), "statement", errors)
+    statement = _source_path(payload.get("statement"), "statement", case_dir, errors)
 
     raw_roots = payload.get("data_roots")
     if not isinstance(raw_roots, list) or not raw_roots:
         errors.append("data_roots 必须是非空列表")
         raw_roots = []
     data_roots = tuple(
-        _absolute_path(value, f"data_roots[{index}]", errors)
+        _source_path(value, f"data_roots[{index}]", case_dir, errors)
         for index, value in enumerate(raw_roots)
     )
 
@@ -74,7 +97,7 @@ def load_sources(
         errors.append("docs 必须是列表")
         raw_docs = []
     docs = tuple(
-        _absolute_path(value, f"docs[{index}]", errors)
+        _source_path(value, f"docs[{index}]", case_dir, errors)
         for index, value in enumerate(raw_docs)
     )
 
