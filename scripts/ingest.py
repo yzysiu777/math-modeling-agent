@@ -15,8 +15,10 @@ from xml.etree import ElementTree
 
 try:
     from .case_sources import CaseSources, SourceConfigError, load_sources
+    from .experiment_board import parse_markdown_table
 except ImportError:  # pragma: no cover
     from case_sources import CaseSources, SourceConfigError, load_sources
+    from experiment_board import parse_markdown_table
 
 
 DOCUMENT_SUFFIXES = {".doc", ".docx", ".pdf"}
@@ -604,6 +606,106 @@ def _write_scout(
     return target
 
 
+LITERATURE_HEADER = (
+    "| key | 标题 | 作者 | 年份 | 出处 | DOI/URL | 获取方式 | 支撑论断 | 核对状态 |"
+)
+YEAR = re.compile(r"\b(19[5-9][0-9]|20[0-4][0-9])\b")
+LATIN_SURNAME = re.compile(r"\b([A-Z][a-z]{2,})\b")
+
+
+def _citation_key(path: Path, text: str, used: set[str]) -> str:
+    """Build a stable, human-editable key. Best effort -- the team verifies it."""
+
+    year = YEAR.search(text)
+    surname = LATIN_SURNAME.search(text)
+    stem = re.sub(r"[^0-9A-Za-z]+", "", path.stem)[:12] or "ref"
+    base = f"{(surname.group(1) if surname else stem).lower()}{year.group(1) if year else ''}"
+    key, index = base or "ref", 2
+    while key in used:
+        key = f"{base}{index}"
+        index += 1
+    used.add(key)
+    return key
+
+
+def _literature_rows(case_dir: Path, sources: CaseSources) -> list[dict[str, str]]:
+    if sources.literature is None:
+        return []
+    used: set[str] = set()
+    rows: list[dict[str, str]] = []
+    for path in sorted(sources.literature.rglob("*")):
+        # 文献多数是 PDF，但队员也可能丢进 md/txt 笔记，一并收。
+        if not path.is_file() or path.suffix.casefold() not in STATEMENT_SUFFIXES:
+            continue
+        try:
+            text, _ = _extract_file(path)
+        except Exception:  # noqa: BLE001
+            text = ""
+        head = "\n".join(line.strip() for line in text.splitlines() if line.strip())[:1200]
+        title = next(
+            (line for line in head.splitlines() if 8 <= len(line) <= 200), path.stem
+        )
+        year = YEAR.search(head)
+        rows.append({
+            "key": _citation_key(path, head, used),
+            "标题": _markdown_cell(title),
+            "作者": "待核对",
+            "年份": year.group(1) if year else "待核对",
+            "出处": _markdown_cell(_display_path(case_dir, path)),
+            "DOI/URL": "-",
+            "获取方式": "人工放入",
+            "支撑论断": "待填写",
+            "核对状态": "待核对",
+        })
+    return rows
+
+
+def _write_literature(case_dir: Path, sources: CaseSources) -> Path:
+    """Refresh the folder-sourced half of the registry, keep everything else.
+
+    Re-running Stage 0 must not wipe the Writer's web-found entries, nor reset a
+    row the team already verified.
+    """
+
+    target = case_dir / "paper/文献清单.md"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_file():
+        existing = target.read_text(encoding="utf-8")
+    else:
+        existing = (Path(__file__).resolve().parents[1] / "templates/文献清单.md").read_text(
+            encoding="utf-8"
+        )
+    previous = {
+        str(row.get("key", "")).strip(): row
+        for row in parse_markdown_table(existing)
+        if str(row.get("key", "")).strip()
+    }
+    kept = [
+        row for key, row in previous.items()
+        if str(row.get("获取方式", "")).strip() != "人工放入"
+    ]
+    fresh = []
+    for row in _literature_rows(case_dir, sources):
+        older = previous.get(row["key"])
+        if older:
+            for field in ("作者", "年份", "DOI/URL", "支撑论断", "核对状态"):
+                value = str(older.get(field, "")).strip()
+                if value and value not in {"待核对", "待填写", "-"}:
+                    row[field] = value
+        fresh.append(row)
+
+    prose = existing.split(LITERATURE_HEADER)[0].rstrip("\n")
+    lines = [prose, "", LITERATURE_HEADER, "|" + "---|" * 9]
+    for row in fresh + kept:
+        lines.append("| " + " | ".join(
+            str(row.get(field, "")).strip() or "-"
+            for field in ("key", "标题", "作者", "年份", "出处",
+                          "DOI/URL", "获取方式", "支撑论断", "核对状态")
+        ) + " |")
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return target
+
+
 def _scope_paths(root: Path, values: Iterable[str]) -> list[Path]:
     return [candidate.resolve() for value in values if (candidate := root / value).exists()]
 
@@ -636,7 +738,8 @@ def ingest_case(case_dir: Path) -> list[Path]:
     doc_texts, untranscribed = _write_docs(case_dir, _auto_docs(sources))
     inventory, observations = _write_inventory(case_dir, sources, doc_texts)
     scout = _write_scout(case_dir, sources, observations, untranscribed)
-    return [statement, inventory, scout, *_write_scopes(case_dir, sources)]
+    literature = _write_literature(case_dir, sources)
+    return [statement, inventory, scout, literature, *_write_scopes(case_dir, sources)]
 
 
 def main() -> int:

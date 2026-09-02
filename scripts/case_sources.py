@@ -13,6 +13,8 @@ import yaml
 
 QUESTION = re.compile(r"^q[1-9][0-9]*$", re.IGNORECASE)
 REQUIRED_FIELDS = ("statement", "data_roots", "docs", "questions", "shared")
+#: 可选：队员放文献 PDF 的文件夹。缺省表示本案例暂不建文献库。
+OPTIONAL_FIELDS = ("literature",)
 
 
 class SourceConfigError(ValueError):
@@ -26,6 +28,7 @@ class CaseSources:
     docs: tuple[Path, ...]
     questions: dict[str, str]
     shared: tuple[str, ...]
+    literature: Path | None = None
 
 
 def _relative_scope(value: Any, label: str, errors: list[str]) -> str:
@@ -125,8 +128,15 @@ def load_sources(
         for index, value in enumerate(raw_shared)
     )
 
+    raw_literature = payload.get("literature")
+    literature: Path | None = None
+    if raw_literature not in (None, "", []):
+        literature = _source_path(raw_literature, "literature", case_dir, errors)
+
     if require_existing_paths:
         path_specs = [(statement, "statement", None), *(
+            [(literature, "literature", "dir")] if literature is not None else []
+        ), *(
             (root, f"data_roots[{index}]", "dir") for index, root in enumerate(data_roots)
         ), *(
             (doc, f"docs[{index}]", None) for index, doc in enumerate(docs)
@@ -165,4 +175,4 @@ def load_sources(
 
     if errors:
         raise SourceConfigError("；".join(errors))
-    return CaseSources(statement, data_roots, docs, questions, shared)
+    return CaseSources(statement, data_roots, docs, questions, shared, literature)

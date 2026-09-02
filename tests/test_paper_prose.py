@@ -6,7 +6,14 @@ import unittest
 from pathlib import Path
 
 from scripts.claim_evidence import validate_check_report
-from scripts.qa_latex import check_figures, check_paper_prose
+from scripts.qa_latex import (
+    check_citations,
+    check_evidence_citations,
+    check_figures,
+    check_paper_prose,
+    check_prose_style,
+    check_sealed_questions,
+)
 
 
 def paper_with(body: str, *, registry: str | None = None) -> Path:
@@ -153,3 +160,121 @@ class SeededCaseTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CitationTests(unittest.TestCase):
+    """v2 论文 \\cite 为 0，references.bib 还是占位条目，而研究背景写满了外部事实。"""
+
+    def _paper(self, body: str, *, bib: str = "", registry: str = "") -> Path:
+        root = Path(tempfile.mkdtemp())
+        paper = root / "paper"
+        (paper / "sections").mkdir(parents=True)
+        (paper / "bibliography").mkdir(parents=True)
+        (paper / "sections/01-background.tex").write_text(body, encoding="utf-8")
+        (paper / "bibliography/references.bib").write_text(bib, encoding="utf-8")
+        if registry:
+            (paper / "文献清单.md").write_text(registry, encoding="utf-8")
+        return paper
+
+    ROW = (
+        "| key | 标题 | 作者 | 年份 | 出处 | DOI/URL | 获取方式 | 支撑论断 | 核对状态 |\n"
+        "|---|---|---|---|---|---|---|---|---|\n"
+    )
+    BIB = "@article{kolmogorov1941, title={Local structure}, year={1941}}\n"
+
+    def test_citation_outside_the_registry_is_flagged_as_fabricated(self):
+        paper = self._paper("湍流服从 $-5/3$ 律\\cite{kolmogorov1941}。", bib=self.BIB)
+        problems = check_citations(paper)
+        self.assertTrue(any("疑似编造" in item for item in problems))
+
+    def test_citation_without_a_bib_entry_is_flagged(self):
+        registry = self.ROW + "| kolmogorov1941 | Local structure | K | 1941 | - | - | 人工放入 | 背景 | 已核对 |\n"
+        paper = self._paper("湍流服从 $-5/3$ 律\\cite{kolmogorov1941}。", registry=registry)
+        self.assertTrue(any("没有条目" in item for item in check_citations(paper)))
+
+    def test_registered_and_bibbed_citation_passes(self):
+        registry = self.ROW + "| kolmogorov1941 | Local structure | K | 1941 | - | - | 人工放入 | 背景 | 已核对 |\n"
+        paper = self._paper("湍流服从 $-5/3$ 律\\cite{kolmogorov1941}。", bib=self.BIB, registry=registry)
+        self.assertEqual(check_citations(paper), [])
+
+    def test_pending_verification_blocks_the_submission(self):
+        registry = self.ROW + "| kolmogorov1941 | Local structure | K | 1941 | - | - | 人工放入 | 背景 | 待核对 |\n"
+        paper = self._paper("湍流服从 $-5/3$ 律\\cite{kolmogorov1941}。", bib=self.BIB, registry=registry)
+        self.assertEqual(check_citations(paper), [])
+        self.assertTrue(any("必须由队员核对" in item for item in check_citations(paper, final=True)))
+
+    def test_placeholder_bib_entry_blocks_the_submission(self):
+        registry = self.ROW + "| kolmogorov1941 | Local structure | K | 1941 | - | - | 人工放入 | 背景 | 已核对 |\n"
+        paper = self._paper(
+            "湍流服从 $-5/3$ 律\\cite{kolmogorov1941}。",
+            bib=self.BIB + "@misc{placeholder2026, title={待替换}}\n", registry=registry)
+        self.assertTrue(any("占位条目" in item for item in check_citations(paper, final=True)))
+
+    def test_background_without_any_citation_is_reminded(self):
+        paper = self._paper("主流数值预报模式的分辨率通常在公里量级。")
+        self.assertTrue(any("没有任何引用" in item for item in check_evidence_citations(paper)))
+
+
+class SealedQuestionTests(unittest.TestCase):
+    """v2 把还没做 A 步的问题二、问题三的技术路线整段写死了。"""
+
+    def _case(self, body: str, *, opened: tuple[int, ...] = ()) -> Path:
+        root = Path(tempfile.mkdtemp())
+        (root / "paper/sections").mkdir(parents=True)
+        (root / "paper/sections/02-restate.tex").write_text(body, encoding="utf-8")
+        for number in opened:
+            reviews = root / f"q{number}/reviews"
+            reviews.mkdir(parents=True)
+            (reviews / "C1_done.md").write_text("Node decision: GO\n", encoding="utf-8")
+        return root / "paper"
+
+    SEALED = (
+        "\\subsection{问题二}\n"
+        "% <<Q2-SEALED>> 问题二通过 C1 之前保持原样。\n"
+    )
+
+    def test_writing_into_a_sealed_question_is_flagged(self):
+        paper = self._case(self.SEALED + "构建 100 m 网格的三维湍流场。\n")
+        self.assertTrue(any("不得写入实质内容" in item for item in check_sealed_questions(paper)))
+
+    def test_sealed_and_empty_passes(self):
+        self.assertEqual(check_sealed_questions(self._case(self.SEALED)), [])
+
+    def test_opened_question_may_be_written(self):
+        paper = self._case(self.SEALED + "构建 100 m 网格的三维湍流场。\n", opened=(2,))
+        self.assertEqual(check_sealed_questions(paper), [])
+
+    def test_deleting_the_sentinel_does_not_bypass_the_gate(self):
+        paper = self._case("\\subsection{问题二}\n构建 100 m 网格的三维湍流场。\n")
+        self.assertTrue(any("封存标记被删除" in item for item in check_sealed_questions(paper)))
+
+
+class ProseStyleTests(unittest.TestCase):
+    """获奖论文 110 页 8 个项目符号行；v2 论文 23 页 32 个 —— 密度差 21 倍。"""
+
+    def _paper(self, name: str, body: str) -> Path:
+        root = Path(tempfile.mkdtemp())
+        (root / "paper/sections").mkdir(parents=True)
+        (root / "paper/sections" / name).write_text(body, encoding="utf-8")
+        return root / "paper"
+
+    LIST = "\\begin{itemize}\n  \\item 甲\n  \\item 乙\n\\end{itemize}\n"
+
+    def test_list_in_a_narrative_chapter_is_flagged(self):
+        problems = check_prose_style(self._paper("01-background.tex", self.LIST))
+        self.assertTrue(any("叙述式行文" in item for item in problems))
+
+    def test_list_in_assumptions_is_allowed(self):
+        self.assertEqual(check_prose_style(self._paper("05-assumptions.tex", self.LIST * 3)), [])
+
+    def test_question_chapter_gets_one_list_of_budget(self):
+        self.assertEqual(check_prose_style(self._paper("q1.tex", self.LIST)), [])
+        self.assertTrue(check_prose_style(self._paper("q1.tex", self.LIST * 2)))
+
+    def test_stock_phrases_are_flagged(self):
+        problems = check_prose_style(self._paper("q1.tex", "结果如图所示。\n"))
+        self.assertTrue(any("套话" in item for item in problems))
+
+    def test_a_sentence_that_says_what_the_figure_shows_passes(self):
+        body = "图~\\ref{fig:a} 给出五个时刻的耗散率廓线，低层量级差异主要来自切变。\n"
+        self.assertEqual(check_prose_style(self._paper("q1.tex", body)), [])
