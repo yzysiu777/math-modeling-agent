@@ -54,6 +54,9 @@ dist/
 # version control is what lets `make test` and `make demos` leave the tree clean.
 cases/**/q*/outputs/logs/
 
+# 案例论文的编译产物：每次由 make paper CASE=... 重新生成，不入库
+cases/**/output/
+
 # Competition case data and private review bundles are opt-in
 cases/**/input/
 !cases/examples/*/input/

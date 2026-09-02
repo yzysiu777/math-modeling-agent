@@ -1,0 +1,54 @@
+% !Mode:: "TeX:UTF-8"
+%!TEX program = xelatex
+%
+% 案例论文工程入口。文档类、样式、bst 和封面图都从仓库 paper/ 经 TEXINPUTS 解析，
+% 本目录只放本案例自己的内容 —— 不复制 gmcmthesis.cls，避免与仓库那份分叉。
+%
+% 整本编译：   make paper CASE=<案例目录>
+% 单题编译：   make paper CASE=<案例目录> Q=q1
+%
+% 分章不是排版洁癖：比赛期间多人同时写作，单文件 main.tex 会制造合并冲突。
+
+\documentclass[bwprint]{gmcmthesis}
+
+\input{config/paper-profile.tex}
+\usepackage{style/modeling-paper}
+
+% 单题编译开关。Makefile 通过 -usepretex='\def\PaperOnly{q1}' 注入；
+% 未注入时 \PaperOnly 为 all，编译整本。
+\providecommand{\PaperOnly}{all}
+\edef\PaperOnlyName{\PaperOnly}
+\def\PaperAllName{all}
+\newcommand{\InputQuestion}[1]{%
+  \ifx\PaperOnlyName\PaperAllName
+    \input{sections/#1}%
+  \else
+    \edef\PaperThisName{#1}%
+    \ifx\PaperThisName\PaperOnlyName\input{sections/#1}\fi
+  \fi}
+
+\begin{document}
+
+\maketitle
+\pagestyle{plain}
+
+\input{sections/00-abstract}
+
+\input{sections/01-background}
+\input{sections/02-restate}
+\input{sections/03-symbols}
+\input{sections/04-analysis}
+\input{sections/05-assumptions}
+
+\InputQuestion{q1}
+
+\input{sections/90-evaluation}
+
+\bibliographystyle{gmcm}
+\bibliography{bibliography/references}
+
+\begin{appendices}
+\input{appendix/99-programs}
+\end{appendices}
+
+\end{document}
