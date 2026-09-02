@@ -71,3 +71,10 @@ CI PDF 只是预览。正式提交前，队员必须用当届官方文件核对�
 [LATEX_SNIPPETS.md](LATEX_SNIPPETS.md) 收录三线表、跨行表、长表、伪代码、子图、公式、
 代码附录和引用的可直接复制片段。`make snippet-check` 会把它们全部实际编译一遍，
 所以这份文档不会烂掉；`make paper-example` 编译上游完整示例，看排版效果。
+
+## 已退役
+
+`writing/prompts/` 的六份角色提示词写于三角色合并之前，与「一题一个持续 Writer
+会话」的现行结构矛盾，已删除。其中真正有用的写作约束吸收进 `prompts/writer.md`，
+C3 审查提示词以 `prompts/reviewer/C3_results_challenge.md` 为准，引用审计已由
+`scripts/qa_latex.py` 的引用检查与 `paper/文献清单.md` 承担。

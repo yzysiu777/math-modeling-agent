@@ -6,14 +6,16 @@
   \centering
   \caption{结果报告结构示例}
   \label{tab:result-report}
-  \begin{tabular}{p{0.22\textwidth}rrrr}
+  \begin{tabular}{p{0.26\textwidth}rrr}
     \toprule
-    方法 & 指标一 & 指标二 & 运行时间 & 实验 ID \\
+    方法 & 指标一 & 指标二 & 运行时间 \\
     \midrule
-    baseline（示例） & -- & -- & -- & EXP-EXAMPLE-001 \\
-    候选方法（示例） & -- & -- & -- & EXP-EXAMPLE-002 \\
+    基线（示例） & -- & -- & -- \\
+    候选方法（示例） & -- & -- & -- \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 报告结果时必须同时给出数据/算例范围、指标定义、对照、波动或敏感性、失败情况和解释边界。优化结果还要报告约束违反数和目标复算差异；数据结果还要报告切分、区间、校准或误差分解。
+
+实验编号不进正文表格 —— 溯源写在案例的关键数字溯源表里，草稿需要标记来源时用 \verb|\dataref{}|，它默认不打印。

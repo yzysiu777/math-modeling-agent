@@ -105,6 +105,12 @@ def _seed_paper(case_dir: Path, questions: int) -> None:
         (case_dir / "paper" / relative).write_text(
             path.read_text(encoding="utf-8"), encoding="utf-8"
         )
+    # 文献清单即使没有文献库也要有：写作手联网检索补的条目要落到同一本账。
+    registry = case_dir / "paper/文献清单.md"
+    if not registry.is_file():
+        registry.write_text(
+            (TEMPLATES / "文献清单.md").read_text(encoding="utf-8"), encoding="utf-8"
+        )
     main = case_dir / "paper/main.tex"
     text = main.read_text(encoding="utf-8")
     # 用字面替换而不是 re.sub：替换串里的 \InputQuestion 会被当成正则转义。

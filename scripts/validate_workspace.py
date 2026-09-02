@@ -41,13 +41,17 @@ REQUIRED_FILES = (
     "templates/paper/sections/00-abstract.tex", "templates/paper/sections/02-restate.tex",
     "templates/paper/sections/03-symbols.tex", "templates/paper/sections/05-assumptions.tex",
     "templates/paper/sections/q1.tex", "templates/paper/sections/90-evaluation.tex",
-    "templates/paper/appendix/99-programs.tex", "templates/待补图清单.md",
+    "templates/paper/appendix/99-programs.tex", "templates/待补图清单.md", "templates/文献清单.md",
 )
 RETIRED_PATHS = (
     "CLAUDE.md", "prompts/claude", "templates/claude_review_packet.md",
     "prompts/codex-start.md", "roles", ".agents/skills/industrial-mathematical-modeling",
     ".agents/skills/model-race",
     "templates/spec_probe.md", "templates/model_comparison.md", "templates/model_candidate.md",
+    # 六份 writing/prompts 角色提示词：写于三角色合并之前，全仓库无人引用，
+    # 内容要么已被 prompts/writer.md 与 prompts/reviewer/ 覆盖，要么与「一题一个
+    # 持续 Writer 会话」矛盾。有用的写作约束已吸收进 prompts/writer.md。
+    "writing/prompts",
 )
 # 指导文本里指向已废布局的引用。三个 Skill 曾在三轮重构里没人动过，仍教 Agent 去写
 # `models/comparison.md` 这种早就删掉的文件 —— 检查器抓不到，因为它只看文件在不在，

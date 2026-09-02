@@ -30,8 +30,9 @@ class CaseAndBoardTests(unittest.TestCase):
             self.assertFalse((case / "reports").exists())
             self.assertTrue((case / "sources.yaml").is_file())
             files = [path for path in case.rglob("*") if path.is_file()]
-            # 18 份工作文件 + 论文骨架（main/profile/bib/appendix + 7 前后章 + 3 题章）
-            self.assertEqual(len(files), 33)
+            # 18 份工作文件 + 论文骨架（main/profile/bib/appendix/文献清单 + 7 前后章 + 3 题章）
+            self.assertEqual(len(files), 34)
+            self.assertTrue((case / "paper/文献清单.md").is_file())
             self.assertIn("gmcmthesis", (case / "paper/main.tex").read_text(encoding="utf-8"))
             self.assertNotIn("ctexart", (case / "paper/main.tex").read_text(encoding="utf-8"))
             for name in ("00-abstract", "02-restate", "03-symbols", "05-assumptions", "90-evaluation"):

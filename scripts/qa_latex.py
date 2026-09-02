@@ -11,6 +11,11 @@ from pathlib import Path
 
 import yaml
 
+try:
+    from .experiment_board import parse_markdown_table
+except ImportError:  # pragma: no cover
+    from experiment_board import parse_markdown_table
+
 
 DRAFT_PLACEHOLDERS = re.compile(r"\b(?:TODO|FIXME)\b|待补充|未验证")
 FINAL_PLACEHOLDERS = re.compile(r"\b(?:TODO|FIXME)\b|待补充|未验证|待填写|待替换")
@@ -134,6 +139,201 @@ def _strip_paperexample(text: str) -> str:
         index = cursor
 
 
+CITE = re.compile(r"\\cite[tp]?(?:\[[^\]]*\])?\{([^}]+)\}")
+BIB_ENTRY = re.compile(r"@\w+\s*\{\s*([^,\s]+)\s*,")
+BIB_PLACEHOLDER = re.compile(r"待替换|待填写|placeholder")
+EVIDENCE_SECTIONS = ("01-background.tex", "04-analysis.tex")
+
+
+def _cited_keys(paper_dir: Path) -> dict[str, list[str]]:
+    """Map citation key -> the section files that use it."""
+
+    found: dict[str, list[str]] = {}
+    for path in sorted((paper_dir / "sections").glob("*.tex")) + sorted(
+        (paper_dir / "appendix").glob("*.tex")
+    ):
+        text = _strip_paperexample(_without_tex_comments(path.read_text(encoding="utf-8")))
+        for group in CITE.findall(text):
+            for key in (item.strip() for item in group.split(",")):
+                if key:
+                    found.setdefault(key, []).append(path.name)
+    return found
+
+
+def _registry_rows(paper_dir: Path) -> list[dict[str, str]]:
+    path = paper_dir / "文献清单.md"
+    if not path.is_file():
+        return []
+    return [
+        row for row in parse_markdown_table(path.read_text(encoding="utf-8"))
+        if str(row.get("key", "")).strip() and str(row.get("key", "")).strip() != "key"
+    ]
+
+
+def check_citations(paper_dir: Path, *, final: bool = False) -> list[str]:
+    """Every citation must be traceable to the registry the team verifies.
+
+    The v2 paper cited nothing at all while asserting a page of external facts.
+    The fix is not to judge whether a reference is good -- that is the team's
+    call -- but to make an unverifiable citation impossible to leave in place.
+    """
+
+    problems: list[str] = []
+    cited = _cited_keys(paper_dir)
+    rows = _registry_rows(paper_dir)
+    registered = {str(row.get("key", "")).strip(): row for row in rows}
+
+    bib = paper_dir / "bibliography/references.bib"
+    bib_text = bib.read_text(encoding="utf-8") if bib.is_file() else ""
+    bib_keys = set(BIB_ENTRY.findall(bib_text))
+
+    for key, where in cited.items():
+        places = "、".join(dict.fromkeys(where))
+        if key not in registered:
+            problems.append(f"{places}: 引用 {key} 不在 文献清单.md 中，疑似编造")
+        if key not in bib_keys:
+            problems.append(f"{places}: 引用 {key} 在 references.bib 中没有条目")
+
+    if final:
+        for key, row in registered.items():
+            status = str(row.get("核对状态", "")).strip()
+            if status != "已核对":
+                problems.append(f"文献清单.md: {key} 的核对状态是「{status or '空'}」，提交前必须由队员核对")
+            if not str(row.get("支撑论断", "")).strip().strip("-") or "待填写" in str(row.get("支撑论断", "")):
+                problems.append(f"文献清单.md: {key} 没有写清支撑正文哪一处论断")
+        if BIB_PLACEHOLDER.search(bib_text):
+            problems.append("references.bib 仍含占位条目")
+    return problems
+
+
+def check_evidence_citations(paper_dir: Path) -> list[str]:
+    """Sections that assert external facts should carry sources."""
+
+    reminders: list[str] = []
+    for name in EVIDENCE_SECTIONS:
+        path = paper_dir / "sections" / name
+        if not path.is_file():
+            continue
+        text = _strip_paperexample(_without_tex_comments(path.read_text(encoding="utf-8")))
+        if PAPER_EXAMPLE.search(path.read_text(encoding="utf-8")):
+            continue  # 尚未开写的模板章节不提醒
+        if not CITE.search(text):
+            reminders.append(f"{name}: 陈述了外部事实却没有任何引用")
+    unused = {
+        str(row.get("key", "")).strip() for row in _registry_rows(paper_dir)
+    } - set(_cited_keys(paper_dir))
+    reminders.extend(f"文献清单.md: {key} 登记了但正文没引用" for key in sorted(unused))
+    return reminders
+
+
+SEALED = re.compile(r"%\s*<<Q([1-9][0-9]*)(?:-OUTLOOK)?-SEALED>>")
+NODE_DECISION = re.compile(r"^[ \t]*Node\s+decision[ \t]*[:：]", re.IGNORECASE | re.MULTILINE)
+LIST_ENVIRONMENT = re.compile(r"\\begin\{(itemize|enumerate|description)\}")
+#: 列表只在这三处天然合理：假设逐条、符号成表、程序清单成表。
+LIST_ALLOWED = {"05-assumptions.tex", "03-symbols.tex", "99-programs.tex"}
+#: 每题正文留一个额度，其余章节一律叙述式。
+LIST_BUDGET_PER_QUESTION = 1
+CLICHE = re.compile(r"如图所示|如表所示|如下所示|如下图|见下表|如上图|如上表")
+
+
+def _opened_questions(case_dir: Path) -> set[int]:
+    """A question is open once its C1 card carries a node decision."""
+
+    opened: set[int] = set()
+    for directory in sorted(case_dir.glob("q[0-9]*")):
+        match = re.fullmatch(r"q([1-9][0-9]*)", directory.name)
+        reviews = directory / "reviews"
+        if match is None or not reviews.is_dir():
+            continue
+        for path in reviews.glob("C1*.md"):
+            if NODE_DECISION.search(path.read_text(encoding="utf-8", errors="replace")):
+                opened.add(int(match.group(1)))
+                break
+    return opened
+
+
+def _block_is_substantive(text: str) -> bool:
+    """Template guidance and placeholder figures are not content."""
+
+    body = _strip_paperexample(text)
+    body = re.sub(r"\\begin\{figure\}.*?\\end\{figure\}", "", body, flags=re.DOTALL)
+    for line in body.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("%"):
+            continue
+        if stripped.startswith("\\subsection") or stripped.startswith("\\section"):
+            continue
+        return True
+    return False
+
+
+def check_sealed_questions(paper_dir: Path) -> list[str]:
+    """A question's sections stay sealed until that question has passed C1.
+
+    The v2 paper wrote the full technical route for questions two and three --
+    grid resolutions, model names, a search algorithm -- while neither question
+    had a brief, a route comparison or a review. Routes have to come out of a
+    question's own A step, not be guessed in another question's D step.
+    """
+
+    problems: list[str] = []
+    opened = _opened_questions(paper_dir.parent)
+    for path in sorted((paper_dir / "sections").glob("*.tex")):
+        text = path.read_text(encoding="utf-8")
+        marks = list(SEALED.finditer(text))
+        sealed_here = {int(match.group(1)) for match in marks}
+        for match in marks:
+            number = int(match.group(1))
+            if number in opened:
+                continue
+            # 从哨兵所在行的行尾开始，否则该行 `>>` 之后的说明文字会被当成正文。
+            line_end = text.find("\n", match.end())
+            tail = text[line_end + 1:] if line_end != -1 else ""
+            stop = re.search(r"\n\\(?:sub)*section\{|\n%\s*<<Q", tail)
+            block = tail[:stop.start()] if stop else tail
+            if _block_is_substantive(block):
+                problems.append(
+                    f"{path.name}: 问题 {number} 尚未通过 C1，本小节不得写入实质内容")
+        # 哨兵被整段删掉同样要抓：该题没开工，章节里却出现了它的小节。
+        for number in range(1, 10):
+            if number in opened or number in sealed_here:
+                continue
+            heading = re.search(rf"\\subsection\{{问题{'一二三四五六七八九'[number - 1]}[^}}]*\}}", text)
+            if heading is not None:
+                problems.append(
+                    f"{path.name}: 问题 {number} 的封存标记被删除，但该题尚未通过 C1")
+    return problems
+
+
+def check_prose_style(paper_dir: Path) -> list[str]:
+    """Lists and stock phrases are how a paper turns into a slide deck.
+
+    The reference award paper carries 8 bullet lines across 110 pages; v2 carried
+    32 across 23 -- a 21x density. Lists are allowed only where enumeration is
+    the natural form.
+    """
+
+    problems: list[str] = []
+    for path in sorted((paper_dir / "sections").glob("*.tex")) + sorted(
+        (paper_dir / "appendix").glob("*.tex")
+    ):
+        text = _strip_paperexample(_without_tex_comments(path.read_text(encoding="utf-8")))
+        lists = LIST_ENVIRONMENT.findall(text)
+        if path.name not in LIST_ALLOWED:
+            budget = LIST_BUDGET_PER_QUESTION if re.fullmatch(r"q[0-9]+\.tex", path.name) else 0
+            if len(lists) > budget:
+                problems.append(
+                    f"{path.name}: 用了 {len(lists)} 个列表环境，上限 {budget} —— "
+                    "本章应当叙述式行文")
+        for number, line in enumerate(text.splitlines(), start=1):
+            hit = CLICHE.search(line)
+            if hit:
+                problems.append(
+                    f"{path.name}:{number} 套话「{hit.group(0)}」—— "
+                    "要写清这张图或这张表说明了什么")
+    return problems
+
+
 def check_paper_prose(paper_dir: Path) -> list[str]:
     """Report workbench artefacts that leaked into the paper body."""
 
@@ -230,7 +430,10 @@ def check_sources(paper_dir: Path, *, final: bool = False) -> list[str]:
     if not sorted((paper_dir / "sections").glob("*.tex")):
         errors.append("no section files under sections/; the split structure is required")
     errors.extend(check_figures(paper_dir, final=final))
+    errors.extend(check_citations(paper_dir, final=final))
+    errors.extend(check_sealed_questions(paper_dir))
     if final:
+        errors.extend(check_prose_style(paper_dir))
         errors.extend(_official_freeze_errors(paper_dir))
         errors.extend(check_paper_prose(paper_dir))
     return errors
@@ -347,9 +550,13 @@ def main() -> int:
     )
     if not args.final:
         # 草稿阶段只提醒：正文还在改，不该因为一处遗留的实验编号挡住编译流程。
-        reminders = check_paper_prose(args.paper_dir)
+        reminders = (
+            check_paper_prose(args.paper_dir)
+            + check_evidence_citations(args.paper_dir)
+            + check_prose_style(args.paper_dir)
+        )
         if reminders:
-            print("REMINDER 正文含工作台内部符号（提交前必须清干净）")
+            print("REMINDER 正文问题（提交前必须清干净）")
             print("\n".join(f"- {item}" for item in reminders))
     if errors:
         print("FAIL LaTeX QA")
