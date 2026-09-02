@@ -215,10 +215,10 @@ def recompute_objective(assignment, cost):
     return sum(cost[j][i] for i, j in assignment)
 \end{lstlisting}
 
-\begin{lstlisting}[language=Matlab, caption={场景生成与湍流强度计算}, label={lst:scenario}]
-function tke = turbulence_intensity(u, v, w)
-    % 由三分量脉动速度计算湍流动能
-    tke = 0.5 * mean(u.^2 + v.^2 + w.^2);
+\begin{lstlisting}[language=Matlab, caption={多分量样本的方差型指标}, label={lst:scenario}]
+function value = variance_index(x, y, z)
+    % 由三个分量的样本方差合成一个标量指标
+    value = 0.5 * mean(x.^2 + y.^2 + z.^2);
 end
 \end{lstlisting}
 ```

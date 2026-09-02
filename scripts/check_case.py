@@ -343,6 +343,32 @@ def _c2_trigger_reasons(work_dir: Path) -> list[str]:
     return reasons
 
 
+def _single_route_findings(work_dir: Path, question: str, stage: str) -> list[Finding]:
+    """One implemented route means there is nothing to compare it against.
+
+    The workbench asks for six ideas and three routes on paper, then implements
+    one -- so the race that justifies the choice never happens, and the paper has
+    no comparison table to show for the work already done. This only reminds:
+    a second route is a modelling judgement, not something a script can force.
+    """
+
+    if stage not in {"model_selection", "paper_claims", "final"}:
+        return []
+    specs_dir = work_dir / "specs"
+    specs = [
+        path for path in sorted(specs_dir.glob("SPEC-*.md"))
+        if not path.name.endswith(".questions.md")
+    ] if specs_dir.is_dir() else []
+    if len(specs) >= 2:
+        return []
+    return [_finding(
+        "REMINDER", "SINGLE_ROUTE",
+        f"{question.upper()} 只有 {len(specs)} 条路线进入正式实现，统一对比表无从建立；"
+        "第二条可以是同一路线的优化版或延伸版",
+        "MODELER", "C2",
+    )]
+
+
 def _question_review_findings(
     case_dir: Path, question: str, work_dir: Path, stage: str
 ) -> list[Finding]:
@@ -714,6 +740,7 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
             if qname is None:
                 continue
             findings.extend(_question_review_findings(case_dir, qname, qdir, stage))
+            findings.extend(_single_route_findings(qdir, qname, stage))
             findings.extend(_review_card_policy_findings(case_dir, qname))
             findings.extend(_cross_question_findings(qdir, qname))
             findings.extend(_failed_experiment_findings(qdir))

@@ -179,3 +179,25 @@ class WorkspaceContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PaperSeedContentTests(unittest.TestCase):
+    """已经做过的路线取舍工作必须在论文里有落点，否则评委看不到。"""
+
+    def test_analysis_seed_asks_for_the_rejected_routes(self):
+        text = (ROOT / "templates/paper/sections/04-analysis.tex").read_text(encoding="utf-8")
+        for marker in ("候选路线", "为什么排除", "被看见"):
+            self.assertIn(marker, text)
+
+    def test_evaluation_seed_asks_where_rejected_routes_would_win(self):
+        text = (ROOT / "templates/paper/sections/90-evaluation.tex").read_text(encoding="utf-8")
+        self.assertIn("被否决", text)
+
+    def test_question_seed_asks_for_cleaning_comparison_and_race_table(self):
+        text = (ROOT / "templates/paper/sections/q1.tex").read_text(encoding="utf-8")
+        for marker in ("清洗前后", "剔除", "统一对比表", "回答了什么问题"):
+            self.assertIn(marker, text)
+
+    def test_only_changed_variables_get_a_cleaning_figure(self):
+        text = (ROOT / "templates/paper/sections/q1.tex").read_text(encoding="utf-8")
+        self.assertIn("没被改动的变量不放", text)
