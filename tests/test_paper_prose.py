@@ -292,3 +292,42 @@ class ProseStyleTests(unittest.TestCase):
     def test_a_sentence_that_says_what_the_figure_shows_passes(self):
         body = "图~\\ref{fig:a} 给出五个时刻的耗散率廓线，低层量级差异主要来自切变。\n"
         self.assertEqual(check_prose_style(self._paper("q1.tex", body)), [])
+
+
+class C3CardTests(unittest.TestCase):
+    """C3 卡曾经落在 paper/reviews/ 而检查器去 q<k>/reviews/ 找 —— 审了也等于没审。"""
+
+    def _case(self) -> Path:
+        from scripts.create_case import create_case
+
+        root = Path(tempfile.mkdtemp())
+        case = create_case("c3-case", cases_root=root, questions=2)
+        (case / "sources.yaml").write_text(
+            "statement: input/README.md\ndata_roots:\n  - input\ndocs: []\n"
+            "questions:\n  q1: a\n  q2: b\nshared: []\n", encoding="utf-8")
+        for name in ("a", "b"):
+            (case / "input" / name).mkdir(parents=True, exist_ok=True)
+        (case / "paper/sections/q1.tex").write_text("本题结论。\n", encoding="utf-8")
+        return case
+
+    def test_per_question_c3_materials_include_the_paper_and_registry(self):
+        from scripts.make_review_packet import build_packet
+
+        card = build_packet(self._case(), "C3", question="q1")
+        self.assertIn("paper/sections/q1.tex", card)
+        self.assertIn("paper/文献清单.md", card)
+        self.assertIn("paper/claim_map.md", card)
+
+    def test_per_question_c3_does_not_drag_in_other_questions(self):
+        from scripts.make_review_packet import build_packet
+
+        card = build_packet(self._case(), "C3", question="q1")
+        self.assertIn("Q1 实验板", card)
+        self.assertNotIn("Q2 实验板", card)
+
+    def test_case_level_c3_spans_every_question(self):
+        from scripts.make_review_packet import build_packet
+
+        card = build_packet(self._case(), "C3")
+        self.assertIn("Q1 实验板", card)
+        self.assertIn("Q2 实验板", card)
