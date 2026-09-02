@@ -28,7 +28,8 @@ except ImportError:  # pragma: no cover
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLES = ("orchestrator", "modeler", "engineer", "writer", "reviewer")
-STEP_BY_ROLE = {"modeler": "A", "engineer": "C", "writer": "D", "reviewer": "C1"}
+STEP_BY_ROLE = {"modeler": "A", "engineer": "C", "writer": "D"}
+NODES = ("C1", "C2", "C3")
 NODE_DECISION = re.compile(r"^[ \t]*Node\s+decision[ \t]*[:：]", re.IGNORECASE | re.MULTILINE)
 CODE_FENCE = re.compile(r"```text\n(?P<body>.*?)```", re.DOTALL)
 
@@ -83,7 +84,17 @@ def _spec_names(case_dir: Path, question: str) -> str:
     return "、".join(specs) if specs else "尚无 Full SPEC"
 
 
-def build_prompt(case_dir: Path, role: str, question: str | None = None) -> str:
+def _latest_card(case_dir: Path, node: str, question: str | None) -> Path | None:
+    """The card the reviewer is being handed: newest of that node in that scope."""
+
+    directory = (case_dir / question / "reviews") if question else (case_dir / "paper/reviews")
+    cards = sorted(directory.glob(f"{node}_*.md")) if directory.is_dir() else []
+    return cards[-1] if cards else None
+
+
+def build_prompt(
+    case_dir: Path, role: str, question: str | None = None, node: str | None = None
+) -> str:
     if role not in ROLES:
         raise ValueError(f"role must be one of {list(ROLES)}")
     if not case_dir.is_dir():
@@ -104,6 +115,20 @@ def build_prompt(case_dir: Path, role: str, question: str | None = None) -> str:
         .replace("q<k>", name)
     )
     body = body.replace("<绝对路径>", f"{case}/{name}/specs/")
+
+    if role == "reviewer":
+        chosen = (node or "C1").upper()
+        if chosen not in NODES:
+            raise ValueError(f"node must be one of {list(NODES)}")
+        card = _latest_card(case_dir, chosen, None if chosen == "C3" and node is None else name)
+        body = body.replace("<C1/C2/C3>", chosen)
+        body = body.replace(
+            "<审核卡绝对路径或完整正文>",
+            str(card) if card else f"尚未生成 —— 先跑 make review-packet CASE=... NODE={chosen}",
+        )
+        body = body.replace("<审核卡列出的材料>", "见审核卡「允许读取或上传的材料」一节，不得越界")
+        body = body.replace("<实际 provider>", "如实填写").replace(
+            "<实际 model 或 human>", "如实填写")
 
     opened = _opened(case_dir)
     sealed = [item for item in _questions(case_dir) if item not in opened]
@@ -130,16 +155,17 @@ def main() -> int:
     parser.add_argument("--case-dir", type=Path, required=True)
     parser.add_argument("--role", choices=ROLES, required=True)
     parser.add_argument("--question")
+    parser.add_argument("--node", choices=NODES, help="reviewer 专用：本轮审哪个节点")
     parser.add_argument("--out", type=Path)
     args = parser.parse_args()
     try:
-        text = build_prompt(args.case_dir, args.role, args.question)
+        text = build_prompt(args.case_dir, args.role, args.question, args.node)
     except Exception as exc:  # noqa: BLE001
         print(f"FAIL start prompt: {exc}")
         return 1
 
     name = normalize_question(args.question) if args.question else "q1"
-    step = STEP_BY_ROLE.get(args.role, "X")
+    step = STEP_BY_ROLE.get(args.role) or (args.node or "C1")
     target = args.out or (
         args.case_dir / "队员工作区/启动提示词"
         / f"{name.upper()}-{step}-{args.role.capitalize()}.md"

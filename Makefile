@@ -100,7 +100,7 @@ spec-check:
 start-prompt:
 	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
 	@test -n "$(ROLE)" || (echo "ROLE is required (orchestrator/modeler/engineer/writer/reviewer)"; exit 2)
-	$(PYTHON) scripts/make_start_prompt.py --case-dir "$(CASE)" --role "$(ROLE)" $(if $(Q),--question $(Q),)
+	$(PYTHON) scripts/make_start_prompt.py --case-dir "$(CASE)" --role "$(ROLE)" $(if $(Q),--question $(Q),) $(if $(NODE),--node $(NODE),)
 
 review-packet:
 	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
