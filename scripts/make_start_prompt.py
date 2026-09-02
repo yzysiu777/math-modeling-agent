@@ -28,7 +28,8 @@ except ImportError:  # pragma: no cover
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLES = ("orchestrator", "modeler", "engineer", "writer", "reviewer")
-STEP_BY_ROLE = {"modeler": "A", "engineer": "C", "writer": "D"}
+# 调度者贯穿 A–E，不属于任何一步；审核者按节点命名。
+STEP_BY_ROLE = {"modeler": "A", "engineer": "C", "writer": "D", "orchestrator": "ALL"}
 NODES = ("C1", "C2", "C3")
 NODE_DECISION = re.compile(r"^[ \t]*Node\s+decision[ \t]*[:：]", re.IGNORECASE | re.MULTILINE)
 CODE_FENCE = re.compile(r"```text\n(?P<body>.*?)```", re.DOTALL)
