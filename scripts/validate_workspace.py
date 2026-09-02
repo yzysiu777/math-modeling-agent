@@ -75,7 +75,6 @@ RETIRED_PHRASES = (
     re.compile(r"全案例[^。\n]{0,6}C3[^。\n]{0,6}一次"),
     re.compile(r"七阶段"),
     re.compile(r"ctexart"),
-    re.compile(r"只(?:为|给)[^。\n]{0,12}写一份[^。\n]{0,6}Full SPEC"),
     re.compile(r"只为进入正式赛马的路线建立 Full SPEC"),
 )
 # 题目身份标识出现在工作台规范里，没有任何正当理由 —— 与「用词像不像这道题」
@@ -151,6 +150,18 @@ def _retired_reference_errors() -> List[str]:
                 errors.append(
                     f"guidance still states a retired policy: {relative} -> {hit.group(0)}"
                 )
+        # 「一份 Full SPEC」是旧口径，但「至少两条……各一份」是新口径的正确写法，
+        # 两者只能按行区分 —— 变长后顾正则做不到，所以单独按行查。
+        # 第一版把模式写成「只为/只给……写一份」，漏掉了启动模板里的「与一份 Full SPEC」，
+        # 又一次证明逐字列举抓不住换了语序的同一件事。
+        for number, line in enumerate(text.splitlines(), start=1):
+            if "Full SPEC" not in line or not re.search(r"[一单]份", line):
+                continue
+            if "至少两条" in line or "各一份" in line or "各写一份" in line or "多份" in line:
+                continue
+            errors.append(
+                f"guidance still states a retired policy: {relative}:{number} -> 一份 Full SPEC"
+            )
         for pattern in PROBLEM_IDENTIFIERS:
             hit = pattern.search(text)
             if hit:

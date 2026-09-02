@@ -74,6 +74,58 @@ class ProblemIdentifierTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
 
+class SingleSpecPhrasingTests(unittest.TestCase):
+    """协议改成「至少两条」之后，启动模板和共同协议里还留着「一份 Full SPEC」。
+
+    建模手照着提示词干活，两边不一致它就得停下来问 —— 实测里它真的问了。
+    """
+
+    def test_no_guidance_still_says_one_spec(self):
+        errors = [item for item in _retired_reference_errors() if "一份 Full SPEC" in item]
+        self.assertEqual(errors, [])
+
+    def test_guard_catches_the_phrasing_regardless_of_word_order(self):
+        variants = (
+            "完成 brief、2–3 个 Probe 与一份 Full SPEC。",
+            "只给正式路线写一份五段 Full SPEC；",
+            "`q<k>/board.md` + 一份 Full SPEC",
+            "为该路线建立单份 Full SPEC",
+        )
+        for text in variants:
+            with self.subTest(text=text):
+                scratch = Path(tempfile.mkdtemp())
+                try:
+                    doc = scratch / "prompts" / "stale.md"
+                    doc.parent.mkdir(parents=True)
+                    doc.write_text(text, encoding="utf-8")
+                    with mock.patch("scripts.validate_workspace.ROOT", scratch), \
+                         mock.patch("scripts.validate_workspace.GUIDANCE_DIRS", ("prompts",)), \
+                         mock.patch("scripts.validate_workspace.GUIDANCE_ROOT_FILES", ()):
+                        errors = _retired_reference_errors()
+                    self.assertTrue(any("一份 Full SPEC" in item for item in errors),
+                                    f"守卫漏掉了：{text}")
+                finally:
+                    shutil.rmtree(scratch)
+
+    def test_correct_new_phrasings_are_not_flagged(self):
+        for text in ("至少两条路线各一份 Full SPEC",
+                     "**至少两条**进入正式实现的路线各写一份五段 Full SPEC",
+                     "本题 Full SPEC 目录：可能有多份"):
+            with self.subTest(text=text):
+                scratch = Path(tempfile.mkdtemp())
+                try:
+                    doc = scratch / "prompts" / "ok.md"
+                    doc.parent.mkdir(parents=True)
+                    doc.write_text(text, encoding="utf-8")
+                    with mock.patch("scripts.validate_workspace.ROOT", scratch), \
+                         mock.patch("scripts.validate_workspace.GUIDANCE_DIRS", ("prompts",)), \
+                         mock.patch("scripts.validate_workspace.GUIDANCE_ROOT_FILES", ()):
+                        errors = _retired_reference_errors()
+                    self.assertEqual(errors, [], f"误报：{text}")
+                finally:
+                    shutil.rmtree(scratch)
+
+
 class SingleRouteReminderTests(unittest.TestCase):
     """发散六条、比较三条，最后只实现一条 —— 赛马从未真的发生过。"""
 
