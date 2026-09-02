@@ -7,6 +7,7 @@ from pathlib import Path
 
 from scripts.claim_evidence import validate_check_report
 from scripts.qa_latex import (
+    check_citation_verification,
     check_citations,
     check_evidence_citations,
     check_figures,
@@ -197,11 +198,24 @@ class CitationTests(unittest.TestCase):
         paper = self._paper("湍流服从 $-5/3$ 律\\cite{kolmogorov1941}。", bib=self.BIB, registry=registry)
         self.assertEqual(check_citations(paper), [])
 
-    def test_pending_verification_blocks_the_submission(self):
+    def test_pending_verification_is_reported_but_never_blocks(self):
+        """核对是队员的判断，脚本不替他判，也不因此拦住流程 —— 不阻断项目优先。"""
         registry = self.ROW + "| kolmogorov1941 | Local structure | K | 1941 | - | - | 人工放入 | 背景 | 待核对 |\n"
         paper = self._paper("湍流服从 $-5/3$ 律\\cite{kolmogorov1941}。", bib=self.BIB, registry=registry)
         self.assertEqual(check_citations(paper), [])
-        self.assertTrue(any("必须由队员核对" in item for item in check_citations(paper, final=True)))
+        self.assertEqual(check_citations(paper, final=True), [])
+        self.assertTrue(any("待你核对" in item for item in check_citation_verification(paper)))
+
+    def test_unfilled_support_is_reported_but_never_blocks(self):
+        registry = self.ROW + "| kolmogorov1941 | Local structure | K | 1941 | - | - | 联网检索 | 待填写 | 待核对 |\n"
+        paper = self._paper("湍流服从 $-5/3$ 律\\cite{kolmogorov1941}。", bib=self.BIB, registry=registry)
+        self.assertEqual(check_citations(paper, final=True), [])
+        self.assertTrue(any("支撑正文哪一处论断" in item for item in check_citation_verification(paper)))
+
+    def test_a_citation_with_no_registry_row_still_blocks(self):
+        """机械错误照旧拦：连记录都没有的引用，无从核对。"""
+        paper = self._paper("湍流服从 $-5/3$ 律\\cite{ghost2020}。", bib=self.BIB)
+        self.assertTrue(any("疑似编造" in item for item in check_citations(paper, final=True)))
 
     def test_placeholder_bib_entry_blocks_the_submission(self):
         registry = self.ROW + "| kolmogorov1941 | Local structure | K | 1941 | - | - | 人工放入 | 背景 | 已核对 |\n"

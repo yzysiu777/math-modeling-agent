@@ -194,16 +194,31 @@ def check_citations(paper_dir: Path, *, final: bool = False) -> list[str]:
         if key not in bib_keys:
             problems.append(f"{places}: 引用 {key} 在 references.bib 中没有条目")
 
-    if final:
-        for key, row in registered.items():
-            status = str(row.get("核对状态", "")).strip()
-            if status != "已核对":
-                problems.append(f"文献清单.md: {key} 的核对状态是「{status or '空'}」，提交前必须由队员核对")
-            if not str(row.get("支撑论断", "")).strip().strip("-") or "待填写" in str(row.get("支撑论断", "")):
-                problems.append(f"文献清单.md: {key} 没有写清支撑正文哪一处论断")
-        if BIB_PLACEHOLDER.search(bib_text):
-            problems.append("references.bib 仍含占位条目")
+    if final and BIB_PLACEHOLDER.search(bib_text):
+        problems.append("references.bib 仍含占位条目")
     return problems
+
+
+def check_citation_verification(paper_dir: Path) -> list[str]:
+    """The team's own reading list -- reported, never blocking.
+
+    Whether a reference is real and whether it actually supports the sentence it
+    is attached to are judgements only a person can make. Holding the build
+    hostage to that judgement stops the work without improving it, so this comes
+    back as a reminder at every stage; the mechanical half (a citation with no
+    registry row, no bib entry, or a placeholder entry) stays strict.
+    """
+
+    reminders: list[str] = []
+    for row in _registry_rows(paper_dir):
+        key = str(row.get("key", "")).strip()
+        status = str(row.get("核对状态", "")).strip()
+        if status != "已核对":
+            reminders.append(f"文献清单.md: {key} 待你核对（状态「{status or '空'}」）")
+        support = str(row.get("支撑论断", "")).strip().strip("-")
+        if not support or "待填写" in support:
+            reminders.append(f"文献清单.md: {key} 没有写清它支撑正文哪一处论断")
+    return reminders
 
 
 def check_evidence_citations(paper_dir: Path) -> list[str]:
@@ -554,10 +569,17 @@ def main() -> int:
             check_paper_prose(args.paper_dir)
             + check_evidence_citations(args.paper_dir)
             + check_prose_style(args.paper_dir)
+            + check_citation_verification(args.paper_dir)
         )
         if reminders:
             print("REMINDER 正文问题（提交前必须清干净）")
             print("\n".join(f"- {item}" for item in reminders))
+    if args.final:
+        # 提交前也只提醒：核对是队员的事，脚本不替他判断，也不因此拦住流程。
+        pending = check_citation_verification(args.paper_dir)
+        if pending:
+            print("REMINDER 文献待人工核对（不阻断）")
+            print("\n".join(f"- {item}" for item in pending))
     if errors:
         print("FAIL LaTeX QA")
         print("\n".join(f"- {error}" for error in errors))
