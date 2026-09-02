@@ -9,6 +9,7 @@
 本题目录：<案例目录>/q<k>
 
 读取 prompts/modeler.md、input/题面全文.md、input/说明文档/ 和本题数据范围。只负责本题 A–B；
-不得读取后续题 outputs。完成 brief、C1 落实、2–3 个 Probe 与一份 Full SPEC。
+不得读取后续题 outputs。完成 brief、C1 落实、2–3 个 Probe，以及**至少两条**进入正式实现
+的路线各一份 Full SPEC（第二条可以是同一路线的优化版或延伸版）。
 按六行 Agent 回报卡回复。
 ```
