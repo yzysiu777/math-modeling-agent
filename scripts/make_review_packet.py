@@ -169,7 +169,20 @@ def _new_node_materials(
             materials.append(("全案例关键 Claim", "paper/claim_map.md"))
         else:
             missing.append("paper/claim_map.md 不存在")
-        for qname in sources.questions:
+        # C3 挑战的是论文里的强结论，没有正文就只能看着数字猜它被写成了什么。
+        sections = sorted((case_dir / "paper/sections").glob("*.tex"))
+        sections += sorted((case_dir / "paper/appendix").glob("*.tex"))
+        if not sections:
+            missing.append("paper/sections/ 没有正文")
+        materials.extend(
+            ("论文正文", _relative_or_absolute(path, case_dir)) for path in sections
+        )
+        registry = case_dir / "paper/文献清单.md"
+        if registry.is_file():
+            materials.append(("文献清单（核对引用是否可追）", "paper/文献清单.md"))
+        # 给了题号就只看那一题；全案例收官那次才跨题。
+        scope = [question] if question else list(sources.questions)
+        for qname in scope:
             qdir = case_dir / qname
             board = qdir / "board.md"
             if board.is_file():
@@ -393,7 +406,13 @@ def main() -> int:
     else:
         question = args.question or _active_question(args.case_dir)
         if (args.case_dir / "sources.yaml").is_file():
-            directory = args.case_dir / ("paper/reviews" if args.node == "C3" else f"{question}/reviews")
+            # C3 分两层：给了 --question 就是该题那次，落 q<k>/reviews/；
+            # 不给才是全案例收官那次，落 paper/reviews/。检查器按同样的规则找卡，
+            # 两边不一致会让人以为审过了而检查器仍说没有。
+            directory = (
+                args.case_dir / f"{question}/reviews" if question
+                else args.case_dir / "paper/reviews"
+            )
         else:
             directory = args.case_dir / "reviews"
         target, review_id = _unique_target(directory, args.node)
