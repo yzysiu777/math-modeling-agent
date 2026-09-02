@@ -30,12 +30,17 @@ class CaseAndBoardTests(unittest.TestCase):
             self.assertFalse((case / "reports").exists())
             self.assertTrue((case / "sources.yaml").is_file())
             files = [path for path in case.rglob("*") if path.is_file()]
-            self.assertEqual(len(files), 18)
+            # 18 份工作文件 + 论文骨架（main/profile/bib/appendix + 7 前后章 + 3 题章）
+            self.assertEqual(len(files), 33)
+            self.assertIn("gmcmthesis", (case / "paper/main.tex").read_text(encoding="utf-8"))
+            self.assertNotIn("ctexart", (case / "paper/main.tex").read_text(encoding="utf-8"))
+            for name in ("00-abstract", "02-restate", "03-symbols", "05-assumptions", "90-evaluation"):
+                self.assertTrue((case / f"paper/sections/{name}.tex").is_file())
             self.assertFalse(any("待 Orchestrator 汇总" in path.read_text(encoding="utf-8") for path in files))
             workspace = case / "队员工作区"
             self.assertEqual(
                 {path.name for path in workspace.iterdir() if path.is_file()},
-                {"现在做什么.md", "审核卡索引.md", "我的笔记.md"},
+                {"现在做什么.md", "审核卡索引.md", "我的笔记.md", "待补图清单.md"},
             )
             self.assertEqual(
                 {path.name for path in workspace.iterdir() if path.is_dir()},

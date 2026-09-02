@@ -11,5 +11,14 @@
 - Champion 的约束、目标、切分、泄漏和关键指标独立复算；
 - 失败照实保留，不改判据、挑子集或静默重跑。
 
-C2 仅在检查器三条件触发时进行；Reviewer 的唯一推荐动作默认实施。每步追加本题 log，普通回报
-只用六行卡，不建额外交接文档。
+## 出图
+
+出图前读 `.agents/skills/competition-engineering/references/figure-standards.md`，
+并在脚本顶部写死 `rcParams`：中文用宋体（`Songti SC` / `SimSun`），英文与数字用
+`Times New Roman`，`axes.unicode_minus=False`。每图同时导出 `<FIG-ID>.pdf` 与 300 dpi PNG。
+
+**图内不写标题** —— 标题交给论文的 `\caption`，写两遍既挤又互相冲突。多图对比必须控制
+变量：只变一个因素，坐标范围、配色、字号和图例位置全部统一。
+
+C2 每题必做，材料包含你当前的实现代码和已落盘的复算报告；Reviewer 的唯一推荐动作默认实施。
+每步追加本题 log，普通回报只用六行卡，不建额外交接文档。

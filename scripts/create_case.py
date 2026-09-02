@@ -10,6 +10,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "templates"
 ROUTES = {"optimization", "data_analysis", "hybrid", "insufficient_information"}
+_CN_ORDINAL = {1: "一", 2: "二", 3: "三", 4: "四", 5: "五", 6: "六",
+               7: "七", 8: "八", 9: "九", 10: "十"}
+QUESTION_SECTION = re.compile(r"^q[1-9][0-9]*\.tex$")
 CASE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{1,63}$")
 
 
@@ -79,6 +82,40 @@ def _log_seed(question: str) -> str:
 """
 
 
+def _seed_paper(case_dir: Path, questions: int) -> None:
+    """Copy the paper skeleton so the Writer never has to invent a document class.
+
+    The third dry run produced a hand-rolled ``ctexart`` main.tex because the case
+    only offered an empty ``paper/sections/`` -- the gmcmthesis engineering that
+    handles the cover page, the abstract layout and anonymity was never reached.
+    Class, style and bst stay in the repository ``paper/`` and are found through
+    TEXINPUTS; only case-specific content is copied here.
+    """
+
+    source = TEMPLATES / "paper"
+    for relative in ("config", "sections", "bibliography", "figures", "tables", "appendix", "reviews"):
+        (case_dir / "paper" / relative).mkdir(parents=True, exist_ok=True)
+    for path in sorted(source.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(source)
+        if relative.parent.name == "sections" and QUESTION_SECTION.fullmatch(relative.name):
+            if int(relative.stem[1:]) > questions:
+                continue
+        (case_dir / "paper" / relative).write_text(
+            path.read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    main = case_dir / "paper/main.tex"
+    text = main.read_text(encoding="utf-8")
+    # 用字面替换而不是 re.sub：替换串里的 \InputQuestion 会被当成正则转义。
+    seeded = "\n".join(f"\\InputQuestion{{q{index}}}" for index in (1, 2, 3))
+    wanted = "\n".join(
+        f"\\InputQuestion{{q{index}}}" for index in range(1, questions + 1)
+    )
+    text = text.replace(seeded, wanted)
+    main.write_text(text, encoding="utf-8")
+
+
 def create_case(
     case_id: str,
     route: str = "insufficient_information",
@@ -96,7 +133,7 @@ def create_case(
         raise FileExistsError(f"case already exists: {case_dir}")
 
     for relative in (
-        "input/说明文档", "paper/reviews", "paper/sections",
+        "input/说明文档",
         "队员工作区/待批准", "队员工作区/已批准", "队员工作区/启动提示词",
     ):
         (case_dir / relative).mkdir(parents=True, exist_ok=True)
@@ -127,17 +164,29 @@ def create_case(
         "# 阶段 0 生成目录\n\n运行 `make ingest CASE=cases/<case_id>` 后生成题面全文、数据清单、说明文档和每题数据范围。\n",
         encoding="utf-8",
     )
+    _seed_paper(case_dir, questions)
     (case_dir / "paper/README.md").write_text(
-        "# 全案例论文\n\n每题正文写入 `sections/q<k>.tex`；C3 在全案例收官前只做一次。\n",
+        "# 全案例论文\n\n"
+        "文档类、样式和 bst 来自仓库 `paper/`，本目录只放本案例内容。\n\n"
+        "- 整本编译：`make paper CASE=<案例目录>`\n"
+        "- 单题编译：`make paper CASE=<案例目录> Q=q1`\n\n"
+        "每题正文写入 `sections/q<k>.tex`；每题 D 结束做一次 C3，全案例收官前再做一次。\n",
         encoding="utf-8",
     )
     (case_dir / "paper/claim_map.md").write_text(
         (TEMPLATES / "claim_map.md").read_text(encoding="utf-8"), encoding="utf-8"
     )
-    for name in ("现在做什么.md", "审核卡索引.md", "我的笔记.md"):
+    for name in ("现在做什么.md", "审核卡索引.md", "我的笔记.md", "待补图清单.md"):
         text = (TEMPLATES / name).read_text(encoding="utf-8")
         if name == "现在做什么.md":
             text = text.replace("- 案例：/", f"- 案例：{case_id} /")
+        if name == "待补图清单.md":
+            # 骨架自带的每题流程图也要登记，否则新案例一建好就报「未登记」。
+            text += "".join(
+                f"| `fig:q{index}-flow` | 问题{_CN_ORDINAL[index]}的求解流程或算法框图"
+                " | 需要人工绘制 | 待认领 |\n"
+                for index in range(1, questions + 1)
+            )
         (case_dir / "队员工作区" / name).write_text(text, encoding="utf-8")
     return case_dir
 

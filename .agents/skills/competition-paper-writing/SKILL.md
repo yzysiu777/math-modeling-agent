@@ -11,6 +11,37 @@ The Skill of the **Writer** role (`prompts/writer.md`). Use it as soon as a
 baseline produces a stable observation. The paper is a second representation of
 the model and experiments, not a final-day decoration.
 
+## The paper is the deliverable, the claim map is the ledger
+
+The third dry run traced every number correctly and then wrote the traceability
+into the paper: 23 experiment IDs, 21 six-decimal figures and a closing paragraph
+of script paths and command-line flags. No competition paper reads like that.
+
+Trace in `paper/claim_map.md`. Keep out of the body: experiment IDs, file names,
+directories, command-line flags, checker codes and workbench vocabulary
+(`board`, `SPEC`, `checkpoint`). Use `\dataref{EXP-...}` when a draft needs the
+link visible -- it prints nothing in the PDF. Round to **3-4 significant digits**
+in prose and tables; full precision belongs in the data files. Programs appear
+once, as a two-column table in the appendix: a Chinese program name and a
+one-line purpose.
+
+## Organise by question, not by activity
+
+Front matter (background, problem restatement, symbols, problem analysis,
+assumptions) is shared; each question then gets one whole chapter running data
+preprocessing -> model -> solution -> evaluation metrics -> results. The
+restatement and the preprocessing subsection are where judges decide whether you
+actually read the problem and touched the data, so neither may be a single
+paragraph.
+
+The case paper project is seeded by `create_case` and uses the official
+`gmcmthesis` class. **Never create a second main document or change the document
+class.** Build with `make paper CASE=<case> Q=q<k>`.
+
+A figure you cannot draw is not a figure you skip: hold the slot with
+`\PlaceholderFigure{what it should show}` and register one line in
+`队员工作区/待补图清单.md`.
+
 ## The three rules
 
 1. **Every number is traceable.** Each number and strong claim in the abstract,

@@ -29,11 +29,12 @@ class LightweightProtocolTests(unittest.TestCase):
             self.assertIn("回签", text)
 
     def test_c1_c2_c3_frequency_is_documented(self):
+        """MMAG-009 起 C2 每题必做，三条风险条件降级为审核卡的输入。"""
         text = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")
         self.assertIn("C1 每题必做", text)
-        self.assertIn("C2 仅在", text)
-        self.assertIn("C3", text)
-        self.assertIn("全案例", text)
+        self.assertIn("C2 每题必做", text)
+        self.assertNotIn("C2 仅在", text)
+        self.assertIn("全案例 C3", text)
 
     def test_stage_zero_and_shared_scope_are_documented(self):
         text = (ROOT / "protocol/competition-workflow.md").read_text(encoding="utf-8")

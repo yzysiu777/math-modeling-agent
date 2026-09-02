@@ -83,11 +83,14 @@ human_block: ""
     return case
 
 
-def question_review(case: Path, route: str | None = "optimization", body: str = "") -> None:
+def question_review(
+    case: Path, route: str | None = "optimization", body: str = "", *, nodes: tuple[str, ...] = ("C1",)
+) -> None:
     route_line = f"推荐路由：{route}\n" if route else ""
-    (case / "q1/reviews/C1_done.md").write_text(
-        f"Node decision: GO\n{route_line}{body}\n", encoding="utf-8"
-    )
+    for node in nodes:
+        (case / f"q1/reviews/{node}_done.md").write_text(
+            f"Node decision: GO\n{route_line}{body}\n", encoding="utf-8"
+        )
 
 
 def make_case(root: Path, case_id: str = "case-a", *, complete_startup: bool = True) -> Path:
@@ -324,14 +327,28 @@ class CaseCheckTests(unittest.TestCase):
             question_review(case)
             self.assertIn("C2_REQUIRED", {f.code for f in check_case(case, "model_selection").findings})
 
-    def test_c2_trigger_1_negative_skips_c2_with_champion_pass(self):
+    def test_c2_is_required_even_when_no_trigger_condition_fires(self):
+        """MMAG-009 的语义反转：C2 每题必做，不再按三条件跳过。
+
+        第三次实测里三条件全假、C2 一次没跑，队员判定「c2 的一轮审核还是必要的，
+        要不回去修改也耗费时间」。这条测试锁住反转，防止有人按旧直觉改回去。
+        """
         passed = "| EXP-001 | M-01 | probe | q | PASS | toy | 1 min | done | 判定：PASS | yes | Full |"
         with tempfile.TemporaryDirectory() as tmp:
             case = make_question_case(Path(tmp), passed)
             question_review(case)
             report = check_case(case, "model_selection")
-            self.assertNotIn("C2_REQUIRED", {f.code for f in report.findings})
-            self.assertIn("C2_SKIPPED", {f.code for f in report.findings})
+            self.assertIn("C2_REQUIRED", {f.code for f in report.findings})
+            self.assertNotIn("C2_SKIPPED", {f.code for f in report.findings})
+
+    def test_c2_card_satisfies_the_requirement(self):
+        passed = "| EXP-001 | M-01 | probe | q | PASS | toy | 1 min | done | 判定：PASS | yes | Full |"
+        with tempfile.TemporaryDirectory() as tmp:
+            case = make_question_case(Path(tmp), passed)
+            question_review(case, nodes=("C1", "C2"))
+            self.assertNotIn(
+                "C2_REQUIRED", {f.code for f in check_case(case, "model_selection").findings}
+            )
 
     def test_c2_trigger_2_requires_c2_after_two_failures_on_same_route(self):
         rows = "\n".join((
@@ -344,15 +361,22 @@ class CaseCheckTests(unittest.TestCase):
             question_review(case)
             self.assertIn("C2_REQUIRED", {f.code for f in check_case(case, "model_selection").findings})
 
-    def test_c2_trigger_2_negative_allows_one_failure(self):
+    def test_trigger_reasons_are_carried_into_the_c2_finding(self):
+        """触发条件不再决定要不要审，但要出现在 finding 里，供审核卡填「最担心什么」。"""
         rows = "\n".join((
             "| EXP-001 | M-01 | probe | q | PASS | toy | 1 min | done | 判定：PASS | yes | Full |",
             "| EXP-002 | M-01 | probe | q2 | PASS | toy | 1 min | failed | 判定：FAIL | no | 改进 |",
+            "| EXP-003 | M-01 | probe | q3 | PASS | toy | 1 min | failed | 判定：FAIL | no | 改进 |",
         ))
         with tempfile.TemporaryDirectory() as tmp:
             case = make_question_case(Path(tmp), rows)
             question_review(case)
-            self.assertNotIn("C2_REQUIRED", {f.code for f in check_case(case, "model_selection").findings})
+            reason = next(
+                f.reason for f in check_case(case, "model_selection").findings
+                if f.code == "C2_REQUIRED"
+            )
+            self.assertIn("本轮风险提示", reason)
+            self.assertIn("failed", reason)
 
     def test_c2_trigger_3_requires_c2_for_waived_or_pending_spec(self):
         passed = "| EXP-001 | M-01 | probe | q | PASS | toy | 1 min | done | 判定：PASS | yes | Full |"
@@ -362,12 +386,21 @@ class CaseCheckTests(unittest.TestCase):
                 question_review(case)
                 self.assertIn("C2_REQUIRED", {f.code for f in check_case(case, "model_selection").findings})
 
-    def test_c2_trigger_3_negative_allows_pass_spec(self):
+    def test_case_level_c3_is_required_at_final_in_addition_to_the_per_question_one(self):
         passed = "| EXP-001 | M-01 | probe | q | PASS | toy | 1 min | done | 判定：PASS | yes | Full |"
         with tempfile.TemporaryDirectory() as tmp:
             case = make_question_case(Path(tmp), passed, "PASS")
-            question_review(case)
-            self.assertNotIn("C2_REQUIRED", {f.code for f in check_case(case, "model_selection").findings})
+            question_review(case, nodes=("C1", "C2", "C3"))
+            codes = {f.code for f in check_case(case, "final").findings}
+            self.assertNotIn("C3_REQUIRED", codes)
+            self.assertIn("CASE_C3_REQUIRED", codes)
+            (case / "paper/reviews").mkdir(parents=True, exist_ok=True)
+            (case / "paper/reviews/C3_case.md").write_text(
+                "Node decision: GO\n", encoding="utf-8"
+            )
+            self.assertNotIn(
+                "CASE_C3_REQUIRED", {f.code for f in check_case(case, "final").findings}
+            )
 
     def test_review_card_with_options_but_no_recommendation_is_reminded(self):
         passed = "| EXP-001 | M-01 | probe | q | PASS | toy | 1 min | done | 判定：PASS | yes | Full |"

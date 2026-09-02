@@ -27,6 +27,7 @@ except ImportError:  # pragma: no cover
     from make_review_packet import _data_roots
 
 
+CASE_LEVEL = "__case__"
 ROUTES = {"optimization", "data_analysis", "hybrid", "insufficient_information"}
 STAGES = {"exploration", "model_selection", "paper_claims", "final"}
 PLACEHOLDERS = {"", "-", "—", "待填写", "待填", "待补充", "todo", "tbd", "n/a"}
@@ -185,23 +186,34 @@ def _question_context(
 
 
 def _review_files(case_dir: Path, node: str, question: str | None = None) -> list[Path]:
-    if question is None:
-        directory = case_dir / "reviews"
-    elif node == "C3":
-        directory = case_dir / "paper/reviews"
-    else:
-        directory = case_dir / question / "reviews"
+    directory = (case_dir / "reviews") if question is None else (case_dir / question / "reviews")
     if not directory.is_dir():
         return []
     pattern = re.compile(rf"^{node}(?:[_. -].*)?\.md$", re.IGNORECASE)
     return sorted(path for path in directory.iterdir() if path.is_file() and pattern.fullmatch(path.name))
 
 
+def _case_review_files(case_dir: Path, node: str) -> list[Path]:
+    """Case-level review cards live beside the shared paper, not under a question."""
+
+    directory = case_dir / "paper/reviews"
+    if not directory.is_dir():
+        return []
+    pattern = re.compile(rf"^{node}(?:[_. -].*)?\.md$", re.IGNORECASE)
+    return sorted(
+        path for path in directory.iterdir() if path.is_file() and pattern.fullmatch(path.name)
+    )
+
+
 def _review_decision(
     case_dir: Path, node: str, question: str | None = None
 ) -> tuple[str | None, str]:
     failures: list[str] = []
-    for path in reversed(_review_files(case_dir, node, question)):
+    files = (
+        _case_review_files(case_dir, node) if question == CASE_LEVEL
+        else _review_files(case_dir, node, question)
+    )
+    for path in reversed(files):
         text = path.read_text(encoding="utf-8")
         match = NODE_DECISION.search(text)
         if match is None:
@@ -217,7 +229,8 @@ def _review_decision(
                 failures.append(f"{path.name}: Reviewer 不接受拒绝理由")
                 continue
         return match.group(1).upper(), path.name
-    return None, "; ".join(failures) or f"reviews/ 中没有 {node} 审核卡"
+    where = "paper/reviews/" if question == CASE_LEVEL else "reviews/"
+    return None, "; ".join(failures) or f"{where} 中没有 {node} 审核卡"
 
 
 def _review_route(case_dir: Path, question: str) -> str | None:
@@ -231,12 +244,10 @@ def _review_route(case_dir: Path, question: str) -> str | None:
     return None
 
 
-def _review_card_policy_findings(
-    case_dir: Path, question: str | None, *, include_c3: bool = True
-) -> list[Finding]:
+def _review_card_policy_findings(case_dir: Path, question: str | None) -> list[Finding]:
     findings: list[Finding] = []
     paths: list[Path] = []
-    nodes = ("C1", "C2", "C3") if include_c3 else ("C1", "C2")
+    nodes = ("C1", "C2", "C3")
     for node in nodes:
         paths.extend(_review_files(case_dir, node, question))
     for path in dict.fromkeys(paths):
@@ -333,7 +344,7 @@ def _c2_trigger_reasons(work_dir: Path) -> list[str]:
 
 
 def _question_review_findings(
-    case_dir: Path, question: str, work_dir: Path, stage: str, *, include_c3: bool = True
+    case_dir: Path, question: str, work_dir: Path, stage: str
 ) -> list[Finding]:
     findings: list[Finding] = []
     c1_decision, c1_detail = _review_decision(case_dir, "C1", question)
@@ -349,36 +360,57 @@ def _question_review_findings(
             "ORCHESTRATOR", "C1",
         ))
 
+    # C2 每题必做，与 C1 同级。第三次实测里三条触发条件全假、C2 一次没跑，
+    # 队员的结论是「c2 的一轮审核还是必要的，要不回去修改也耗费时间」——
+    # 触发条件保留，但降级为审核卡里「本轮最担心什么」的输入，不再决定要不要审。
     if stage in {"model_selection", "paper_claims", "final"}:
-        reasons = _c2_trigger_reasons(work_dir)
         c2_decision, c2_detail = _review_decision(case_dir, "C2", question)
         if c2_decision == "STOP":
             findings.append(_finding(
-                "BLOCK", "C2_STOP", f"C2 返回 STOP（{c2_detail}）", "ORCHESTRATOR", "C2"
+                "BLOCK", "C2_STOP", f"{question.upper()} 的 C2 返回 STOP（{c2_detail}）",
+                "ORCHESTRATOR", "C2",
             ))
-        elif reasons and c2_decision is None:
+        elif c2_decision is None:
+            reasons = _c2_trigger_reasons(work_dir)
+            detail = f"；本轮风险提示：{'；'.join(reasons)}" if reasons else ""
             findings.append(_finding(
-                "BLOCK", "C2_REQUIRED", "；".join(reasons), "ORCHESTRATOR", "C2"
-            ))
-        elif not reasons and c2_decision is None:
-            findings.append(_finding(
-                "REMINDER", "C2_SKIPPED",
-                f"{question.upper()} 未触发 C2；在 {question}/log.md 记录一行跳过理由",
+                "BLOCK", "C2_REQUIRED",
+                f"{question.upper()} 尚无 C2 可执行决定（{c2_detail}）{detail}",
                 "ORCHESTRATOR", "C2",
             ))
 
-    if include_c3 and stage in {"paper_claims", "final"}:
+    # C3 分两层：每题 D 结束一次，全案例收官前再一次。
+    if stage in {"paper_claims", "final"}:
         c3_decision, c3_detail = _review_decision(case_dir, "C3", question)
         if c3_decision is None:
             findings.append(_finding(
                 "REMINDER" if stage == "paper_claims" else "BLOCK", "C3_REQUIRED",
-                f"全案例尚无 C3 可执行决定（{c3_detail}）", "ORCHESTRATOR", "C3",
+                f"{question.upper()} 尚无 C3 可执行决定（{c3_detail}）", "ORCHESTRATOR", "C3",
             ))
         elif c3_decision == "STOP":
             findings.append(_finding(
-                "BLOCK", "C3_STOP", f"C3 返回 STOP（{c3_detail}）", "ORCHESTRATOR", "C3"
+                "BLOCK", "C3_STOP", f"{question.upper()} 的 C3 返回 STOP（{c3_detail}）",
+                "ORCHESTRATOR", "C3",
             ))
     return findings
+
+
+def _case_c3_findings(case_dir: Path, stage: str) -> list[Finding]:
+    """The whole-paper C3 that samples the highest-risk claims across questions."""
+
+    if stage != "final":
+        return []
+    decision, detail = _review_decision(case_dir, "C3", CASE_LEVEL)
+    if decision is None:
+        return [_finding(
+            "BLOCK", "CASE_C3_REQUIRED",
+            f"全案例收官尚无 C3 可执行决定（{detail}）", "ORCHESTRATOR", "C3",
+        )]
+    if decision == "STOP":
+        return [_finding(
+            "BLOCK", "CASE_C3_STOP", f"全案例 C3 返回 STOP（{detail}）", "ORCHESTRATOR", "C3"
+        )]
+    return []
 
 
 def _startup_findings(
@@ -681,15 +713,12 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
         for index, (qname, qdir, state) in enumerate(contexts):
             if qname is None:
                 continue
-            findings.extend(_question_review_findings(
-                case_dir, qname, qdir, stage, include_c3=index == 0
-            ))
-            findings.extend(_review_card_policy_findings(
-                case_dir, qname, include_c3=index == 0
-            ))
+            findings.extend(_question_review_findings(case_dir, qname, qdir, stage))
+            findings.extend(_review_card_policy_findings(case_dir, qname))
             findings.extend(_cross_question_findings(qdir, qname))
             findings.extend(_failed_experiment_findings(qdir))
             findings.extend(_risk_findings(qdir, state, stage))
+        findings.extend(_case_c3_findings(case_dir, stage))
     else:
         findings.extend(_legacy_review_findings(case_dir, stage))
         findings.extend(_review_card_policy_findings(case_dir, None))
