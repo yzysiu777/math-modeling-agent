@@ -103,9 +103,22 @@ def validate_check_report(path: Path, claim_exp: Optional[str]) -> ReportVerdict
     found = EXP_ID.findall(raw_exp)
     if len(found) != 1 or not _EXACT_EXP_ID.match(raw_exp):
         return ReportVerdict(problem=f"报告的 exp_id {raw_exp!r} 不是唯一且规范的 EXP-ID")
-    if claim_exp and raw_exp.upper() != claim_exp.upper():
+    # 一份复算脚本常常一次核完主实验和它的两个稳健性子实验。第三次实测里，
+    # 因为要求顶层 exp_id 必须等于 claim 的 EXP-ID，把一份统一报告拆成三份，
+    # 走了八次交接。允许报告显式声明它还覆盖了哪些实验，只放宽这一处。
+    covered = {raw_exp.upper()}
+    raw_covers = payload.get("covers")
+    if raw_covers is not None:
+        if not isinstance(raw_covers, list):
+            return ReportVerdict(problem="covers 必须是 EXP-ID 列表")
+        for item in raw_covers:
+            text = str(item or "").strip().strip("`")
+            if not _EXACT_EXP_ID.match(text):
+                return ReportVerdict(problem=f"covers 中的 {text!r} 不是规范的 EXP-ID")
+            covered.add(text.upper())
+    if claim_exp and claim_exp.upper() not in covered:
         return ReportVerdict(
-            problem=f"报告属于 {raw_exp.upper()}，与 claim 的 {claim_exp.upper()} 不一致")
+            problem=f"报告覆盖 {'、'.join(sorted(covered))}，不含 claim 的 {claim_exp.upper()}")
 
     checks = payload.get("checks")
     if not isinstance(checks, list) or not checks:

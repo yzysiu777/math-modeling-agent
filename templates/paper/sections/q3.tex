@@ -1,0 +1,41 @@
+\section{问题三模型的建立与求解}
+\label{sec:q3}
+
+\subsection{数据预处理}
+
+\paperexample{这一小节要写细，评委靠它判断你有没有真的碰过数据。至少覆盖：
+时间对齐与时区、高度或空间网格对齐、缺测与哨兵值的识别与处理、异常值判定、
+单位换算、以及样本量与覆盖率。每一步说清依据，不要只写「做了清洗」。}
+
+\subsubsection{对齐与缺测处理}
+
+\subsubsection{参数准备}
+
+\subsection{模型建立}
+
+\paperexample{按变量、目标、约束或统计关系的顺序展开，公式编号并在正文中引用。
+符号沿用第~\ref{sec:q3} 节之前的符号说明，不重复定义。
+如果本问有多个模型（模型 a / 模型 b），各占一个小节。}
+
+\subsection{模型求解}
+
+\paperexample{算法流程、关键参数、终止条件和计算规模。配一张流程图或算法框图；
+缺了用占位图挡住并登记。求解过程写方法与思路，不写脚本名、路径或命令行。}
+
+\begin{figure}[H]
+  \centering
+  \PlaceholderFigure{问题三的求解流程或算法框图。人工绘制后替换为
+    \texttt{\textbackslash includegraphics}，并从待补图清单中删去对应行。}
+  \caption{问题三求解流程}
+  \label{fig:q3-flow}
+\end{figure}
+
+\subsection{模型评估指标}
+
+\paperexample{先写清用什么指标、判据阈值是多少、以及为什么这样定 —— 判据必须在
+看到结果之前就定好。切分方式与独立样本单位也在这里交代。}
+
+\subsection{结果与分析}
+
+\paperexample{给出结果表与结果图，并解释物理或业务含义。数字一律 3--4 位有效数字。
+结论强度必须与证据匹配：没有超过基线就不要写「优于」。不确定性按真实的独立样本单位描述。}

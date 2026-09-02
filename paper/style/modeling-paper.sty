@@ -53,6 +53,23 @@
   \par\noindent{\color{gray}\itshape 模板示例：#1}\par
 }
 
+% 占位图。技术路线图、组织架构图、流程图往往要人工绘制，写作手画不了就用它挡住，
+% 而不是悄悄跳过一张该有的图。它会在版面上占出真实图的位置并印出「待补」字样，
+% 人工补完后把整个 \PlaceholderFigure 换成 \includegraphics 即可。
+%
+% 每出现一次，都必须在案例的 队员工作区/待补图清单.md 里有对应一行 —— 
+% qa_latex 会核对这个对应关系，防止占位图一路留到提交稿。
+\RequirePackage{tikz}
+\newcommand{\PlaceholderFigure}[2][0.85]{%
+  \begin{tikzpicture}
+    \draw[dashed,gray,line width=0.8pt]
+      (0,0) rectangle (#1\textwidth,0.55\linewidth);
+    \node[align=center,text width=0.8\textwidth,gray]
+      at (0.5*#1\textwidth,0.275\linewidth)
+      {\bfseries 待补图\\[4pt]\normalfont #2};
+  \end{tikzpicture}%
+}
+
 % 数字溯源标记：把正文里的数字与实验 ID 绑在一起，便于写作手自查和 C3 抽查。
 % 用法：本文在 12 个算例上均可行\dataref{EXP-OPT-002}。
 % 默认不打印，只在草稿模式下显示；提交稿不受影响。

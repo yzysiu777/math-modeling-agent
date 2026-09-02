@@ -148,6 +148,21 @@ def _new_node_materials(
             ("Full SPEC", _relative_or_absolute(path, case_dir))
             for path in specs if not path.name.endswith(".questions.md")
         )
+        # 队员原话：「c2 审核是需要根据当时代码状态来调整审核或者思考方向的」。
+        # 只给规格和实验板，审核者看不到实现与规格是否真的对得上。
+        entries = [
+            path for pattern in ("code/python/*.py", "code/matlab/*.m")
+            for path in sorted(work_dir.glob(pattern))
+        ]
+        if not entries:
+            missing.append(f"{question}/code/ 没有可审的实现")
+        materials.extend(
+            ("当前实现代码", _relative_or_absolute(path, case_dir)) for path in entries
+        )
+        materials.extend(
+            ("已落盘复算报告", _relative_or_absolute(path, case_dir))
+            for path in sorted((work_dir / "outputs/checks").glob("*.json"))
+        )
     else:
         claim_map = case_dir / "paper/claim_map.md"
         if claim_map.is_file():

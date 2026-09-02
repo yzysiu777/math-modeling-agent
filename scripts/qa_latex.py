@@ -91,18 +91,122 @@ def _official_freeze_errors(paper_dir: Path) -> list[str]:
     return errors
 
 
+# 论文正文里不该出现的工作台内部符号。第三次实测的 q1.tex 里 `EXP-` 出现 23 次、
+# 六位小数 21 处，末尾整整一段是脚本路径和命令行 —— 溯源机制漏进了交付物。
+# 溯源留在案例的关键数字溯源表里，正文只写论文该有的东西。
+PROSE_BANS = (
+    (re.compile(r"EXP-[A-Za-z0-9][A-Za-z0-9_-]*"), "实验编号"),
+    (re.compile(r"[\w\u4e00-\u9fff\-]+\.(?:py|csv|json|ya?ml|md|txt|log)\b"), "文件名"),
+    (re.compile(r"\bq[1-9][0-9]*/|\boutputs/|\bcode/(?:python|matlab)|\bexperiments/"), "工作台目录"),
+    (re.compile(r"\\path\s*\{"), r"\path 宏"),
+    (re.compile(r"(?<![\w-])--[a-z][a-z-]{2,}"), "命令行参数"),
+    (re.compile(r"\b(?:BLOCK|REMINDER|CLAIM_[A-Z_]+|SPEC-[A-Z0-9])"), "检查器或规格编号"),
+    (re.compile(r"claim_map|checkpoint\.yaml|probe_result|board\.md|队员工作区"), "工作台词汇"),
+    (re.compile(r"\d\.\d{5,}"), "超过四位有效数字"),
+)
+NON_PROSE_ARGUMENT = re.compile(
+    r"\\(?:includegraphics(?:\[[^\]]*\])?|label|ref|eqref|cite|dataref)\{[^}]*\}"
+)
+INCLUDE_GRAPHICS = re.compile(r"\\includegraphics(?:\[[^\]]*\])?\{([^}]+)\}")
+PLACEHOLDER_FIGURE = re.compile(r"\\PlaceholderFigure(?:\[[^\]]*\])?\{")
+FIGURE_LABEL = re.compile(r"\\label\{(fig:[^}]+)\}")
+
+
+def _strip_paperexample(text: str) -> str:
+    """Drop \\paperexample{...} blocks: template guidance is not prose."""
+
+    out: list[str] = []
+    index = 0
+    while True:
+        match = PAPER_EXAMPLE.search(text, index)
+        if match is None:
+            out.append(text[index:])
+            return "".join(out)
+        out.append(text[index:match.start()])
+        depth, cursor = 1, match.end()
+        while cursor < len(text) and depth:
+            char = text[cursor]
+            if char == "{" and text[cursor - 1] != "\\":
+                depth += 1
+            elif char == "}" and text[cursor - 1] != "\\":
+                depth -= 1
+            cursor += 1
+        index = cursor
+
+
+def check_paper_prose(paper_dir: Path) -> list[str]:
+    """Report workbench artefacts that leaked into the paper body."""
+
+    problems: list[str] = []
+    for path in sorted((paper_dir / "sections").glob("*.tex")):
+        text = _strip_paperexample(_without_tex_comments(path.read_text(encoding="utf-8")))
+        # 只查读者看得见的文字。图片路径、标签和引用键不会印进 PDF，
+        # 用工作台命名不影响论文可读性。
+        text = NON_PROSE_ARGUMENT.sub("", text)
+        for number, line in enumerate(text.splitlines(), start=1):
+            for pattern, label in PROSE_BANS:
+                found = pattern.search(line)
+                if found:
+                    problems.append(
+                        f"{path.name}:{number} 正文出现{label}「{found.group(0)}」："
+                        f"{line.strip()[:60]}"
+                    )
+                    break
+    return problems
+
+
+def check_figures(paper_dir: Path, *, final: bool = False) -> list[str]:
+    """Placeholder figures must be registered, and final figures must be vector."""
+
+    problems: list[str] = []
+    registry = paper_dir.parent / "队员工作区/待补图清单.md"
+    registered = registry.read_text(encoding="utf-8") if registry.is_file() else ""
+    for path in sorted((paper_dir / "sections").glob("*.tex")):
+        text = _without_tex_comments(path.read_text(encoding="utf-8"))
+        for block in re.split(r"\\begin\{figure\}", text)[1:]:
+            body = block.split("\\end{figure}")[0]
+            if not PLACEHOLDER_FIGURE.search(body):
+                continue
+            label = FIGURE_LABEL.search(body)
+            name = label.group(1) if label else path.name
+            if final:
+                problems.append(f"{path.name}: 提交稿仍有占位图 {name}")
+            elif not registry.is_file():
+                problems.append(f"{path.name}: 有占位图 {name}，但缺少 队员工作区/待补图清单.md")
+            elif label and label.group(1) not in registered:
+                problems.append(f"{path.name}: 占位图 {name} 未登记在待补图清单中")
+        for reference in INCLUDE_GRAPHICS.findall(_strip_paperexample(text)):
+            target = paper_dir / reference
+            if target.suffix:
+                candidates = [target]
+            else:
+                candidates = [target.with_suffix(item) for item in (".pdf", ".png", ".jpg", ".eps")]
+            if not any(item.is_file() for item in candidates):
+                problems.append(f"{path.name}: 引用了不存在的图 {reference}")
+                continue
+            if final and not target.with_suffix(".pdf").is_file():
+                problems.append(f"{path.name}: 提交稿要求矢量图，缺少 {target.with_suffix('.pdf').name}")
+    return problems
+
+
 def check_sources(paper_dir: Path, *, final: bool = False) -> list[str]:
     errors: list[str] = []
+    # 案例论文只放自己的内容，文档类、样式、bst 和封面图经 TEXINPUTS 从仓库
+    # paper/ 解析。缺少 gmcmthesis.cls 即判定为案例工程，不再强求那几份共享文件。
+    inherited = not (paper_dir / "gmcmthesis.cls").is_file()
     required = [
         paper_dir / "main.tex",
         paper_dir / "config/paper-profile.tex",
-        paper_dir / "style/modeling-paper.sty",
         paper_dir / "bibliography/references.bib",
-        paper_dir / "gmcmthesis.cls",
-        paper_dir / "gmcm.bst",
-        paper_dir / "figures/logo.pdf",
-        paper_dir / "figures/title.pdf",
     ]
+    if not inherited:
+        required += [
+            paper_dir / "style/modeling-paper.sty",
+            paper_dir / "gmcmthesis.cls",
+            paper_dir / "gmcm.bst",
+            paper_dir / "figures/logo.pdf",
+            paper_dir / "figures/title.pdf",
+        ]
     for path in required:
         if not path.exists():
             errors.append(f"missing required LaTeX file: {path}")
@@ -125,8 +229,10 @@ def check_sources(paper_dir: Path, *, final: bool = False) -> list[str]:
             errors.append(f"main.tex missing required marker: {marker}")
     if not sorted((paper_dir / "sections").glob("*.tex")):
         errors.append("no section files under sections/; the split structure is required")
+    errors.extend(check_figures(paper_dir, final=final))
     if final:
         errors.extend(_official_freeze_errors(paper_dir))
+        errors.extend(check_paper_prose(paper_dir))
     return errors
 
 
@@ -239,6 +345,12 @@ def main() -> int:
     errors = check_sources(args.paper_dir, final=args.final) + check_build(
         args.build_dir, args.paper_dir, final=args.final
     )
+    if not args.final:
+        # 草稿阶段只提醒：正文还在改，不该因为一处遗留的实验编号挡住编译流程。
+        reminders = check_paper_prose(args.paper_dir)
+        if reminders:
+            print("REMINDER 正文含工作台内部符号（提交前必须清干净）")
+            print("\n".join(f"- {item}" for item in reminders))
     if errors:
         print("FAIL LaTeX QA")
         print("\n".join(f"- {error}" for error in errors))

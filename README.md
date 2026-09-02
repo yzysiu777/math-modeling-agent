@@ -82,7 +82,7 @@ A 定题、B 试跑、C 出结果、D 写本题；最后 E 全案例收官。详
 make review-packet CASE=cases/contest-a NODE=C1 QUESTION=q1
 ```
 
-C1 每题必做；C2 由检查器按 Probe/失败/SPEC 状态触发；C3 全案例一次。审核者必须给唯一推荐
+C1、C2 每题必做；C3 每题一次，全案例收官前再一次。审核者必须给唯一推荐
 动作，生产角色默认执行，队员可否决。审核者保持新会话、最小材料、不同方法和反例任务，
 provider/model 如实填写。
 
@@ -97,6 +97,8 @@ make case-check CASE=cases/contest-a STAGE=exploration
 make review-packet CASE=cases/contest-a NODE=C2 QUESTION=q1
 make demos
 make paper
+make paper CASE=cases/<case_id>          # 案例论文整本
+make paper CASE=cases/<case_id> Q=q1    # 只编译某一题
 make paper-ci
 make final-check CASE=cases/contest-a
 ```

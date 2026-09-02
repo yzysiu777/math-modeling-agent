@@ -9,15 +9,39 @@ PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 # CI 与 Linux 上这些字体不存在，需要 ctex 的 fandol 字体集。
 # 设 PAPER_FONTSET=fandol 即可注入；本机留空使用系统字体，排版更接近提交稿。
 PAPER_FONTSET ?=
+PRETEX :=
 ifneq ($(PAPER_FONTSET),)
-LATEXMK_PRETEX := -usepretex='\PassOptionsToClass{fontset=$(PAPER_FONTSET)}{ctexart}'
+PRETEX := $(PRETEX)\PassOptionsToClass{fontset=$(PAPER_FONTSET)}{ctexart}
+endif
+# Q=q1 只编译该题。案例 main.tex 的 \InputQuestion 读 \PaperOnly 决定是否展开。
+ifneq ($(Q),)
+PRETEX := $(PRETEX)\def\PaperOnly{$(Q)}
+QSUFFIX := -$(Q)
+endif
+ifneq ($(PRETEX),)
+LATEXMK_PRETEX := -usepretex='$(PRETEX)'
 endif
 
 .PHONY: paper paper-ci qa clean test validate demos ingest case-check spec-check review-packet final-check
 
+# 不带 CASE 编译仓库论文工程；带 CASE 编译该案例的论文。
+# 案例只放自己的内容，文档类、样式、bst 和封面图经 TEXINPUTS 从仓库 paper/ 解析 ——
+# 第三次实测里写作手因为案例没有主文档而自造了一份 ctexart，绕开了官方版式。
 paper:
+ifeq ($(CASE),)
 	mkdir -p $(PAPER_BUILD)
 	cd $(PAPER_DIR) && latexmk -r ../latexmkrc -xelatex $(LATEXMK_PRETEX) -interaction=nonstopmode -halt-on-error -outdir=build main.tex
+else
+	@test -f "$(CASE)/paper/main.tex" || (echo "案例没有论文工程：$(CASE)/paper/main.tex"; exit 2)
+	mkdir -p "$(CASE)/output/pdf"
+	cd "$(CASE)/paper" && \
+	  TEXINPUTS=".:$(CURDIR)/$(PAPER_DIR)//:" BSTINPUTS=".:$(CURDIR)/$(PAPER_DIR):" \
+	  latexmk -r "$(CURDIR)/latexmkrc" -xelatex $(LATEXMK_PRETEX) \
+	    -interaction=nonstopmode -halt-on-error -outdir=build main.tex
+	@name=$$(basename "$(CASE)"); \
+	  cp "$(CASE)/paper/build/main.pdf" "$(CASE)/output/pdf/$$name$(QSUFFIX).pdf"; \
+	  echo "已编译：$(CASE)/output/pdf/$$name$(QSUFFIX).pdf"
+endif
 
 # 编译上游示例，展示这套模板支持的排版元素（算法、表格、子图、代码附录）。
 # 与论文工程完全隔离：不同的源、不同的构建目录，不会污染 paper/build。

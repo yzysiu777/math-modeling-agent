@@ -35,6 +35,13 @@ REQUIRED_FILES = (
     "prompts/startup/reviewer.md", "prompts/reviewer/C1_problem_challenge.md",
     "prompts/reviewer/C2_model_challenge.md", "prompts/reviewer/C3_results_challenge.md",
     "paper/main.tex", "paper/official/2025/manifest.yaml", "paper/official/2026/manifest.yaml",
+    # 案例论文骨架。第三次实测里案例只有空的 sections/，写作手自造了一份 ctexart，
+    # 官方版式完全没被用到 —— 模板缺失必须当成契约破损，而不是等下一次实测发现。
+    "templates/paper/main.tex", "templates/paper/config/paper-profile.tex",
+    "templates/paper/sections/00-abstract.tex", "templates/paper/sections/02-restate.tex",
+    "templates/paper/sections/03-symbols.tex", "templates/paper/sections/05-assumptions.tex",
+    "templates/paper/sections/q1.tex", "templates/paper/sections/90-evaluation.tex",
+    "templates/paper/appendix/99-programs.tex", "templates/待补图清单.md",
 )
 RETIRED_PATHS = (
     "CLAUDE.md", "prompts/claude", "templates/claude_review_packet.md",

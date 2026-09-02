@@ -35,25 +35,43 @@ PASS/FAIL。只为进入正式实现的路线写一份五段 Full SPEC。B 结�
 Engineer 按 Full SPEC 实现、统一比较并把 data/checks/figures 写入本题 outputs。Champion 的
 约束、目标、切分、泄漏与关键指标使用独立路径复算。
 
-C2 仅在以下任一条件成立时阻断 `model_selection`：
+C2 每题必做，与 C1 同级。审核卡除路线、实验板和 Full SPEC 外，还带上本题当前的实现代码
+与已落盘的复算报告 —— 审核者要看得到实现与规格是否真的对得上，才能调整审核方向。
+
+检查器的三条风险条件不再决定要不要审，只作为审核卡「本轮最担心什么」的输入：
 
 1. Champion 没有任何 `status=done` 且判定 PASS 的 Probe；
 2. 同一路线至少出现两行 `status=failed`；
 3. Full SPEC 的 `probe_result` 为 `WAIVED` 或 `PENDING`。
 
-全假时检查器输出 REMINDER，并要求在 `q<k>/log.md` 记一行跳过理由。C 结束时 Orchestrator
-覆盖更新 `现在做什么.md`，只链接 board、SPEC 和 outputs，不转写内容。
+第三次实测里这三条全假、C2 一次没跑，回头改反而更费时间 —— 这是把先验设计换成实测结论。
 
 ## D 写本题（不超过 2 小时）
 
 Writer 只从 Full SPEC、board、outputs 与复算报告写 `paper/sections/q<k>.tex`，并在全案例
 `paper/claim_map.md` 增加本题关键 Claim。普通表格由数据生成，不逐数登记。证据不足时降低
-“最优”“因果”等表述强度。D 结束时 Orchestrator 覆盖更新 `现在做什么.md`，只登记本题
-章节和 Claim 路径。
+“最优”“因果”等表述强度。
+
+论文工程由 `create_case` 播种，用官方版式 `gmcmthesis`，按问分章：前置的研究背景、问题重述、
+符号说明、问题分析、模型假设全案例共用，每题只写自己那一章。**写作手不得新建主文档或换文档类。**
+
+正文是交付物，溯源留在 claim map：实验编号、文件路径、命令行、检查器码和超过四位有效数字
+一律不进正文；需要在草稿里标来源用 `\dataref{}`，它默认不打印。画不了的图用
+`\PlaceholderFigure` 占位并登记到 `队员工作区/待补图清单.md`，不要悄悄少一张该有的图。
+
+D 的收尾条件是**编译出本题 PDF**：
+
+```bash
+make paper CASE=<案例目录> Q=q<k>
+```
+
+编译通过后做本题 C3。D 结束时 Orchestrator 覆盖更新 `现在做什么.md`，只登记本题章节、
+PDF 与 Claim 路径。
 
 ## E 全案例收官
 
-全部子问题完成后只做一次 C3，从 claim map 抽查 3–5 条最高风险强结论。随后统一核数、术语、
+全部子问题完成后再做一次全案例 C3（每题那次在各自 D 已完成），从 claim map 跨题抽查
+3–5 条最高风险强结论。随后统一核数、术语、
 图表、引用、匿名、官方格式和 PDF，运行 `make final-check`。最终文件确认与实际提交必须等待队员。
 E 结束时 Orchestrator 更新 `现在做什么.md` 与 C3 索引；最终提交批准单必须使用“必须等待”。
 
