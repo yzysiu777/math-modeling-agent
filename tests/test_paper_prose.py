@@ -133,5 +133,23 @@ class CheckReportCoverageTests(unittest.TestCase):
         self.assertIn("不是规范的 EXP-ID", validate_check_report(report, "EXP-C01").problem)
 
 
+class SeededCaseTests(unittest.TestCase):
+    """新建案例必须自洽：骨架自带的占位图都已登记，正文没有禁词。"""
+
+    def test_fresh_case_paper_is_self_consistent(self):
+        from scripts.create_case import create_case
+
+        with tempfile.TemporaryDirectory() as tmp:
+            case = create_case("fresh-case", cases_root=Path(tmp), questions=3)
+            self.assertEqual(check_figures(case / "paper"), [])
+            self.assertEqual(check_paper_prose(case / "paper"), [])
+            main = (case / "paper/main.tex").read_text(encoding="utf-8")
+            self.assertIn("{gmcmthesis}", main)
+            self.assertNotIn("ctexart", main)
+            registry = (case / "队员工作区/待补图清单.md").read_text(encoding="utf-8")
+            for label in ("fig:overall-roadmap", "fig:q1-flow", "fig:q3-flow"):
+                self.assertIn(label, registry)
+
+
 if __name__ == "__main__":
     unittest.main()

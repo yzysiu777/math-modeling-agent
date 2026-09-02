@@ -10,6 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "templates"
 ROUTES = {"optimization", "data_analysis", "hybrid", "insufficient_information"}
+_CN_ORDINAL = {1: "一", 2: "二", 3: "三", 4: "四", 5: "五", 6: "六",
+               7: "七", 8: "八", 9: "九", 10: "十"}
 QUESTION_SECTION = re.compile(r"^q[1-9][0-9]*\.tex$")
 CASE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{1,63}$")
 
@@ -178,6 +180,13 @@ def create_case(
         text = (TEMPLATES / name).read_text(encoding="utf-8")
         if name == "现在做什么.md":
             text = text.replace("- 案例：/", f"- 案例：{case_id} /")
+        if name == "待补图清单.md":
+            # 骨架自带的每题流程图也要登记，否则新案例一建好就报「未登记」。
+            text += "".join(
+                f"| `fig:q{index}-flow` | 问题{_CN_ORDINAL[index]}的求解流程或算法框图"
+                " | 需要人工绘制 | 待认领 |\n"
+                for index in range(1, questions + 1)
+            )
         (case_dir / "队员工作区" / name).write_text(text, encoding="utf-8")
     return case_dir
 
