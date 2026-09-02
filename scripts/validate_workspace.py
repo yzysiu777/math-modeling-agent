@@ -29,7 +29,7 @@ REQUIRED_FILES = (
     "templates/spec.md", "templates/现在做什么.md", "templates/批准单.md",
     "templates/审核卡索引.md", "templates/我的笔记.md", "scripts/create_case.py",
     "scripts/case_sources.py", "scripts/ingest.py", "scripts/check_case.py",
-    "scripts/check_spec.py", "scripts/make_review_packet.py", "scripts/make_start_prompt.py",
+    "scripts/check_spec.py", "scripts/make_review_packet.py", "scripts/make_start_prompt.py", "scripts/check_overfit.py",
     "prompts/modeler.md", "prompts/engineer.md", "prompts/writer.md",
     "prompts/startup/orchestrator.md", "prompts/startup/modeler.md",
     "prompts/startup/engineer.md", "prompts/startup/writer.md",
@@ -75,6 +75,17 @@ RETIRED_PHRASES = (
     re.compile(r"全案例[^。\n]{0,6}C3[^。\n]{0,6}一次"),
     re.compile(r"七阶段"),
     re.compile(r"ctexart"),
+    re.compile(r"只(?:为|给)[^。\n]{0,12}写一份[^。\n]{0,6}Full SPEC"),
+    re.compile(r"只为进入正式赛马的路线建立 Full SPEC"),
+)
+# 题目身份标识出现在工作台规范里，没有任何正当理由 —— 与「用词像不像这道题」
+# 那种需要判断的信号不同，这几类是机械可判的，所以直接报错而不是提醒。
+PROBLEM_IDENTIFIERS = (
+    re.compile(r"20[0-9]{2}\s*[A-F]\s*题"),
+    re.compile(r"\b20[0-9]{2}[A-F]\b"),
+    re.compile(r"往年真题"),
+    # 只认「带年份的真实案例名」，放过 cases/examples、cases/contest-a 这类通用占位。
+    re.compile(r"cases/[A-Za-z_-]*20[0-9]{2}[A-Za-z_-]*"),
 )
 GUIDANCE_DIRS = (".agents", "prompts", "protocol", "writing", "docs")
 GUIDANCE_ROOT_FILES = ("README.md", "AGENTS.md", "agent.md", "REVIEWER.md")
@@ -139,6 +150,12 @@ def _retired_reference_errors() -> List[str]:
             if hit:
                 errors.append(
                     f"guidance still states a retired policy: {relative} -> {hit.group(0)}"
+                )
+        for pattern in PROBLEM_IDENTIFIERS:
+            hit = pattern.search(text)
+            if hit:
+                errors.append(
+                    f"guidance names a specific problem: {relative} -> {hit.group(0)}"
                 )
     return errors
 

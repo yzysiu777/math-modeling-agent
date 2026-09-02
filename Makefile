@@ -22,7 +22,7 @@ ifneq ($(PRETEX),)
 LATEXMK_PRETEX := -usepretex='$(PRETEX)'
 endif
 
-.PHONY: paper paper-ci qa clean test validate demos ingest case-check spec-check review-packet start-prompt final-check
+.PHONY: paper paper-ci qa clean test validate demos ingest case-check spec-check review-packet start-prompt overfit-check final-check
 
 # 不带 CASE 编译仓库论文工程；带 CASE 编译该案例的论文。
 # 案例只放自己的内容，文档类、样式、bst 和封面图经 TEXINPUTS 从仓库 paper/ 解析 ——
@@ -97,6 +97,12 @@ spec-check:
 
 # 从案例生成角色启动提示词。规则在 prompts/，事实在案例里，这里只填空和指路 ——
 # 手写提示词会把题目结论抄进去，抄一次就多一处会过期的副本。
+# 用当前案例的题面反扫工作台，提醒规范里是否吸收了这道题的词汇。
+# 只提醒、不阻断，也不进 final-check —— 它的作用是提示去看一眼，不是替人判断。
+overfit-check:
+	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
+	$(PYTHON) scripts/check_overfit.py --case-dir "$(CASE)"
+
 start-prompt:
 	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
 	@test -n "$(ROLE)" || (echo "ROLE is required (orchestrator/modeler/engineer/writer/reviewer)"; exit 2)

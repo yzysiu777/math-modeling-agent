@@ -26,7 +26,7 @@ C1 每题必做。A 结束必须完成本题 C1。Reviewer 先读原始题面与
 ## B 试跑（不超过 2 小时）
 
 Modeler 在 `q<k>/board.md` 写 2–3 行便宜 Probe：先填假设、判据、范围、预算，再运行并写
-PASS/FAIL。只为进入正式实现的路线写一份五段 Full SPEC。B 结束时至少一条 Champion Probe
+PASS/FAIL。**至少两条**进入正式实现的路线各写一份五段 Full SPEC。B 结束时至少一条 Champion Probe
 为 done+PASS，且 `make spec-check` 通过。B 结束时 Orchestrator 更新 `现在做什么.md` 和
 `审核卡索引.md`；索引只写卡片路径、节点决定与一句话结论，不复制 finding 正文。
 
