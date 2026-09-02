@@ -88,3 +88,41 @@ class StartPromptTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReviewerPromptTests(unittest.TestCase):
+    """审核者提示词里留着 <C1/C2/C3> 和 <审核卡绝对路径>，等于让人再手填一次。"""
+
+    def _case(self):
+        from scripts.create_case import create_case
+
+        root = Path(tempfile.mkdtemp())
+        case = create_case("rev-case", cases_root=root, questions=2)
+        (case / "q1/reviews/C1_done.md").write_text("Node decision: GO\n", encoding="utf-8")
+        return case
+
+    def test_node_and_card_path_are_filled(self):
+        case = self._case()
+        (case / "q1/reviews/C3_20260101-000000.md").write_text("卡", encoding="utf-8")
+        text = build_prompt(case, "reviewer", "q1", "C3")
+        self.assertIn("本会话只执行 C3", text)
+        self.assertIn("critical_node: C3", text)
+        self.assertIn("q1/reviews/C3_20260101-000000.md", text)
+        self.assertNotIn("<C1/C2/C3>", text)
+        self.assertNotIn("<审核卡绝对路径", text)
+
+    def test_missing_card_says_how_to_make_one(self):
+        text = build_prompt(self._case(), "reviewer", "q1", "C2")
+        self.assertIn("make review-packet", text)
+
+    def test_newest_card_wins(self):
+        case = self._case()
+        for stamp in ("20260101-000000", "20260202-000000"):
+            (case / f"q1/reviews/C3_{stamp}.md").write_text("卡", encoding="utf-8")
+        text = build_prompt(case, "reviewer", "q1", "C3")
+        self.assertIn("C3_20260202-000000.md", text)
+        self.assertNotIn("C3_20260101-000000.md", text)
+
+    def test_unknown_node_is_rejected(self):
+        with self.assertRaises(ValueError):
+            build_prompt(self._case(), "reviewer", "q1", "C9")
