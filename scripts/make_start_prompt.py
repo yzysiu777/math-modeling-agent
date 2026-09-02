@@ -61,6 +61,20 @@ def _board_summary(case_dir: Path, question: str) -> str:
     return f"实验板共 {len(rows)} 行，其中 done {len(done)} 行、failed {len(failed)} 行"
 
 
+def _literature_summary(case_dir: Path) -> str:
+    path = case_dir / "paper/文献清单.md"
+    if not path.is_file():
+        return "文献清单尚不存在"
+    rows = [
+        row for row in parse_markdown_table(path.read_text(encoding="utf-8"))
+        if str(row.get("key", "")).strip() and str(row.get("key", "")).strip() != "key"
+    ]
+    if not rows:
+        return "文献清单当前为空 —— 本轮引用全靠你检索并登记"
+    pending = sum(1 for row in rows if str(row.get("核对状态", "")).strip() != "已核对")
+    return f"文献清单现有 {len(rows)} 条，其中 {pending} 条待队员核对"
+
+
 def _spec_names(case_dir: Path, question: str) -> str:
     specs = [
         path.name for path in sorted((case_dir / question / "specs").glob("SPEC-*.md"))
@@ -99,6 +113,8 @@ def build_prompt(case_dir: Path, role: str, question: str | None = None) -> str:
         f"- 已通过 C1 的子问题：{'、'.join(item.upper() for item in opened) or '无'}",
         f"- 仍处封存状态、不得书写的子问题：{'、'.join(item.upper() for item in sealed) or '无'}",
     ]
+    if role == "writer":
+        notes.append(f"- {_literature_summary(case_dir)}")
     if role in {"engineer", "writer"}:
         notes.append(f"- 本题 Full SPEC：{_spec_names(case_dir, name)}")
         notes.append(f"- {_board_summary(case_dir, name)}")

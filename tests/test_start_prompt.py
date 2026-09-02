@@ -64,6 +64,19 @@ class StartPromptTests(unittest.TestCase):
         self.assertNotIn("方向一致性", text)    # 不抄具体结论
         self.assertNotIn("ρ≥0.30", text)
 
+    def test_writer_is_told_the_state_of_the_literature_registry(self):
+        case = self._case(opened=(1,))
+        text = build_prompt(case, "writer", "q1")
+        self.assertIn("文献清单当前为空", text)
+
+        registry = case / "paper/文献清单.md"
+        registry.write_text(
+            registry.read_text(encoding="utf-8")
+            + "| a2020 | 标题 | 作者 | 2020 | 出处 | - | 联网检索 | 背景第一段 | 待核对 |\n",
+            encoding="utf-8",
+        )
+        self.assertIn("现有 1 条，其中 1 条待队员核对", build_prompt(case, "writer", "q1"))
+
     def test_unknown_role_is_rejected(self):
         with self.assertRaises(ValueError):
             build_prompt(self._case(), "reviewer-2", "q1")
