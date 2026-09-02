@@ -53,5 +53,17 @@ make case-check CASE=cases/<case_id> STAGE=paper_claims
 make final-check CASE=cases/<case_id>
 ```
 
-STAGE 对应 A/B 前段、B 末/C、D、E；它们不是另一套流程。C1 每题必做，C2 按风险触发，C3
-全案例一次。最终提交由队员确认。
+STAGE 对应 A/B 前段、B 末/C、D、E；它们不是另一套流程。C1、C2 每题必做，C3 每题一次、
+全案例收官前再一次。最终提交由队员确认。
+
+## 论文与文献
+
+`paper/` 由 `create_case` 播种成一套官方版式的按问分章工程，写作手只填章节，不新建主文档。
+`paper/文献清单.md` 是引用的唯一账本：阶段 0 把 `sources.yaml` 的 `literature` 文件夹登记为
+`人工放入`，写作手联网检索的登记为 `联网检索`，每行写清支撑论断，核对状态留给队员。
+没通过 C1 的子问题在各章里保持 `% <<Qk-SEALED>>` 封存，不得提前书写。
+
+```bash
+make paper CASE=cases/<case_id> Q=q1                      # 单题编译
+make start-prompt CASE=cases/<case_id> ROLE=writer Q=q1   # 生成启动提示词
+```

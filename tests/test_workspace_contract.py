@@ -18,6 +18,26 @@ class RetiredReferenceGuardTests(unittest.TestCase):
     def test_guidance_does_not_point_at_the_retired_layout(self):
         self.assertEqual(_retired_reference_errors(), [])
 
+    def test_guidance_does_not_state_a_retired_policy(self):
+        """路径退役检查器看得见，「C2 按风险触发」这种说法看不见 ——
+        MMAG-009 改了语义后，它在三份文档里活了两轮才被人工发现。"""
+        errors = [item for item in _retired_reference_errors() if "retired policy" in item]
+        self.assertEqual(errors, [])
+
+    def test_guard_fires_on_a_retired_policy_phrase(self):
+        scratch = Path(tempfile.mkdtemp())
+        try:
+            doc = scratch / "prompts" / "stale.md"
+            doc.parent.mkdir(parents=True)
+            doc.write_text("C2 仅在检查器触发时进行。", encoding="utf-8")
+            with mock.patch("scripts.validate_workspace.ROOT", scratch), \
+                 mock.patch("scripts.validate_workspace.GUIDANCE_DIRS", ("prompts",)), \
+                 mock.patch("scripts.validate_workspace.GUIDANCE_ROOT_FILES", ()):
+                errors = _retired_reference_errors()
+            self.assertTrue(any("retired policy" in item for item in errors))
+        finally:
+            shutil.rmtree(scratch)
+
     def test_guard_actually_fires_on_a_retired_reference(self):
         scratch = Path(tempfile.mkdtemp())
         try:

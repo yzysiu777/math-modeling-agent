@@ -10,7 +10,8 @@ Orchestrator 独占写入，唯一例外 `队员工作区/我的笔记.md` 属�
 - Orchestrator：`sources.yaml` 协助、阶段 0、`checkpoint.yaml`、审核卡及队员工作区指针；
 - Modeler：当前题 `brief.md`、`board.md`、`specs/`；
 - Engineer：当前题 `code/`、`outputs/` 与 board 结果；
-- Writer：`paper/sections/q<k>.tex` 与共享 `paper/claim_map.md`；
+- Writer：`paper/sections/q<k>.tex`、共享 `paper/claim_map.md` 与 `paper/文献清单.md`
+  （清单的「核对状态」一列属于队员，Writer 只写 `待核对`，不得自行改成 `已核对`）；
 - Reviewer：只写本题 C1/C2 卡或共享 C3 卡，不改主解；
 - 队员：人工专属 `decisions.md` 与最终提交。
 

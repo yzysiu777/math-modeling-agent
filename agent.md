@@ -12,7 +12,7 @@
 | A 定题 | `q<k>/brief.md` | C1 有节点决定、推荐动作和路由 |
 | B 试跑 | `q<k>/board.md` + 一份 Full SPEC | Probe PASS，`spec-check` 通过 |
 | C 出结果 | `q<k>/outputs/` | Champion 关键结果独立复算通过 |
-| D 写本题 | `paper/sections/q<k>.tex` + claim map 行 | 本题关键 Claim 可追溯 |
+| D 写本题 | `paper/sections/q<k>.tex` + claim map 行 + 本题 PDF | 关键 Claim 可追溯且编译通过 |
 | E 收官 | 提交 PDF | 全案例一次 C3、最终检查和人工提交 |
 
 后题可以使用前题 outputs，前题不得依赖后题。返工更新原文件和 `q<k>/log.md`，不建立 v2、

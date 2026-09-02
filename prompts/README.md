@@ -9,10 +9,10 @@
 | Orchestrator | `prompts/orchestrator.md` | 案例、当前题、sources 与 checkpoint |
 | Modeler | `prompts/modeler.md` | 题面、本题数据范围、brief、board |
 | Engineer | `prompts/engineer.md` | 本题 Full SPEC、board、白名单 |
-| Writer | `prompts/writer.md` | 本题 SPEC、outputs、共享 claim map |
+| Writer | `prompts/writer.md` | 本题 SPEC、outputs、共享 claim map 与文献清单 |
 | Reviewer | `REVIEWER.md` + 节点提示词 | 一张审核卡与允许材料 |
 
-快速模板在 `prompts/startup/`。每份都必须填写“当前子问题”和“本题目录”。普通回报只用
+快速模板在 `prompts/startup/`，只留槽位、不复述协议。**不要手写启动提示词**，用 `make start-prompt CASE=<案例> ROLE=<角色> Q=q<k>` 从案例生成。普通回报只用
 `agent.md` 六行；跨角色时才展开交接。审核卡命令：
 
 ```bash
