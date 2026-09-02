@@ -62,6 +62,12 @@ RETIRED_REFERENCES = (
     "experiments/board.md", "experiments/outputs/", "experiments/code/",
     "reports/stage-0",
 )
+# 已被推翻的口径。路径退役有 RETIRED_REFERENCES 兜着，但「C2 按风险触发」这种
+# 说法不是路径，检查器看不见 —— MMAG-009 改了语义之后，它在三份文档里活了两轮。
+RETIRED_PHRASES = (
+    "C2 仅在", "C2 按风险触发", "C2 由检查器触发", "条件触发", "C2_SKIPPED",
+    "C3 全案例一次", "七阶段", "ctexart",
+)
 GUIDANCE_DIRS = (".agents", "prompts", "protocol", "writing", "docs")
 GUIDANCE_ROOT_FILES = ("README.md", "AGENTS.md", "agent.md", "REVIEWER.md")
 
@@ -111,11 +117,19 @@ def _retired_reference_errors() -> List[str]:
     errors: List[str] = []
     for path in _guidance_files():
         text = path.read_text(encoding="utf-8", errors="ignore")
+        relative = path.relative_to(ROOT).as_posix()
         for marker in RETIRED_REFERENCES:
             if marker in text:
                 errors.append(
-                    f"guidance still points at the retired layout: "
-                    f"{path.relative_to(ROOT).as_posix()} -> {marker}"
+                    f"guidance still points at the retired layout: {relative} -> {marker}"
+                )
+        # 退役说法只查规则文档；写作手协议里拿旧说法当反面教材是正当的。
+        if relative.startswith(("writing/", "docs/")) and "已退役" in text:
+            continue
+        for phrase in RETIRED_PHRASES:
+            if phrase in text:
+                errors.append(
+                    f"guidance still states a retired policy: {relative} -> {phrase}"
                 )
     return errors
 

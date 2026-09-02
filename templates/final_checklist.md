@@ -19,7 +19,7 @@
 
 ## Independent Reviewer 与人工
 
-- [ ] 每题 C1、被风险触发的 C2、全案例一次 C3 已完成并保存
+- [ ] 每题的 C1、C2、C3 与全案例收官 C3 已完成并保存
 - [ ] 审核报告已注明 provider、model、`review_session: fresh`、`saw_main_conversation: false` 和 critical node
 - [ ] `decisions.md` 只记录人工专属边界决定
 - [ ] `make case-check CASE=... STAGE=paper_claims` 已运行且没有阻断项

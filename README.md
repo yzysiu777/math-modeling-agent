@@ -11,7 +11,8 @@ python3 -m venv .venv
 .venv/bin/python scripts/create_case.py --case-id contest-a --questions 3
 ```
 
-新案例初始 18 个文件，没有七份空阶段报告；增加的三份是队员入口，数量不随题数增长。先编辑
+新案例初始 34 个文件：18 份工作文件加一套按问分章的论文骨架。没有空阶段报告，队员入口
+不随题数增长。先编辑
 `cases/contest-a/sources.yaml`：
 
 ```yaml
@@ -24,10 +25,15 @@ questions:
   q2: 第二题
   q3: 第三题
 shared: [共享数据]
+literature: /absolute/path/to/文献        # 可选
 ```
 
 `statement` 可为 PDF、DOC/DOCX、Markdown、文本或目录。`docs: []` 会自动扫描数据根及父目录
 的说明文件。原始数据不复制、不软链、不修改。
+
+`literature` 是你自建的文献文件夹，可留空。阶段 0 会把里面的文献登记进
+`paper/文献清单.md`；写作手联网检索到的补充文献登记在同一张表。**每一条的核对状态都留给
+你** —— 脚本只保证「引用能追到账本」，真伪只有人能判。
 
 ## 阶段 0
 
@@ -36,8 +42,8 @@ make ingest CASE=cases/contest-a
 ```
 
 它一次性生成带来源行的 `input/题面全文.md`、完整列名与缺测候选的 `input/数据清单.md`、
-`input/说明文档/`、只列需人工判断异常的 `队员工作区/数据踏勘速览.md`，以及每题
-`q<k>/数据范围.md`。路径缺失、相对、不可读或题数不一致时直接失败。
+`input/说明文档/`、只列需人工判断异常的 `队员工作区/数据踏勘速览.md`、`paper/文献清单.md`，
+以及每题 `q<k>/数据范围.md`。路径缺失、相对、不可读或题数不一致时直接失败。
 
 ## 目录
 
