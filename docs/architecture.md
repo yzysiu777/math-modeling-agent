@@ -26,11 +26,17 @@ Modeler 维护本题 brief、board 与 Full SPEC；Engineer 维护本题 code �
 - `case_sources.py` 校验唯一来源声明、绝对路径、可读性和题数目录一致性；
 - `ingest.py` 抽取题面来源行、转写或登记说明文档、列全数据表头并生成白名单；
 - `check_spec.py` 检查五段 Full SPEC、Probe 闭环和跨题方向；
-- `check_case.py` 检查 C1、风险触发 C2、全案例 C3、确定性结果、Claim 与跨题方向；
-- `make_review_packet.py` 从 `sources.yaml` 和当前题目录构造最小审核材料，旧案例才使用历史路径读法。
+- `check_case.py` 检查每题的 C1/C2/C3、全案例 C3、确定性结果、Claim 与跨题方向；
+- `make_review_packet.py` 从 `sources.yaml` 和当前题目录构造最小审核材料，C2 的材料含
+  当前实现代码与已落盘复算报告；旧案例才使用历史路径读法；
+- `make_start_prompt.py` 从案例填角色启动模板，只做填空和指路，不转写任何题目结论；
+- `qa_latex.py` 除 LaTeX 与 PDF 外，还检查正文禁词、占位图登记、按问封存、引用可追
+  （`\cite` 必须同时在 `paper/文献清单.md` 与 `references.bib`）以及行文规范
+  （列表按章白名单、禁用套话）。
 
-四个 STAGE 值只是检查强度，不是另一套流程。C2 的触发条件写死在检查器；C1 与 C3 的范围
-固定。所有脚本只判断可见结构和已记录状态，不证明数学正确性。
+四个 STAGE 值只是检查强度，不是另一套流程。C1、C2 每题必做；检查器里那三条风险条件
+只用来给审核卡填「本轮最担心什么」，不再决定要不要审。所有脚本只判断可见结构和已记录
+状态，不证明数学正确性。
 
 ## 证据边界
 

@@ -20,6 +20,7 @@
 ## Independent Reviewer 与人工
 
 - [ ] 每题的 C1、C2、C3 与全案例收官 C3 已完成并保存
+- [ ] `paper/文献清单.md` 里的引用已抽查（脚本只提醒不阻断，真伪只有你能判）
 - [ ] 审核报告已注明 provider、model、`review_session: fresh`、`saw_main_conversation: false` 和 critical node
 - [ ] `decisions.md` 只记录人工专属边界决定
 - [ ] `make case-check CASE=... STAGE=paper_claims` 已运行且没有阻断项

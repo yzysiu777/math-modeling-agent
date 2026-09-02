@@ -38,6 +38,36 @@ class RetiredReferenceGuardTests(unittest.TestCase):
         finally:
             shutil.rmtree(scratch)
 
+
+    def test_guard_matches_the_concept_not_one_phrasing(self):
+        """按概念匹配，不按恰好修过的那几个字串。
+
+        第一版逐字列举，漏掉了「风险触发 C2」和「C2 的触发条件写死在检查器」——
+        只是语序不同，守卫却报了通过，给了假的安全感。
+        """
+        variants = (
+            "风险触发 C2、全案例 C3、确定性结果",
+            "C2 的触发条件写死在检查器",
+            "仅触发时生成 C2 卡",
+            "C3 全案例一次",
+        )
+        for text in variants:
+            with self.subTest(text=text):
+                scratch = Path(tempfile.mkdtemp())
+                try:
+                    doc = scratch / "prompts" / "stale.md"
+                    doc.parent.mkdir(parents=True)
+                    doc.write_text(text, encoding="utf-8")
+                    with mock.patch("scripts.validate_workspace.ROOT", scratch), \
+                         mock.patch("scripts.validate_workspace.GUIDANCE_DIRS", ("prompts",)), \
+                         mock.patch("scripts.validate_workspace.GUIDANCE_ROOT_FILES", ()):
+                        errors = _retired_reference_errors()
+                    self.assertTrue(
+                        any("retired policy" in item for item in errors),
+                        f"守卫漏掉了：{text}")
+                finally:
+                    shutil.rmtree(scratch)
+
     def test_guard_actually_fires_on_a_retired_reference(self):
         scratch = Path(tempfile.mkdtemp())
         try:

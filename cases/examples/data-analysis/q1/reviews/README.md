@@ -1,4 +1,4 @@
 # 数据分析演示审核
 
-C1/C2 报告由队员手动触发 Independent Reviewer 后保存；C3 保存在 `paper/reviews/`。
-当前演示只提供时间切分和泄漏反例。
+此处保存本题的 C1、C2、C3 报告；全案例收官那一次 C3 保存在 `paper/reviews/`。
+审核由队员人工启动外部 Reviewer，不伪造外部审核结果。

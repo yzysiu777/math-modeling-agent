@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import subprocess
 from pathlib import Path
 from typing import Iterable, List
@@ -64,9 +65,16 @@ RETIRED_REFERENCES = (
 )
 # 已被推翻的口径。路径退役有 RETIRED_REFERENCES 兜着，但「C2 按风险触发」这种
 # 说法不是路径，检查器看不见 —— MMAG-009 改了语义之后，它在三份文档里活了两轮。
+# 按概念匹配，不按我恰好修过的那几个字串 —— 上一版漏掉了「风险触发 C2」和
+# 「C2 的触发条件写死在检查器」，只因语序不同，守卫却报了通过。
 RETIRED_PHRASES = (
-    "C2 仅在", "C2 按风险触发", "C2 由检查器触发", "条件触发", "C2_SKIPPED",
-    "C3 全案例一次", "七阶段", "ctexart",
+    re.compile(r"C2[^。\n]{0,14}触发"),
+    re.compile(r"触发[^。\n]{0,6}C2"),
+    re.compile(r"C2_SKIPPED"),
+    re.compile(r"C3[^。\n]{0,10}全案例一次"),
+    re.compile(r"全案例[^。\n]{0,6}C3[^。\n]{0,6}一次"),
+    re.compile(r"七阶段"),
+    re.compile(r"ctexart"),
 )
 GUIDANCE_DIRS = (".agents", "prompts", "protocol", "writing", "docs")
 GUIDANCE_ROOT_FILES = ("README.md", "AGENTS.md", "agent.md", "REVIEWER.md")
@@ -126,10 +134,11 @@ def _retired_reference_errors() -> List[str]:
         # 退役说法只查规则文档；写作手协议里拿旧说法当反面教材是正当的。
         if relative.startswith(("writing/", "docs/")) and "已退役" in text:
             continue
-        for phrase in RETIRED_PHRASES:
-            if phrase in text:
+        for pattern in RETIRED_PHRASES:
+            hit = pattern.search(text)
+            if hit:
                 errors.append(
-                    f"guidance still states a retired policy: {relative} -> {phrase}"
+                    f"guidance still states a retired policy: {relative} -> {hit.group(0)}"
                 )
     return errors
 
