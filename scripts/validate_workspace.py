@@ -28,7 +28,7 @@ REQUIRED_FILES = (
     "templates/spec.md", "templates/现在做什么.md", "templates/批准单.md",
     "templates/审核卡索引.md", "templates/我的笔记.md", "scripts/create_case.py",
     "scripts/case_sources.py", "scripts/ingest.py", "scripts/check_case.py",
-    "scripts/check_spec.py", "scripts/make_review_packet.py",
+    "scripts/check_spec.py", "scripts/make_review_packet.py", "scripts/make_start_prompt.py",
     "prompts/modeler.md", "prompts/engineer.md", "prompts/writer.md",
     "prompts/startup/orchestrator.md", "prompts/startup/modeler.md",
     "prompts/startup/engineer.md", "prompts/startup/writer.md",

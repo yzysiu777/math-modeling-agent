@@ -97,6 +97,7 @@ make case-check CASE=cases/contest-a STAGE=exploration
 make review-packet CASE=cases/contest-a NODE=C2 QUESTION=q1
 make demos
 make paper
+make start-prompt CASE=cases/<case_id> ROLE=writer Q=q1   # 生成角色启动提示词
 make paper CASE=cases/<case_id>          # 案例论文整本
 make paper CASE=cases/<case_id> Q=q1    # 只编译某一题
 make paper-ci

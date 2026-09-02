@@ -22,7 +22,7 @@ ifneq ($(PRETEX),)
 LATEXMK_PRETEX := -usepretex='$(PRETEX)'
 endif
 
-.PHONY: paper paper-ci qa clean test validate demos ingest case-check spec-check review-packet final-check
+.PHONY: paper paper-ci qa clean test validate demos ingest case-check spec-check review-packet start-prompt final-check
 
 # 不带 CASE 编译仓库论文工程；带 CASE 编译该案例的论文。
 # 案例只放自己的内容，文档类、样式、bst 和封面图经 TEXINPUTS 从仓库 paper/ 解析 ——
@@ -94,6 +94,13 @@ case-check:
 spec-check:
 	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
 	$(PYTHON) scripts/check_spec.py --case-dir "$(CASE)"
+
+# 从案例生成角色启动提示词。规则在 prompts/，事实在案例里，这里只填空和指路 ——
+# 手写提示词会把题目结论抄进去，抄一次就多一处会过期的副本。
+start-prompt:
+	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
+	@test -n "$(ROLE)" || (echo "ROLE is required (orchestrator/modeler/engineer/writer/reviewer)"; exit 2)
+	$(PYTHON) scripts/make_start_prompt.py --case-dir "$(CASE)" --role "$(ROLE)" $(if $(Q),--question $(Q),)
 
 review-packet:
 	@test -n "$(CASE)" || (echo "CASE is required"; exit 2)
