@@ -105,8 +105,10 @@ def _relative_or_absolute(path: Path, case_dir: Path) -> str:
 
 
 def _new_node_materials(
-    case_dir: Path, node: str, question: str
+    case_dir: Path, node: str, question: str | None
 ) -> tuple[list[tuple[str, str]], list[str]]:
+    """``question is None`` means the whole-case C3, which spans every question."""
+
     missing: list[str] = []
     materials: list[tuple[str, str]] = []
     try:
@@ -114,7 +116,7 @@ def _new_node_materials(
     except SourceConfigError as exc:
         return [], [f"sources.yaml 无效：{exc}"]
 
-    work_dir = case_dir / question
+    work_dir = (case_dir / question) if question else case_dir
     if node == "C1":
         materials.append(("原始题面（先读）", str(sources.statement.resolve())))
         for path, label in (
@@ -203,6 +205,10 @@ def _node_materials(
     case_dir: Path, node: str, question: str | None = None
 ) -> tuple[list[tuple[str, str]], list[str]]:
     if (case_dir / "sources.yaml").is_file():
+        # 全案例收官的 C3 不属于任何一题，question 保持 None 让材料跨题；
+        # 其余节点都必须落到具体一题。
+        if node == "C3" and question is None:
+            return _new_node_materials(case_dir, node, None)
         active = question or _active_question(case_dir)
         if not active:
             return [], ["checkpoint.yaml 缺少 current_question"]
@@ -277,7 +283,10 @@ def build_packet(
     if not case_dir.is_dir():
         raise FileNotFoundError(f"case directory does not exist: {case_dir}")
 
-    question = question or _active_question(case_dir)
+    # C3 分两层：不给题号就是全案例收官那次，必须跨题，不能被 checkpoint 的
+    # current_question 悄悄收窄成一题 —— 那样「全案例 C3」永远只审了一道题。
+    if question is None and node != "C3":
+        question = _active_question(case_dir)
     materials, missing = _node_materials(case_dir, node, question)
     review_id = review_id or f"{node}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     ready = "true" if not missing else "false"
@@ -293,7 +302,7 @@ def build_packet(
         "review_session: fresh",
         "saw_main_conversation: false",
         f"critical_node: {node}",
-        f"question: {question or 'legacy'}",
+        f"question: {question or ('全案例' if node == 'C3' else 'legacy')}",
         f"card_ready: {ready}",
         "```",
         "",
