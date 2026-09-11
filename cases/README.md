@@ -67,3 +67,13 @@ STAGE 对应 A/B 前段、B 末/C、D、E；它们不是另一套流程。C1、C
 make paper CASE=cases/<case_id> Q=q1                      # 单题编译
 make start-prompt CASE=cases/<case_id> ROLE=writer Q=q1   # 生成启动提示词
 ```
+
+## 交付物契约与降级
+
+`q<k>/brief.md` 的交付物契约表是全题的锚点（交付物／形态／量纲／覆盖范围／验收方式），
+候选路线表带 `状态` 列（`待试`／`进行中`／`已实现`／`已排除（写明理由）`）。
+判据两栏（绝对底线、相对增量）任一不过时，先做合成对照自查，再回路线表换路；
+形态与覆盖范围冲突时保形态、缩范围；一条路都没有了才降级，且要逐条写明
+剩余路线为什么也保不住形态。判为「不满足」的才向队员出批准单。
+细则见 `templates/case_brief.md`、`templates/experiment_board.md`
+与 `protocol/competition-workflow.md`。

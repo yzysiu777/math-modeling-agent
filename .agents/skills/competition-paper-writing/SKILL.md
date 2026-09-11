@@ -79,6 +79,13 @@ source experiment is absent from the board, a figure is marked `stale`, a
 recomputation report contains `passed: false` that the board does not mention,
 or the same quantity differs between two files.
 
+## Prose craft
+
+The hard rules with checkers behind them stay in `prompts/writer.md`. The part that
+decides whether a chapter reads like a paper -- paragraph shape, what has to follow a
+formula, what a result paragraph must carry -- lives in `references/prose-craft.md`
+and is read when writing, not memorised up front.
+
 ## Required reading
 
 Read the case brief and:
