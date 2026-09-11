@@ -94,6 +94,41 @@ def validate_spec(path: Path) -> list[str]:
     return errors
 
 
+def spec_reminders(case_dir: Path, question: str | None = None) -> list[str]:
+    """Criteria written purely as a relative increment pick the least bad, not a usable one.
+
+    A threshold of the form "beats the control by delta" is legitimate, but on its own
+    it lets a route whose absolute performance is worthless win a race and be carried
+    into the paper as the chosen model. The absolute floor is a blank the modeller has
+    to fill from what the problem is for; nothing here judges what it should say.
+    """
+
+    if question is not None:
+        directories = [case_dir / question.strip().casefold()]
+    else:
+        directories = sorted(
+            path for path in case_dir.iterdir()
+            if path.is_dir() and QUESTION_DIR.fullmatch(path.name)
+        ) or [case_dir]
+    paths = [
+        path for directory in directories
+        for path in sorted((directory / "specs").glob("SPEC-*.md"))
+        if not path.name.endswith(".questions.md")
+    ]
+
+    reminders: list[str] = []
+    for path in paths:
+        spec, errors = parse_spec(path)
+        if spec is None or errors:
+            continue
+        goal = spec.sections.get("1", "")
+        if "绝对底线" not in goal:
+            reminders.append(f"{path.name}: 判据缺「绝对底线」一栏，只有相对增量会选出最不烂的那条")
+        if "相对增量" not in goal:
+            reminders.append(f"{path.name}: 判据缺「相对增量」一栏；没有对照时写 n/a 并说明")
+    return reminders
+
+
 def _board_rows(work_dir: Path) -> dict[str, dict[str, str]]:
     path = work_dir / "board.md" if (work_dir / "board.md").is_file() else work_dir / "experiments/board.md"
     if not path.is_file():
@@ -202,6 +237,9 @@ def main() -> int:
     parser.add_argument("--question")
     args = parser.parse_args()
     errors = validate_case_specs(args.case_dir, args.question)
+    # 提醒不影响退出码：判据两栏是建模判断，脚本只负责提示那一栏还空着。
+    for reminder in spec_reminders(args.case_dir, args.question):
+        print(f"REMINDER {reminder}")
     if errors:
         for error in errors:
             print(f"FAIL {error}")

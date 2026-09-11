@@ -343,6 +343,43 @@ def _c2_trigger_reasons(work_dir: Path) -> list[str]:
     return reasons
 
 
+def _deliverable_findings(work_dir: Path, question: str, stage: str) -> list[Finding]:
+    """The deliverable contract is the anchor; an empty one makes the rest theatre.
+
+    Every mechanism in the workbench points downwards -- weaken the claim, downgrade
+    the route, refuse the unsupported sentence. None of them asks what the problem
+    actually wanted delivered, so a chain of individually-correct downgrades can end
+    somewhere far from the requirement with nothing lighting up. The contract is what
+    the later checks compare against, so it has to be filled in first.
+    """
+
+    if stage not in {"model_selection", "paper_claims", "final"}:
+        return []
+    findings: list[Finding] = []
+    brief = work_dir / "brief.md"
+    text = brief.read_text(encoding="utf-8", errors="replace") if brief.is_file() else ""
+    placeholder = "| D-01 | 场 / 序列 / 方案 / 分类 / 说明 |"
+    if not text or "交付物契约" not in text or placeholder in text:
+        findings.append(_finding(
+            "REMINDER", "DELIVERABLE_CONTRACT_EMPTY",
+            f"{question.upper()} 的交付物契约仍是模板占位；"
+            "后面判断「做出来的东西还算不算题目要的」没有依据",
+            "MODELER", "C1",
+        ))
+
+    board = work_dir / "board.md"
+    board_text = board.read_text(encoding="utf-8", errors="replace") if board.is_file() else ""
+    # 实验板出现降级，却没有一行说清降级后题面要求由什么承担。
+    rows = [line for line in board_text.splitlines() if line.startswith("|") and "降级" in line]
+    if rows and "承担" not in board_text:
+        findings.append(_finding(
+            "REMINDER", "DOWNGRADE_UNANSWERED",
+            f"{question.upper()} 的实验板有降级记录，但没写降级后由什么承担交付物契约里的那一项",
+            "MODELER", "C2",
+        ))
+    return findings
+
+
 def _single_route_findings(work_dir: Path, question: str, stage: str) -> list[Finding]:
     """One implemented route means there is nothing to compare it against.
 
@@ -741,6 +778,7 @@ def check_case(case_dir: Path, stage: str) -> CaseReport:
                 continue
             findings.extend(_question_review_findings(case_dir, qname, qdir, stage))
             findings.extend(_single_route_findings(qdir, qname, stage))
+            findings.extend(_deliverable_findings(qdir, qname, stage))
             findings.extend(_review_card_policy_findings(case_dir, qname))
             findings.extend(_cross_question_findings(qdir, qname))
             findings.extend(_failed_experiment_findings(qdir))
