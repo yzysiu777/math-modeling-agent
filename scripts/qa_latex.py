@@ -349,6 +349,30 @@ def check_prose_style(paper_dir: Path) -> list[str]:
     return problems
 
 
+DELIVERABLE_SECTION = re.compile(r"\\subsection\{交付物对照\}")
+
+
+def check_deliverable_sections(paper_dir: Path) -> list[str]:
+    """A paper full of honest negatives still has to say what it delivered.
+
+    Every downgrade may be correctly recorded and every limit correctly stated, and
+    the reader can still finish a chapter without finding the thing the problem asked
+    for. This section is not new content -- it surfaces a comparison the team already
+    had to make -- so its absence is worth a word.
+    """
+
+    reminders: list[str] = []
+    for path in sorted((paper_dir / "sections").glob("q[0-9]*.tex")):
+        text = path.read_text(encoding="utf-8")
+        if PAPER_EXAMPLE.search(text) and "待填写" in text:
+            continue  # 还是模板，没开写
+        if not DELIVERABLE_SECTION.search(text):
+            reminders.append(
+                f"{path.name}: 缺「交付物对照」一节 —— 读者找不到题面要求的正面交付在哪"
+            )
+    return reminders
+
+
 def check_paper_prose(paper_dir: Path) -> list[str]:
     """Report workbench artefacts that leaked into the paper body."""
 
@@ -570,6 +594,7 @@ def main() -> int:
             + check_evidence_citations(args.paper_dir)
             + check_prose_style(args.paper_dir)
             + check_citation_verification(args.paper_dir)
+            + check_deliverable_sections(args.paper_dir)
         )
         if reminders:
             print("REMINDER 正文问题（提交前必须清干净）")
