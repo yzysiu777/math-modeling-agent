@@ -138,3 +138,80 @@ class DeliverableSectionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RouteSwitchBeforeDowngradeTests(unittest.TestCase):
+    """一条路不通不等于所有路不通。
+
+    实测里某题的候选池有四条，第一条判据不过之后直接落到预注册的降级路线，
+    另外两条从头到尾没被碰过 —— 而其中一条明确写着可能保住题面要求的交付形态。
+    """
+
+    DOWNGRADE = (
+        "\n| EXP-002 | M-01 | probe | q | PASS | toy | 1 min | failed | "
+        "判定：FAIL，按预注册降级 M-02；交付物 D-01 改由 M-02 承担 | no | 降级 |"
+    )
+    HEADER = (
+        "\n## 候选路线与七维度\n\n"
+        "| 路线 | 方法族 | 状态 |\n|---|---|---|\n"
+    )
+
+    def _case(self, *, board_extra: str, statuses: tuple[str, ...]) -> Path:
+        case = make_question_case(Path(tempfile.mkdtemp()), PASSED_ROW + board_extra)
+        question_review(case, nodes=("C1", "C2"))
+        brief = case / "q1/brief.md"
+        rows = "".join(
+            f"| M-{index:02d} | 某方法族 | {status} |\n"
+            for index, status in enumerate(statuses, start=1)
+        )
+        brief.write_text(
+            brief.read_text(encoding="utf-8") + self.HEADER + rows, encoding="utf-8"
+        )
+        return case
+
+    def test_downgrade_with_untried_routes_is_reminded(self):
+        case = self._case(board_extra=self.DOWNGRADE, statuses=("已实现", "待试", "待试"))
+        finding = next(
+            f for f in check_case(case, "model_selection").findings
+            if f.code == "UNTRIED_ROUTES"
+        )
+        self.assertIn("M-02", finding.reason)
+        self.assertIn("M-03", finding.reason)
+        self.assertFalse(finding.blocks)
+
+    def test_all_routes_resolved_passes(self):
+        case = self._case(board_extra=self.DOWNGRADE, statuses=("已实现", "已排除（数据不足）"))
+        codes = {f.code for f in check_case(case, "model_selection").findings}
+        self.assertNotIn("UNTRIED_ROUTES", codes)
+
+    def test_no_downgrade_no_reminder(self):
+        case = self._case(board_extra="", statuses=("已实现", "待试"))
+        codes = {f.code for f in check_case(case, "model_selection").findings}
+        self.assertNotIn("UNTRIED_ROUTES", codes)
+
+
+class FailureOrderTests(unittest.TestCase):
+    """降级是最后一步。把顺序写死在模板里，防止有人改回「失败即降级」。"""
+
+    ROOT = Path(__file__).resolve().parents[1]
+
+    def test_route_switch_comes_before_downgrade(self):
+        text = (self.ROOT / "templates/experiment_board.md").read_text(encoding="utf-8")
+        switch = text.index("回到路线池")
+        downgrade = text.index("一条都没有，才降级")
+        self.assertLess(switch, downgrade)
+
+    def test_the_board_says_downgrade_is_last(self):
+        text = (self.ROOT / "templates/experiment_board.md").read_text(encoding="utf-8")
+        self.assertIn("降级是最后一步", text)
+        self.assertIn("逐条写明", text)
+
+    def test_route_table_carries_a_status_column(self):
+        text = (self.ROOT / "templates/case_brief.md").read_text(encoding="utf-8")
+        for marker in ("状态", "待试", "进行中", "已实现", "已排除"):
+            self.assertIn(marker, text)
+
+    def test_form_outranks_coverage_is_stated(self):
+        text = (self.ROOT / "prompts/modeler.md").read_text(encoding="utf-8")
+        self.assertIn("形态优先于范围", text)
+        self.assertIn("保形态、缩范围", text)

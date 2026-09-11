@@ -377,6 +377,22 @@ def _deliverable_findings(work_dir: Path, question: str, stage: str) -> list[Fin
             f"{question.upper()} 的实验板有降级记录，但没写降级后由什么承担交付物契约里的那一项",
             "MODELER", "C2",
         ))
+
+    # 一条路不通不等于所有路不通。路线表里还有没试过的行却已经降级，说明跳过了换路。
+    if rows:
+        untried = [
+            str(row.get("路线", "")).strip()
+            for row in parse_markdown_table(text)
+            if str(row.get("状态", "")).strip() == "待试"
+        ]
+        untried = [name for name in untried if name and name != "路线"]
+        if untried:
+            findings.append(_finding(
+                "REMINDER", "UNTRIED_ROUTES",
+                f"{question.upper()} 已有降级记录，但候选路线表里 {'、'.join(untried)} 仍是「待试」；"
+                "换路应当在降级之前",
+                "MODELER", "C2",
+            ))
     return findings
 
 
