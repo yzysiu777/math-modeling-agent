@@ -13,8 +13,10 @@ import yaml
 
 try:
     from .experiment_board import parse_markdown_table
+    from .make_review_packet import node_decision
 except ImportError:  # pragma: no cover
     from experiment_board import parse_markdown_table
+    from make_review_packet import node_decision
 
 
 DRAFT_PLACEHOLDERS = re.compile(r"\b(?:TODO|FIXME)\b|待补充|未验证")
@@ -242,7 +244,6 @@ def check_evidence_citations(paper_dir: Path) -> list[str]:
 
 
 SEALED = re.compile(r"%\s*<<Q([1-9][0-9]*)(?:-OUTLOOK)?-SEALED>>")
-NODE_DECISION = re.compile(r"^[ \t]*Node\s+decision[ \t]*[:：]", re.IGNORECASE | re.MULTILINE)
 LIST_ENVIRONMENT = re.compile(r"\\begin\{(itemize|enumerate|description)\}")
 #: 列表只在这三处天然合理：假设逐条、符号成表、程序清单成表。
 LIST_ALLOWED = {"05-assumptions.tex", "03-symbols.tex", "99-programs.tex"}
@@ -252,7 +253,7 @@ CLICHE = re.compile(r"如图所示|如表所示|如下所示|如下图|见下表
 
 
 def _opened_questions(case_dir: Path) -> set[int]:
-    """A question is open once its C1 card carries a node decision."""
+    """A question is open once its C1 card carries a filled-in node decision."""
 
     opened: set[int] = set()
     for directory in sorted(case_dir.glob("q[0-9]*")):
@@ -261,7 +262,7 @@ def _opened_questions(case_dir: Path) -> set[int]:
         if match is None or not reviews.is_dir():
             continue
         for path in reviews.glob("C1*.md"):
-            if NODE_DECISION.search(path.read_text(encoding="utf-8", errors="replace")):
+            if node_decision(path.read_text(encoding="utf-8", errors="replace")):
                 opened.add(int(match.group(1)))
                 break
     return opened

@@ -21,6 +21,19 @@ DATA_ROOT_FIELD = re.compile(r"data_root\s*[:：]\s*`?(?P<path>/[^`\n]+)`?", re.
 PROSE_DATA_ROOT = re.compile(r"(?:数据根|原始数据)[^\n]*?`(?P<path>/[^`]+)`")
 DOC_SUFFIXES = {".doc", ".docx", ".pdf", ".txt"}
 TXT_DOC_HINT = re.compile(r"说明|格式|字段|字典|指南|手册|readme|guide|manual|spec", re.IGNORECASE)
+# 只认填了唯一值的行。空白卡自带占位行 `GO | GO_WITH_FIXES | STOP`，
+# 只匹配字段名的话，卡一生成就被当成已通过。
+NODE_DECISION = re.compile(
+    r"^[ \t]*Node\s+decision[ \t]*[:：][ \t]*(GO|GO_WITH_FIXES|STOP)[ \t]*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def node_decision(text: str) -> str | None:
+    """The decision actually filled into a review card, or None."""
+
+    match = NODE_DECISION.search(text)
+    return match.group(1).upper() if match else None
 
 
 def _read(path: Path) -> str:
