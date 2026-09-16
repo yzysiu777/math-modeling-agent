@@ -21,9 +21,11 @@ from pathlib import Path
 try:
     from .case_paths import normalize_question
     from .experiment_board import parse_markdown_table
+    from .make_review_packet import node_decision
 except ImportError:  # pragma: no cover
     from case_paths import normalize_question
     from experiment_board import parse_markdown_table
+    from make_review_packet import node_decision
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,7 +33,6 @@ ROLES = ("orchestrator", "modeler", "engineer", "writer", "reviewer")
 # 调度者贯穿 A–E，不属于任何一步；审核者按节点命名。
 STEP_BY_ROLE = {"modeler": "A", "engineer": "C", "writer": "D", "orchestrator": "ALL"}
 NODES = ("C1", "C2", "C3")
-NODE_DECISION = re.compile(r"^[ \t]*Node\s+decision[ \t]*[:：]", re.IGNORECASE | re.MULTILINE)
 CODE_FENCE = re.compile(r"```text\n(?P<body>.*?)```", re.DOTALL)
 
 
@@ -47,7 +48,7 @@ def _opened(case_dir: Path) -> list[str]:
     opened: list[str] = []
     for question in _questions(case_dir):
         cards = sorted((case_dir / question / "reviews").glob("C1*.md"))
-        if any(NODE_DECISION.search(path.read_text(encoding="utf-8", errors="replace"))
+        if any(node_decision(path.read_text(encoding="utf-8", errors="replace"))
                for path in cards):
             opened.append(question)
     return opened
@@ -100,6 +101,7 @@ def build_prompt(
         raise ValueError(f"role must be one of {list(ROLES)}")
     if not case_dir.is_dir():
         raise FileNotFoundError(f"case directory does not exist: {case_dir}")
+    case_dir = case_dir.resolve()
     template = (ROOT / f"prompts/startup/{role}.md").read_text(encoding="utf-8")
     match = CODE_FENCE.search(template)
     if match is None:
@@ -107,7 +109,7 @@ def build_prompt(
 
     body = match.group("body")
     name = normalize_question(question) if question else (_questions(case_dir) or ["q1"])[0]
-    case = str(case_dir.resolve())
+    case = str(case_dir)
     body = (
         body.replace("<项目根>", str(ROOT))
         .replace("<案例目录>", case)

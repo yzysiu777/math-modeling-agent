@@ -17,14 +17,14 @@ try:
     from .check_spec import parse_spec
     from .experiment_board import parse_markdown_table
     from .ingest import statement_provenance_problem
-    from .make_review_packet import _data_roots
+    from .make_review_packet import _data_roots, node_decision
 except ImportError:  # pragma: no cover
     from case_paths import reference_violation_code, resolve_in_case
     from claim_evidence import board_experiment_ids, parse_source_experiment, validate_check_report
     from check_spec import parse_spec
     from experiment_board import parse_markdown_table
     from ingest import statement_provenance_problem
-    from make_review_packet import _data_roots
+    from make_review_packet import _data_roots, node_decision
 
 
 CASE_LEVEL = "__case__"
@@ -37,10 +37,6 @@ RISK_LABELS = {
     "leakage": "数据泄漏",
     "split_overlap": "数据切分重叠",
 }
-NODE_DECISION = re.compile(
-    r"^[ \t]*Node\s+decision[ \t]*[:：][ \t]*(GO|GO_WITH_FIXES|STOP)[ \t]*$",
-    re.IGNORECASE | re.MULTILINE,
-)
 REJECTED_FINDING = re.compile(
     r"^[ \t]*Rejected\s+finding[ \t]*[:：][ \t]*(.*?)[ \t]*$",
     re.IGNORECASE | re.MULTILINE,
@@ -215,8 +211,8 @@ def _review_decision(
     )
     for path in reversed(files):
         text = path.read_text(encoding="utf-8")
-        match = NODE_DECISION.search(text)
-        if match is None:
+        decision = node_decision(text)
+        if decision is None:
             failures.append(f"{path.name}: 未填写节点决定")
             continue
         rejection = REJECTED_FINDING.search(text)
@@ -228,7 +224,7 @@ def _review_decision(
             if signback.group(1).upper() == "REJECT_REJECTION":
                 failures.append(f"{path.name}: Reviewer 不接受拒绝理由")
                 continue
-        return match.group(1).upper(), path.name
+        return decision, path.name
     where = "paper/reviews/" if question == CASE_LEVEL else "reviews/"
     return None, "; ".join(failures) or f"{where} 中没有 {node} 审核卡"
 
@@ -236,7 +232,7 @@ def _review_decision(
 def _review_route(case_dir: Path, question: str) -> str | None:
     for path in reversed(_review_files(case_dir, "C1", question)):
         text = path.read_text(encoding="utf-8", errors="replace")
-        if NODE_DECISION.search(text) is None:
+        if node_decision(text) is None:
             continue
         match = ROUTE_LINE.search(text)
         if match:
