@@ -30,6 +30,12 @@ PROFILE_VALUE = re.compile(
 IDENTITY_VALUE = re.compile(
     r"\\(?:baominghao|schoolname|membera|memberb|memberc)\{(?P<value>[^{}]+)\}"
 )
+TEX_INPUT = re.compile(r"\\(?:input|include)\s*\{(?P<name>[^{}#]+)\}")
+#: gmcmthesis 印的是「摘\quad 要」，pdftotext 取出来是「摘 要」，字间允许空白。
+PDF_MARKERS = {
+    marker: re.compile(r"\s*".join(map(re.escape, marker)))
+    for marker in ("摘要", "关键词", "参考文献")
+}
 
 
 def _tex_sources(paper_dir: Path) -> list[Path]:
@@ -37,6 +43,28 @@ def _tex_sources(paper_dir: Path) -> list[Path]:
     for directory in ("config", "sections", "appendix", "tables"):
         paths.extend(sorted((paper_dir / directory).glob("*.tex")))
     return paths
+
+
+def _included_text(paper_dir: Path) -> str:
+    """Return main.tex plus every file it pulls in through \\input/\\include.
+
+    案例模板把 \\keywords 放在 sections/00-abstract.tex，只看 main.tex 会误报。
+    """
+
+    parts: list[str] = []
+    seen: set[Path] = set()
+    pending = [paper_dir / "main.tex"]
+    while pending:
+        path = pending.pop(0)
+        if path.suffix != ".tex":
+            path = path.with_name(path.name + ".tex")
+        if path in seen or not path.is_file():
+            continue
+        seen.add(path)
+        text = _without_tex_comments(path.read_text(encoding="utf-8"))
+        parts.append(text)
+        pending.extend(paper_dir / m.group("name").strip() for m in TEX_INPUT.finditer(text))
+    return "\n".join(parts)
 
 
 def _without_tex_comments(text: str) -> str:
@@ -462,11 +490,13 @@ def check_sources(paper_dir: Path, *, final: bool = False) -> list[str]:
     main_path = paper_dir / "main.tex"
     main_text = main_path.read_text(encoding="utf-8") if main_path.is_file() else ""
     for marker in (
-        "{gmcmthesis}", "\\maketitle", "\\pagestyle{plain}", "\\keywords",
+        "{gmcmthesis}", "\\maketitle", "\\pagestyle{plain}",
         "\\bibliographystyle{gmcm}", "\\bibliography{",
     ):
         if marker not in main_text:
             errors.append(f"main.tex missing required marker: {marker}")
+    if "\\keywords" not in _included_text(paper_dir):
+        errors.append("main.tex and its \\input files missing required marker: \\keywords")
     if not sorted((paper_dir / "sections").glob("*.tex")):
         errors.append("no section files under sections/; the split structure is required")
     errors.extend(check_figures(paper_dir, final=final))
@@ -569,8 +599,8 @@ def check_build(build_dir: Path, paper_dir: Path, *, final: bool = False) -> lis
         if result.returncode != 0:
             errors.append(f"pdftotext failed: {result.stderr.strip()}")
         else:
-            for marker in ("摘要", "关键词", "参考文献"):
-                if marker not in result.stdout:
+            for marker, pattern in PDF_MARKERS.items():
+                if not pattern.search(result.stdout):
                     errors.append(f"PDF text missing marker: {marker}")
         if final:
             errors.extend(_pdf_layout_errors(pdf, paper_dir))

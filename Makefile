@@ -22,11 +22,14 @@ ifneq ($(PRETEX),)
 LATEXMK_PRETEX := -usepretex='$(PRETEX)'
 endif
 
-.PHONY: paper paper-ci qa clean test validate demos ingest case-check spec-check review-packet start-prompt overfit-check final-check
+.PHONY: paper paper-ci case-paper-check snippet-check qa clean test validate demos ingest case-check spec-check review-packet start-prompt overfit-check final-check
 
 # 不带 CASE 编译仓库论文工程；带 CASE 编译该案例的论文。
 # 案例只放自己的内容，文档类、样式、bst 和封面图经 TEXINPUTS 从仓库 paper/ 解析 ——
 # 第三次实测里写作手因为案例没有主文档而自造了一份 ctexart，绕开了官方版式。
+# TEXINPUTS 只列需要的目录，不能写递归的 paper//：那会让 xelatex 读到仓库
+# paper/build/main.bbl，latexmk 判它为外来 bbl 而跳过 bibtex，案例参考文献为空。
+CASE_TEXINPUTS := .:$(CURDIR)/$(PAPER_DIR):$(CURDIR)/$(PAPER_DIR)/figures:
 paper:
 ifeq ($(CASE),)
 	mkdir -p $(PAPER_BUILD)
@@ -35,7 +38,7 @@ else
 	@test -f "$(CASE)/paper/main.tex" || (echo "案例没有论文工程：$(CASE)/paper/main.tex"; exit 2)
 	mkdir -p "$(CASE)/output/pdf"
 	cd "$(CASE)/paper" && \
-	  TEXINPUTS=".:$(CURDIR)/$(PAPER_DIR)//:" BSTINPUTS=".:$(CURDIR)/$(PAPER_DIR):" \
+	  TEXINPUTS="$(CASE_TEXINPUTS)" BSTINPUTS=".:$(CURDIR)/$(PAPER_DIR):" \
 	  latexmk -r "$(CURDIR)/latexmkrc" -xelatex $(LATEXMK_PRETEX) \
 	    -interaction=nonstopmode -halt-on-error -outdir=build main.tex
 	@name=$$(basename "$(CASE)"); \
@@ -65,9 +68,14 @@ paper-example:
 snippet-check:
 	$(PYTHON) scripts/check_snippets.py $(if $(PAPER_FONTSET),--fontset $(PAPER_FONTSET),)
 
+# 用模板临时建一个带引用的案例并单题编译，要求案例有自己的非空 build/main.bbl。
+case-paper-check:
+	$(PYTHON) scripts/check_case_paper.py $(if $(PAPER_FONTSET),--fontset $(PAPER_FONTSET),)
+
 paper-ci: paper
 	$(PYTHON) scripts/qa_latex.py --paper-dir $(PAPER_DIR) --build-dir $(PAPER_BUILD)
 	$(MAKE) PYTHON="$(PYTHON)" PAPER_FONTSET="$(PAPER_FONTSET)" snippet-check
+	$(MAKE) PYTHON="$(PYTHON)" PAPER_FONTSET="$(PAPER_FONTSET)" case-paper-check
 
 qa:
 	$(PYTHON) scripts/qa_latex.py --paper-dir $(PAPER_DIR) --build-dir $(PAPER_BUILD)
