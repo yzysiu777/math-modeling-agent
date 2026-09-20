@@ -133,6 +133,84 @@ def check_data_split(
     return errors
 
 
+def check_information_cutoff(
+    items: Iterable[Mapping[str, Any]],
+    decision_time: Any = None,
+) -> List[str]:
+    """Check that every input was already available when it was used.
+
+    Each item carries ``name``, ``available_at`` -- the earliest moment the value
+    could be known -- and optionally ``used_for``, the decision moment it feeds;
+    ``decision_time`` is the fallback. Comparison is by moment, never by calendar
+    day or batch label: a value stamped with the right day can still belong to the
+    step after the decision, and a forecast issued at a given hour usually covers
+    offsets in its own units rather than the model's.
+    """
+
+    errors: List[str] = []
+    for index, item in enumerate(items):
+        name = str(item.get("name", f"item[{index}]"))
+        if "available_at" not in item:
+            errors.append(f"{name} has no available_at")
+            continue
+        used_for = item.get("used_for", decision_time)
+        if used_for is None:
+            errors.append(f"{name} has no used_for and no decision_time was given")
+            continue
+        available_at = item["available_at"]
+        try:
+            late = available_at > used_for
+        except TypeError:
+            errors.append(
+                f"{name}: available_at ({type(available_at).__name__}) and used_for "
+                f"({type(used_for).__name__}) are not comparable"
+            )
+            continue
+        if late:
+            errors.append(f"{name} is available at {available_at}, used at {used_for}")
+    return errors
+
+
+def check_nonanticipativity(
+    run: Callable[[Sequence[Any]], Sequence[Any]],
+    path_a: Sequence[Any],
+    path_b: Sequence[Any],
+    split: int,
+    tolerance: float = 0.0,
+) -> Dict[str, Any]:
+    """Run one procedure on two futures that share a prefix and must agree on it.
+
+    ``path_a`` and ``path_b`` are identical up to ``split`` and differ afterwards.
+    Anything the procedure decides inside the shared prefix must be identical in
+    both runs; a difference there means the future was read. The report also says
+    whether the two paths really share a prefix and really diverge -- a test where
+    they do not is vacuous and passes for the wrong reason.
+    """
+
+    out_a = list(run(path_a))
+    out_b = list(run(path_b))
+    compared = min(split, len(out_a), len(out_b))
+    max_deviation = 0.0
+    first_mismatch: Optional[int] = None
+    for index in range(compared):
+        left, right = out_a[index], out_b[index]
+        try:
+            deviation = abs(float(left) - float(right))
+        except (TypeError, ValueError):
+            deviation = 0.0 if left == right else float("inf")
+        max_deviation = max(max_deviation, deviation)
+        if first_mismatch is None and deviation > tolerance:
+            first_mismatch = index
+    return {
+        "passed": first_mismatch is None and compared == split,
+        "compared": compared,
+        "max_deviation": max_deviation,
+        "first_mismatch": first_mismatch,
+        "prefix_shared": list(path_a[:split]) == list(path_b[:split]),
+        "paths_diverge": list(path_a[split:]) != list(path_b[split:]),
+    }
+
+
 def compare_model_results(
     results: Sequence[Mapping[str, Any]],
     metric: str,
