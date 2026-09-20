@@ -28,6 +28,7 @@ Modeler 维护本题 brief、board 与 Full SPEC；Engineer 维护本题 code �
 - `check_spec.py` 检查五段 Full SPEC、Probe 闭环和跨题方向；
 - `check_case.py` 检查每题的 C1/C2/C3、全案例 C3、确定性结果、Claim、跨题方向，
   以及交付物契约是否填写、降级是否交代了承担者与是否跳过了未试路线（均为提醒）；
+  未试路线在收尾阶段也提醒一次 —— 一题做完，路线表里不该还留着没人碰过的行；
 - `check_spec.py` 另给提醒：判据缺绝对底线或相对增量一栏（不影响退出码）；
 - `make_review_packet.py` 从 `sources.yaml` 和当前题目录构造最小审核材料，C2 的材料含
   当前实现代码与已落盘复算报告；旧案例才使用历史路径读法；

@@ -374,20 +374,29 @@ def _deliverable_findings(work_dir: Path, question: str, stage: str) -> list[Fin
             "MODELER", "C2",
         ))
 
-    # 一条路不通不等于所有路不通。路线表里还有没试过的行却已经降级，说明跳过了换路。
-    if rows:
-        untried = [
-            str(row.get("路线", "")).strip()
-            for row in parse_markdown_table(text)
-            if str(row.get("状态", "")).strip() == "待试"
-        ]
-        untried = [name for name in untried if name and name != "路线"]
-        if untried:
+    # 一条路不通不等于所有路不通。降级时还有没试过的行，说明跳过了换路；收尾时还有
+    # 没试过的行，说明这题的发散只落在纸面上 —— 两种都只提醒一次，不阻断。
+    untried = [
+        str(row.get("路线", "")).strip()
+        for row in parse_markdown_table(text)
+        if str(row.get("状态", "")).strip() == "待试"
+    ]
+    untried = [name for name in untried if name and name != "路线"]
+    if untried:
+        names = "、".join(untried)
+        if rows:
             findings.append(_finding(
                 "REMINDER", "UNTRIED_ROUTES",
-                f"{question.upper()} 已有降级记录，但候选路线表里 {'、'.join(untried)} 仍是「待试」；"
+                f"{question.upper()} 已有降级记录，但候选路线表里 {names} 仍是「待试」；"
                 "换路应当在降级之前",
                 "MODELER", "C2",
+            ))
+        elif stage in {"paper_claims", "final"}:
+            findings.append(_finding(
+                "REMINDER", "UNTRIED_ROUTES",
+                f"{question.upper()} 收尾时候选路线表里 {names} 仍是「待试」；"
+                "论文的方法比较一章要交代它们为什么没试，以及排掉的是方法族还是某一种实现",
+                "MODELER", "C3",
             ))
     return findings
 
